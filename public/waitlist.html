@@ -1,0 +1,622 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetworQ — Join the Waitlist</title>
+  <meta name="description" content="NetworQ scans business cards, drafts follow-ups, and reminds you to reconnect before people forget you." />
+
+  <style>
+    /* ── Tokens (light by default) ─────────────────── */
+    :root {
+      --bg:          #F4F6FC;
+      --surface:     #FFFFFF;
+      --border:      #DDE3F0;
+      --text:        #0C0E14;
+      --muted:       #5A6B8A;
+      --accent:      #008F52;
+      --accent-glow: rgba(0, 143, 82, 0.14);
+      --accent-dim:  rgba(0, 143, 82, 0.08);
+      --danger:      #DC2626;
+      --radius:      10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:          #0C0E14;
+        --surface:     #161B26;
+        --border:      #252D42;
+        --text:        #F1F3FA;
+        --muted:       #6B7A9B;
+        --accent:      #3BFFA1;
+        --accent-glow: rgba(59, 255, 161, 0.18);
+        --accent-dim:  rgba(59, 255, 161, 0.09);
+        --danger:      #FF6B6B;
+      }
+    }
+
+    :root[data-theme="light"] {
+      --bg:          #F4F6FC;
+      --surface:     #FFFFFF;
+      --border:      #DDE3F0;
+      --text:        #0C0E14;
+      --muted:       #5A6B8A;
+      --accent:      #008F52;
+      --accent-glow: rgba(0, 143, 82, 0.14);
+      --accent-dim:  rgba(0, 143, 82, 0.08);
+      --danger:      #DC2626;
+    }
+
+    :root[data-theme="dark"] {
+      --bg:          #0C0E14;
+      --surface:     #161B26;
+      --border:      #252D42;
+      --text:        #F1F3FA;
+      --muted:       #6B7A9B;
+      --accent:      #3BFFA1;
+      --accent-glow: rgba(59, 255, 161, 0.18);
+      --accent-dim:  rgba(59, 255, 161, 0.09);
+      --danger:      #FF6B6B;
+    }
+
+    /* ── Reset ──────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Canvas bg ──────────────────────────────────── */
+    #net-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── Layout ─────────────────────────────────────── */
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: clamp(32px, 6vw, 64px) 20px;
+    }
+
+    .inner {
+      width: 100%;
+      max-width: 520px;
+    }
+
+    /* ── Wordmark ───────────────────────────────────── */
+    .wordmark {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: clamp(40px, 7vw, 64px);
+    }
+
+    .wordmark-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .wordmark-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .wordmark-text {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      color: var(--text);
+    }
+
+    /* ── Eyebrow ────────────────────────────────────── */
+    .eyebrow {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 20px;
+    }
+
+    /* ── Headline ───────────────────────────────────── */
+    h1 {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(1.75rem, 5.5vw, 2.75rem);
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-wrap: balance;
+      margin-bottom: 20px;
+    }
+
+    h1 .n {
+      color: var(--accent);
+      font-style: italic;
+    }
+
+    /* ── Subhead ────────────────────────────────────── */
+    .subhead {
+      font-size: clamp(15px, 2.2vw, 17px);
+      line-height: 1.6;
+      color: var(--muted);
+      max-width: 42ch;
+      margin-bottom: clamp(36px, 6vw, 52px);
+    }
+
+    /* ── Form ───────────────────────────────────────── */
+    .form-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .email-input {
+      flex: 1;
+      min-width: 0;
+      height: 60px;
+      padding: 0 20px;
+      font-size: 16px;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .email-input::placeholder { color: var(--muted); }
+
+    .email-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .email-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .submit-btn {
+      height: 60px;
+      padding: 0 22px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      color: #0C0E14;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: opacity 0.15s, transform 0.1s;
+      flex-shrink: 0;
+    }
+
+    .submit-btn:hover:not(:disabled) { opacity: 0.88; }
+    .submit-btn:active:not(:disabled) { transform: scale(0.97); }
+    .submit-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* spinner */
+    .spinner {
+      width: 15px;
+      height: 15px;
+      border: 2px solid rgba(0,0,0,0.2);
+      border-top-color: #0C0E14;
+      border-radius: 50%;
+      animation: spin 0.65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg {
+      font-size: 13px;
+      color: var(--danger);
+      padding: 10px 14px;
+      background: rgba(255, 107, 107, 0.08);
+      border: 1px solid rgba(255, 107, 107, 0.2);
+      border-radius: 8px;
+    }
+
+    /* ── Fine print ─────────────────────────────────── */
+    .fine-print {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .fine-print strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ── Success state ──────────────────────────────── */
+    .success-card {
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 24px;
+      background: var(--accent-dim);
+      border: 1.5px solid var(--accent);
+      border-radius: 14px;
+      animation: slideUp 0.35s ease;
+    }
+
+    .success-card.visible { display: flex; }
+
+    /* Returning user — calm, neutral, no accent border */
+    .success-card.returning {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .success-position {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(2rem, 6vw, 3rem);
+      font-weight: 400;
+      color: var(--accent);
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .success-card.returning .success-position {
+      color: var(--muted);
+    }
+
+    .success-label {
+      font-size: 15px;
+      color: var(--text);
+      font-weight: 500;
+      line-height: 1.4;
+    }
+
+    .success-note {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Footer ─────────────────────────────────────── */
+    .footer {
+      margin-top: clamp(48px, 8vw, 72px);
+      font-size: 12px;
+      color: var(--muted);
+      opacity: 0.6;
+    }
+
+    /* ── Mobile adjustments (375px–480px) ──────────── */
+    @media (max-width: 480px) {
+      /* Tighter page breathing room — centered content shouldn't start far down */
+      .page         { padding: 24px 20px; }
+
+      /* Wordmark gap cut roughly in half */
+      .wordmark     { margin-bottom: 20px; }
+
+      /* Eyebrow sits closer to headline */
+      .eyebrow      { margin-bottom: 10px; }
+
+      /* Headline: drop to 1.5rem so it wraps to 3 lines max, not 4 */
+      h1            { font-size: 1.5rem; margin-bottom: 14px; }
+
+      /* Subhead: smaller text, tighter gap to the form */
+      .subhead      { font-size: 14px; margin-bottom: 20px; }
+
+      /* Form: stacked inputs */
+      .input-row    { flex-direction: column; }
+      .email-input  { height: 54px; }
+      .submit-btn   { width: 100%; height: 54px; justify-content: center; }
+
+      /* Footer pulled up significantly */
+      .footer       { margin-top: 28px; }
+    }
+
+    /* ── Reduced motion ─────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      .success-card { animation: none; }
+      .spinner { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="net-canvas" aria-hidden="true"></canvas>
+
+<main class="page">
+  <div class="inner">
+
+    <div class="wordmark">
+      <div class="wordmark-icon">
+        <!-- network link icon -->
+        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="4" cy="9" r="2.5" fill="#0C0E14"/>
+          <circle cx="14" cy="4" r="2.5" fill="#0C0E14"/>
+          <circle cx="14" cy="14" r="2.5" fill="#0C0E14"/>
+          <line x1="6.2" y1="8" x2="11.8" y2="5" stroke="#0C0E14" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="6.2" y1="10" x2="11.8" y2="13" stroke="#0C0E14" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="wordmark-text">NetworQ</span>
+    </div>
+
+    <span class="eyebrow">Early Access</span>
+
+    <h1>You met <span class="n">12</span> people at&nbsp;that event. You'll remember <span class="n">2</span> by&nbsp;Friday.</h1>
+
+    <p class="subhead">NetworQ scans business cards and QR codes, drafts your follow-up emails, and nudges you to reconnect before people forget you ever met.</p>
+
+    <!-- Form (shown until success) -->
+    <div id="form-section">
+      <form class="form-wrap" id="waitlist-form" novalidate>
+        <div class="input-row">
+          <input
+            id="email-input"
+            class="email-input"
+            type="email"
+            placeholder="your@email.com"
+            autocomplete="email"
+            inputmode="email"
+            required
+            aria-label="Email address"
+          />
+          <button class="submit-btn" type="submit" id="submit-btn">
+            <span id="btn-label">Join the waitlist</span>
+          </button>
+        </div>
+        <div id="error-msg" class="error-msg" role="alert" style="display:none;"></div>
+      </form>
+      <p class="fine-print">
+        <strong>First 100 signups get 1 year free</strong> when we launch. No spam, ever.
+      </p>
+    </div>
+
+    <!-- Success (shown after submit) -->
+    <div class="success-card" id="success-card" role="status" aria-live="polite">
+      <div class="success-position" id="success-position">#—</div>
+      <div class="success-label" id="success-label">You're on the list.</div>
+      <div class="success-note" id="success-note">We'll email you at launch. First 100 get a full year free.</div>
+    </div>
+
+    <p class="footer">© 2026 NetworQ</p>
+  </div>
+</main>
+
+<script type="module">
+  // ── Replace these with your actual Supabase project values ──────────────────
+  const SUPABASE_URL      = 'REPLACE_WITH_YOUR_SUPABASE_URL';
+  const SUPABASE_ANON_KEY = 'REPLACE_WITH_YOUR_SUPABASE_ANON_KEY';
+  // ────────────────────────────────────────────────────────────────────────────
+
+  import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const form      = document.getElementById('waitlist-form');
+  const emailEl   = document.getElementById('email-input');
+  const btnEl     = document.getElementById('submit-btn');
+  const btnLabel  = document.getElementById('btn-label');
+  const errorEl   = document.getElementById('error-msg');
+  const formSec   = document.getElementById('form-section');
+  const successEl = document.getElementById('success-card');
+  const posEl     = document.getElementById('success-position');
+  const labelEl   = document.getElementById('success-label');
+
+  function setLoading(on) {
+    emailEl.disabled = on;
+    btnEl.disabled   = on;
+    if (on) {
+      btnLabel.textContent = '';
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      sp.id = 'btn-spinner';
+      btnEl.appendChild(sp);
+    } else {
+      document.getElementById('btn-spinner')?.remove();
+      btnLabel.textContent = 'Join the waitlist';
+    }
+  }
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+    errorEl.style.display = 'block';
+  }
+
+  function hideError() {
+    errorEl.style.display = 'none';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+
+    const email = emailEl.value.trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showError('Please enter a valid email address.');
+      emailEl.focus();
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.rpc('join_waitlist', { p_email: email });
+      if (error) throw error;
+
+      const pos          = data.position;
+      const dupe         = data.already_exists;
+      const showPosition = data.show_position;
+
+      const noteEl = document.getElementById('success-note');
+
+      // Position number — shown only once the waitlist hits 20 signups
+      if (showPosition) {
+        posEl.textContent   = `#${pos}`;
+        posEl.style.display = '';
+      } else {
+        posEl.style.display = 'none';
+      }
+
+      // Label and note always reflect new-vs-returning, independent of position threshold
+      if (dupe) {
+        successEl.classList.add('returning');
+        labelEl.textContent = showPosition
+          ? `You're already on the list — you're #${pos}.`
+          : `You're already on the list.`;
+        noteEl.textContent  = "We'll email you when NetworQ launches.";
+      } else {
+        successEl.classList.remove('returning');
+        labelEl.textContent = showPosition
+          ? `You're #${pos} on the list!`
+          : `You're on the list!`;
+        noteEl.textContent  = showPosition
+          ? "We'll email you at launch. First 100 get a full year free."
+          : "We'll email you when NetworQ launches.";
+      }
+
+      formSec.style.display = 'none';
+      successEl.classList.add('visible');
+    } catch (err) {
+      console.error(err);
+      const msg = err?.message?.includes('invalid_email')
+        ? 'Please enter a valid email address.'
+        : 'Something went wrong. Please try again.';
+      showError(msg);
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
+
+<script>
+  // ── Ambient network canvas ───────────────────────────────────────────────────
+  (function () {
+    const canvas = document.getElementById('net-canvas');
+    const ctx    = canvas.getContext('2d');
+    const LINK_DIST = 160;
+    const NODE_COUNT = window.innerWidth < 600 ? 20 : 36;
+    let W, H, nodes, raf;
+
+    const isDark = () =>
+      document.documentElement.dataset.theme === 'dark' ||
+      (!document.documentElement.dataset.theme &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    function resize() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+
+    function init() {
+      nodes = Array.from({ length: NODE_COUNT }, () => ({
+        x:  Math.random() * W,
+        y:  Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.25,
+        vy: (Math.random() - 0.5) * 0.25,
+        r:  Math.random() * 1.5 + 1,
+        phase: Math.random() * Math.PI * 2,
+      }));
+    }
+
+    function draw(t) {
+      ctx.clearRect(0, 0, W, H);
+
+      const dark    = isDark();
+      const dotCol  = dark ? 'rgba(59,255,161,' : 'rgba(0,143,82,';
+      const lineCol = dark ? 'rgba(59,255,161,' : 'rgba(0,143,82,';
+
+      nodes.forEach(n => {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < -20) n.x = W + 20;
+        if (n.x > W + 20) n.x = -20;
+        if (n.y < -20) n.y = H + 20;
+        if (n.y > H + 20) n.y = -20;
+      });
+
+      // edges
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i], b = nodes[j];
+          const dx = a.x - b.x, dy = a.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < LINK_DIST) {
+            const alpha = (1 - dist / LINK_DIST) * 0.12;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.strokeStyle = lineCol + alpha + ')';
+            ctx.lineWidth = 0.8;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // nodes
+      nodes.forEach((n, i) => {
+        const pulse = 0.5 + 0.5 * Math.sin(t * 0.001 + n.phase);
+        const alpha = 0.15 + pulse * 0.25;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r + pulse * 0.8, 0, Math.PI * 2);
+        ctx.fillStyle = dotCol + alpha + ')';
+        ctx.fill();
+      });
+
+      raf = requestAnimationFrame(draw);
+    }
+
+    function start() {
+      resize();
+      init();
+      raf = requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', () => { resize(); });
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      // Static version — draw once
+      resize();
+      init();
+      draw(0);
+    } else {
+      start();
+    }
+  })();
+</script>
+
+</body>
+</html>
