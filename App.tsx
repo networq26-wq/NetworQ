@@ -3211,7 +3211,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
-  const [selectedContactId, setSelectedContactId] = useState<string | null>("seed-priya");
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add">("contacts");
@@ -3311,10 +3311,12 @@ export default function App() {
   const [aiListening, setAiListening] = useState(false);
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isSpeakingReply, setIsSpeakingReply] = useState(false);
+  const [voicePersona, setVoicePersona] = useState<"siri" | "jarvis">("siri");
+  const [speechVoices, setSpeechVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "assistant"; content: string; time?: string }>>([
     {
       role: "assistant",
-      content: "Hello! I am your NetworQ AI & Voice Assistant. How can I help you navigate your contacts, draft executive follow-ups, or search roles today? Tap the microphone anytime to speak.",
+      content: "Hello! I am your NetworQ Voice & AI Assistant. Ask me anything about your contacts, reminders, and follow-up emails, or tap the microphone to speak.",
       time: "Just now",
     },
   ]);
@@ -3327,7 +3329,19 @@ export default function App() {
     }
   }, [aiMessages, aiOpen]);
 
+  // Pre-load and cache native browser/OS voices (Apple Siri, Samantha, Daniel, Natural)
   useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const loadVoices = () => {
+      try {
+        const vs = window.speechSynthesis.getVoices();
+        if (vs && vs.length > 0) {
+          setSpeechVoices(vs);
+        }
+      } catch (e) {}
+    };
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -3335,37 +3349,91 @@ export default function App() {
     };
   }, []);
 
-  const playJarvisVoice = (speechText: string) => {
+  const getPersonaVoice = (persona: "siri" | "jarvis", customVoices?: SpeechSynthesisVoice[]) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+    const list = customVoices && customVoices.length > 0 ? customVoices : window.speechSynthesis.getVoices();
+    if (!list || list.length === 0) return null;
+
+    if (persona === "siri") {
+      // 1. Explicit Apple Siri voices (macOS / iOS)
+      const siri = list.find((v) => /siri/i.test(v.name) && v.lang.startsWith("en"));
+      if (siri) return siri;
+
+      // 2. Samantha (Apple's canonical US Siri voice on macOS and iOS)
+      const samantha = list.find((v) => /samantha/i.test(v.name));
+      if (samantha) return samantha;
+
+      // 3. Apple premium natural voices (Ava, Allison, Karen, Moira)
+      const appleNatural = list.find((v) => /(ava|allison|karen|moira|victoria)/i.test(v.name) && v.lang.startsWith("en"));
+      if (appleNatural) return appleNatural;
+
+      // 4. Chrome / Edge high fidelity natural voices
+      const googleNatural = list.find((v) => /(google us english|natural|jenny|aria)/i.test(v.name) && v.lang.startsWith("en"));
+      if (googleNatural) return googleNatural;
+    } else {
+      // 1. Daniel (Apple's canonical British Jarvis executive voice)
+      const daniel = list.find((v) => /daniel/i.test(v.name) && v.lang.startsWith("en"));
+      if (daniel) return daniel;
+
+      // 2. British executive natural voices
+      const british = list.find((v) => /(oliver|arthur|george|google uk english male|guy|ryan)/i.test(v.name) && v.lang.startsWith("en"));
+      if (british) return british;
+    }
+
+    // Default high-quality English voice
+    return (
+      list.find((v) => v.lang.startsWith("en") && !v.localService) ||
+      list.find((v) => v.lang.startsWith("en-US")) ||
+      list.find((v) => v.lang.startsWith("en")) ||
+      list[0]
+    );
+  };
+
+  const playJarvisVoice = (speechText: string, forcedPersona?: "siri" | "jarvis") => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
 
     const cleanText = speechText
-      .replace(/[*_#`[\]()]/g, " ")
-      .replace(/•/g, " ")
+      .replace(/[*_#`[\]()~]/g, " ")
+      .replace(/•/g, ", ")
+      .replace(/\bCRM\b/g, "C R M")
+      .replace(/\bAI\b/g, "A I")
       .replace(/https?:\/\/\S+/g, "link")
-      .slice(0, 360);
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 420);
+
+    if (!cleanText) return;
 
     const utter = new SpeechSynthesisUtterance(cleanText);
-    const voices = window.speechSynthesis.getVoices();
+    const persona = forcedPersona || voicePersona;
+    const targetVoice = getPersonaVoice(persona, speechVoices);
 
-    const naturalVoice = voices.find((v) => 
-      (v.name.includes("Samantha") || v.name.includes("Siri") || v.name.includes("Daniel") || 
-       v.name.includes("Google UK English Male") || v.name.includes("Google UK English Female") ||
-       v.name.includes("Natural") || v.name.includes("Oliver") || v.name.includes("Guy") || 
-       v.name.includes("Arthur")) && v.lang.startsWith("en")
-    ) || voices.find((v) => v.lang.startsWith("en") && !v.localService) 
-      || voices.find((v) => v.lang.startsWith("en")) 
-      || voices[0];
-
-    if (naturalVoice) {
-      utter.voice = naturalVoice;
+    if (targetVoice) {
+      utter.voice = targetVoice;
     }
-    utter.rate = 1.02;
-    utter.pitch = 1.0;
+
+    if (persona === "siri") {
+      utter.rate = 1.0;
+      utter.pitch = 1.02;
+    } else {
+      utter.rate = 0.98;
+      utter.pitch = 0.96;
+    }
+
     utter.onend = () => setIsSpeakingReply(false);
     utter.onerror = () => setIsSpeakingReply(false);
     setIsSpeakingReply(true);
     window.speechSynthesis.speak(utter);
+  };
+
+  const previewVoicePersona = (persona: "siri" | "jarvis") => {
+    setVoicePersona(persona);
+    const sample =
+      persona === "siri"
+        ? "Hello! I am Siri, your NetworQ executive voice assistant."
+        : "Jarvis online. Ready to organize your network, meetings, and follow-ups.";
+    playJarvisVoice(sample, persona);
   };
 
   const sendAiQuery = async (queryText?: string, wasSpoken = false) => {
@@ -3382,29 +3450,38 @@ export default function App() {
       const dueRemindersList = contacts.filter((c) => c.reminder && c.reminderDate && !c.reminderDone);
       const pendingFollowups = contacts.filter((c) => !c.emailSent);
       const contactSummary = contacts.slice(0, 50).map((c) => 
-        `- ${c.name} (${c.roleCategory || c.role || "Professional"} at ${c.company || "Company"}). Email: ${c.email || "No email"}. Reminder scheduled: ${c.reminder && c.reminderDate ? c.reminderDate : "none"}. Follow-up status: ${c.emailSent ? "email sent" : "needs email follow-up"}. Notes: ${c.notes || "None"}.`
+        `- ${c.name} (${c.roleCategory || c.role || "Executive"} at ${c.company || "Company"}). Email: ${c.email || "No email"}. Scheduled reminder: ${c.reminder && c.reminderDate ? c.reminderDate : "none"}. Follow-up email: ${c.emailSent ? "already sent" : "needs email"}. Notes: ${c.notes || "None"}.`
       ).join("\n");
 
-      const systemPrompt = `You are Jarvis, NetworQ's Elite AI & Voice Executive Assistant for ${currentUser?.name || "the user"}.
-You have direct real-time access to the user's CRM database:
+      const systemPrompt = `You are ${voicePersona === "siri" ? "Siri" : "Jarvis"}, NetworQ's Elite AI & Voice Executive Assistant for ${currentUser?.name || "the user"}.
+You have direct, real-time access to the user's live NetworQ CRM database:
 
-LIVE CRM METRICS:
-Total Contacts: ${contacts.length}
-Pending Reminders (${dueRemindersList.length}):
-${dueRemindersList.length > 0 ? dueRemindersList.map((c) => `• ${c.name} at ${c.company}: Reminder set for ${c.reminderDate}`).join("\n") : "• No active scheduled reminders."}
+CURRENT REAL-TIME CRM DATA:
+• Total Contacts in Network: ${contacts.length}
+• Scheduled Reminders Due (${dueRemindersList.length}):
+${dueRemindersList.length > 0 
+  ? dueRemindersList.map((c) => `  - ${c.name} (${c.company || "Company"}): Scheduled for ${c.reminderDate}. Notes: ${c.reminderNotes || c.notes || "None"}`).join("\n") 
+  : "  - 0 scheduled reminders."}
 
-Needs Follow-up Emails (${pendingFollowups.length}):
-${pendingFollowups.length > 0 ? pendingFollowups.slice(0, 8).map((c) => `• ${c.name} at ${c.company || "Company"}: Follow-up email needed (${c.email || "No email on file"}).`).join("\n") : "• All contacts are up to date."}
+• Contacts Needing Follow-up Emails (${pendingFollowups.length}):
+${pendingFollowups.length > 0 
+  ? pendingFollowups.slice(0, 10).map((c) => `  - ${c.name} (${c.company || "Company"}): Email ${c.email || "No email on file"}.`).join("\n") 
+  : "  - 0 pending follow-up emails. All contacts are up to date."}
 
 CONTACT ROSTER:
-${contactSummary || "No contacts added to CRM yet."}
+${contactSummary || "Your CRM currently contains 0 contacts."}
 
 VOICE & ASSISTANT DIRECTIVES:
-1. When asked "from whom should I send mails and reminders?" or similar:
-   - If contacts exist: State clearly and specifically: "You have reminders scheduled for [Name] at [Company] by [Date]. Additionally, you should email [Name 2] and [Name 3] because you connected recently and haven't followed up yet."
-   - If 0 contacts exist: Be direct: "Your network currently has 0 contacts. As soon as you scan a business card or add a contact, I will track all their reminders and draft their follow-up emails for you."
-2. Act like Jarvis / Siri: articulate, authoritative, highly executive, intelligent, and concise.
-3. Keep answers conversational without complex markdown tables so it sounds polished over audio.`;
+1. When asked "from whom should I send mails and reminders?" or "who should I email / follow up with?":
+   - IF TOTAL CONTACTS IS 0:
+     State clearly and directly: "You currently have 0 contacts in your NetworQ CRM. You don't have any scheduled reminders or pending follow-up emails. Tap '+ Add Contact' or scan a business card, and I will track all their reminders and draft outreach emails for you."
+   - IF CONTACTS EXIST:
+     Break your response clearly into two structured sections:
+     A) Scheduled Reminders: Clearly name each person with their company, reminder date, and purpose.
+     B) Pending Emails: Clearly name each person who needs a follow-up email along with their email address.
+     Conclude with a proactive offer: "Would you like me to draft a follow-up email or open their contact card right now?"
+2. Voice Persona: Sound like ${voicePersona === "siri" ? "Apple Siri" : "Jarvis"} — articulate, calm, executive, warm, and highly intelligent.
+3. Conversational Audio Formatting: Do NOT use complex markdown tables or excessive symbols. Keep sentences crisp, natural, and rhythmic so it sounds exceptional over voice synthesis.`;
 
       const responseText = await callAI(
         newHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -8185,6 +8262,53 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {/* Voice Persona Selector (Siri / Jarvis) */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
+                  borderRadius: 980,
+                  padding: 2,
+                  border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.06)",
+                }}
+              >
+                <button
+                  onClick={() => previewVoicePersona("siri")}
+                  title="Switch to Apple Siri Natural Voice"
+                  style={{
+                    border: "none",
+                    borderRadius: 980,
+                    padding: "3px 9px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: voicePersona === "siri" ? "linear-gradient(135deg, #7C3AED, #6366F1)" : "transparent",
+                    color: voicePersona === "siri" ? "#FFFFFF" : themeStyles.textMuted,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Siri
+                </button>
+                <button
+                  onClick={() => previewVoicePersona("jarvis")}
+                  title="Switch to British Jarvis Voice"
+                  style={{
+                    border: "none",
+                    borderRadius: 980,
+                    padding: "3px 9px",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    background: voicePersona === "jarvis" ? "linear-gradient(135deg, #7C3AED, #6366F1)" : "transparent",
+                    color: voicePersona === "jarvis" ? "#FFFFFF" : themeStyles.textMuted,
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  Jarvis
+                </button>
+              </div>
+
               {/* TTS Voice Toggle Button */}
               <button
                 onClick={toggleSpeechPlayback}
@@ -8242,6 +8366,47 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
           </div>
 
+          {/* Speaking Audio Wave Indicator */}
+          {isSpeakingReply && (
+            <div
+              style={{
+                padding: "6px 16px",
+                background: "linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(99, 102, 241, 0.15))",
+                borderBottom: "1px solid rgba(124, 58, 237, 0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                fontSize: 11,
+                color: "#7C3AED",
+                fontWeight: 600,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>●</span>
+                <span>{voicePersona === "siri" ? "Siri Voice" : "Jarvis"} Speaking...</span>
+              </div>
+              <button
+                onClick={() => {
+                  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+                    window.speechSynthesis.cancel();
+                  }
+                  setIsSpeakingReply(false);
+                }}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  color: "#EF4444",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: "2px 6px",
+                }}
+              >
+                Stop
+              </button>
+            </div>
+          )}
+
           {/* Assistant Chat Message Stream */}
           <div
             style={{
@@ -8260,10 +8425,10 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[
+                  "From whom should I send mails and reminders?",
                   "Who should I follow up with?",
                   "Find all Founders & Investors",
-                  "Draft catch-up email",
-                  "Summarize network by role",
+                  "Summarize network status",
                 ].map((prompt) => (
                   <button
                     key={prompt}
@@ -8346,22 +8511,27 @@ Keep it punchy, sharp, and directly actionable.`;
                     {typeof window !== "undefined" && "speechSynthesis" in window && (
                       <button
                         onClick={() => {
-                          window.speechSynthesis.cancel();
-                          const snippet = m.content.replace(/[*_#`[\]()]/g, " ").slice(0, 320);
-                          const utter = new SpeechSynthesisUtterance(snippet);
-                          utter.rate = 1.05;
-                          window.speechSynthesis.speak(utter);
+                          if (isSpeakingReply) {
+                            window.speechSynthesis.cancel();
+                            setIsSpeakingReply(false);
+                          } else {
+                            playJarvisVoice(m.content);
+                          }
                         }}
                         style={{
                           background: "none",
                           border: "none",
-                          color: "#7C3AED",
+                          color: isSpeakingReply ? "#EF4444" : "#7C3AED",
                           fontSize: 11,
+                          fontWeight: 600,
                           cursor: "pointer",
                           padding: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
                         }}
                       >
-                        🔊 Listen
+                        {isSpeakingReply ? "■ Stop" : (voicePersona === "siri" ? "▶ Siri Speak" : "▶ Jarvis Speak")}
                       </button>
                     )}
                     {m.time && <span style={{ fontSize: 10, color: themeStyles.textMuted }}>{m.time}</span>}
