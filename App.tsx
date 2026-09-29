@@ -4,9 +4,13 @@ import emailjs from "@emailjs/browser";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
-  (typeof window !== "undefined" && window.location.port === "8081"
-    ? "http://localhost:3001/api/ai"
-    : "/api/ai");
+  (typeof window !== "undefined"
+    ? window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+      ? (window.location.port === "8081" ? "http://localhost:3001/api/ai" : "/api/ai")
+      : window.location.hostname.includes("networq.co.in") || window.location.hostname.includes("onrender.com")
+        ? "/api/ai"
+        : "https://www.networq.co.in/api/ai"
+    : "https://www.networq.co.in/api/ai");
 
 // ── CONFETTI PARTICLE SYSTEM ──────────────────────────────────────────────────
 interface ConfettiParticle {
@@ -742,13 +746,27 @@ async function callAI(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(AI_PROXY, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ max_tokens, messages: formattedMessages, action }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(AI_PROXY, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ max_tokens, messages: formattedMessages, action }),
+    });
+  } catch (netErr: any) {
+    throw new Error(`Connection error: ${netErr.message || "Failed to reach AI service"}`);
+  }
 
-  const d = await res.json();
+  const contentType = res.headers.get("content-type") || "";
+  let d: any;
+  if (contentType.includes("application/json")) {
+    d = await res.json();
+  } else {
+    const rawText = await res.text();
+    console.warn("AI endpoint returned non-JSON response:", rawText.slice(0, 150));
+    throw new Error(`AI service temporarily unavailable (${res.status}). Please try again.`);
+  }
+
   if (!res.ok || d.error) {
     throw new Error(d.error?.message || (typeof d.error === "string" ? d.error : `API error ${res.status}`));
   }
@@ -3387,7 +3405,40 @@ export default function App() {
     };
   }, []);
 
-  const sendAiQuery = async (queryText?: string) => {
+  const playJarvisVoice = (speechText: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+
+    const cleanText = speechText
+      .replace(/[*_#`[\]()]/g, " ")
+      .replace(/•/g, " ")
+      .replace(/https?:\/\/\S+/g, "link")
+      .slice(0, 360);
+
+    const utter = new SpeechSynthesisUtterance(cleanText);
+    const voices = window.speechSynthesis.getVoices();
+
+    const naturalVoice = voices.find((v) => 
+      (v.name.includes("Samantha") || v.name.includes("Siri") || v.name.includes("Daniel") || 
+       v.name.includes("Google UK English Male") || v.name.includes("Google UK English Female") ||
+       v.name.includes("Natural") || v.name.includes("Oliver") || v.name.includes("Guy") || 
+       v.name.includes("Arthur")) && v.lang.startsWith("en")
+    ) || voices.find((v) => v.lang.startsWith("en") && !v.localService) 
+      || voices.find((v) => v.lang.startsWith("en")) 
+      || voices[0];
+
+    if (naturalVoice) {
+      utter.voice = naturalVoice;
+    }
+    utter.rate = 1.02;
+    utter.pitch = 1.0;
+    utter.onend = () => setIsSpeakingReply(false);
+    utter.onerror = () => setIsSpeakingReply(false);
+    setIsSpeakingReply(true);
+    window.speechSynthesis.speak(utter);
+  };
+
+  const sendAiQuery = async (queryText?: string, wasSpoken = false) => {
     const text = (queryText || aiInput).trim();
     if (!text || aiLoading) return;
     setAiInput("");
@@ -3398,20 +3449,32 @@ export default function App() {
     setAiLoading(true);
 
     try {
-      const contactSummary = contacts.slice(0, 60).map((c) => 
-        `- ${c.name} (${c.roleCategory || c.role || "Professional"}) at ${c.company || "Company"}${c.title ? `, ${c.title}` : ""}. Email: ${c.email || "N/A"}. Tags: ${(c.tags || []).join(", ")}. Last event: ${c.event || "N/A"}. Due reminder: ${c.reminder && c.reminderDate ? c.reminderDate : "none"}`
+      const dueRemindersList = contacts.filter((c) => c.reminder && c.reminderDate && !c.reminderDone);
+      const pendingFollowups = contacts.filter((c) => !c.emailSent);
+      const contactSummary = contacts.slice(0, 50).map((c) => 
+        `- ${c.name} (${c.roleCategory || c.role || "Professional"} at ${c.company || "Company"}). Email: ${c.email || "No email"}. Reminder scheduled: ${c.reminder && c.reminderDate ? c.reminderDate : "none"}. Follow-up status: ${c.emailSent ? "email sent" : "needs email follow-up"}. Notes: ${c.notes || "None"}.`
       ).join("\n");
 
-      const systemPrompt = `You are NetworQ Executive Networking & Intelligence Assistant for ${currentUser?.name || "the user"} (${currentUser?.role || "Member"} at ${currentUser?.company || "NetworQ"}).
-User's CRM currently has ${contacts.length} contacts:
-${contactSummary || "No contacts added yet."}
+      const systemPrompt = `You are Jarvis, NetworQ's Elite AI & Voice Executive Assistant for ${currentUser?.name || "the user"}.
+You have direct real-time access to the user's CRM database:
 
-Key tasks:
-1. Search contacts by role (Founders, Investors, Engineers, Designers, Consultants, Executives), company, event, or tags.
-2. Recommend follow-ups and priority outreach.
-3. Draft personalized, crisp, executive emails and meeting invites.
-4. Give strategic event networking and relationship building guidance.
-Be direct, helpful, and concise.`;
+LIVE CRM METRICS:
+Total Contacts: ${contacts.length}
+Pending Reminders (${dueRemindersList.length}):
+${dueRemindersList.length > 0 ? dueRemindersList.map((c) => `• ${c.name} at ${c.company}: Reminder set for ${c.reminderDate}`).join("\n") : "• No active scheduled reminders."}
+
+Needs Follow-up Emails (${pendingFollowups.length}):
+${pendingFollowups.length > 0 ? pendingFollowups.slice(0, 8).map((c) => `• ${c.name} at ${c.company || "Company"}: Follow-up email needed (${c.email || "No email on file"}).`).join("\n") : "• All contacts are up to date."}
+
+CONTACT ROSTER:
+${contactSummary || "No contacts added to CRM yet."}
+
+VOICE & ASSISTANT DIRECTIVES:
+1. When asked "from whom should I send mails and reminders?" or similar:
+   - If contacts exist: State clearly and specifically: "You have reminders scheduled for [Name] at [Company] by [Date]. Additionally, you should email [Name 2] and [Name 3] because you connected recently and haven't followed up yet."
+   - If 0 contacts exist: Be direct: "Your network currently has 0 contacts. As soon as you scan a business card or add a contact, I will track all their reminders and draft their follow-up emails for you."
+2. Act like Jarvis / Siri: articulate, authoritative, highly executive, intelligent, and concise.
+3. Keep answers conversational without complex markdown tables so it sounds polished over audio.`;
 
       const responseText = await callAI(
         newHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -3419,29 +3482,26 @@ Be direct, helpful, and concise.`;
         { action: "chat", max_tokens: 800 }
       );
 
-      const replyContent = responseText || "I've reviewed your request, but received an empty response. How else may I assist your network?";
+      const replyContent = responseText || "I've reviewed your request. How else may I assist your network?";
       setAiMessages((prev) => [...prev, { role: "assistant", content: replyContent, time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }]);
 
-      if (voiceReplyEnabled && typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-        const speechSnippet = replyContent.replace(/[*_#`[\]()]/g, " ").slice(0, 320);
-        const utter = new SpeechSynthesisUtterance(speechSnippet);
-        utter.rate = 1.05;
-        utter.onend = () => setIsSpeakingReply(false);
-        utter.onerror = () => setIsSpeakingReply(false);
-        setIsSpeakingReply(true);
-        window.speechSynthesis.speak(utter);
+      if (wasSpoken || voiceReplyEnabled) {
+        playJarvisVoice(replyContent);
       }
     } catch (e: any) {
       console.warn("AI Assistant error:", e);
+      const fallbackReply = `I've analyzed your network. ${e.message ? `(Notice: ${e.message})` : ""}. How can I assist you with your contacts, roles, or follow-ups?`;
       setAiMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: `I've analyzed your network. ${e.message ? `(Notice: ${e.message})` : ""}. How can I assist you with your contacts, roles, or follow-ups?`,
+          content: fallbackReply,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
+      if (wasSpoken || voiceReplyEnabled) {
+        playJarvisVoice(fallbackReply);
+      }
     } finally {
       setAiLoading(false);
     }
@@ -3469,13 +3529,14 @@ Be direct, helpful, and concise.`;
 
       rec.onstart = () => {
         setAiListening(true);
+        setVoiceReplyEnabled(true);
       };
 
       rec.onresult = (ev: any) => {
         const transcript = ev.results?.[0]?.[0]?.transcript;
         if (transcript) {
           setAiInput(transcript);
-          sendAiQuery(transcript);
+          sendAiQuery(transcript, true);
         }
       };
 
@@ -4397,9 +4458,7 @@ Keep it punchy, sharp, and directly actionable.`;
   };
 
   const isMobile = windowWidth < 768;
-  const effectiveContacts = useMemo(() => {
-    return contacts.length > 0 ? contacts : BRAND_SEED_CONTACTS;
-  }, [contacts]);
+  const effectiveContacts = contacts;
 
   const greetingText = useMemo(() => {
     const hr = new Date().getHours();
@@ -7802,20 +7861,30 @@ Keep it punchy, sharp, and directly actionable.`;
         </div>
       )}
 
-      {/* ── MOBILE BOTTOM DOCK ── */}
+      {/* ── IPHONE FLOATING CURVED GLASS DOCK ── */}
       {isMobile && (
         <div
           style={{
             position: "fixed",
-            bottom: 0,
-            left: 0,
-            right: 0,
+            bottom: "max(14px, env(safe-area-inset-bottom, 14px))",
+            left: 14,
+            right: 14,
+            maxWidth: 440,
+            margin: "0 auto",
             height: 64,
-            ...themeStyles.glassNav,
+            background: isDark ? "rgba(18, 18, 24, 0.86)" : "rgba(255, 255, 255, 0.88)",
+            backdropFilter: "blur(28px) saturate(190%)",
+            WebkitBackdropFilter: "blur(28px) saturate(190%)",
             display: "flex",
-            alignItems: "stretch",
+            alignItems: "center",
+            justifyContent: "space-between",
             zIndex: 200,
-            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+            borderRadius: 36,
+            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.16)" : "rgba(0, 0, 0, 0.08)"}`,
+            boxShadow: isDark
+              ? "0 16px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.12)"
+              : "0 16px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255,255,255,0.8)",
+            padding: "4px 8px",
           }}
         >
           {[
@@ -7850,34 +7919,25 @@ Keep it punchy, sharp, and directly actionable.`;
                   justifyContent: "center",
                   gap: 3,
                   border: "none",
-                  background: "none",
+                  background: active
+                    ? (isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.12)")
+                    : "transparent",
+                  borderRadius: 22,
+                  height: 52,
                   cursor: "pointer",
-                  color: active ? (isDark ? "#2997FF" : "#0071E3") : themeStyles.textMuted,
+                  color: active ? (isDark ? "#818CF8" : "#4F46E5") : themeStyles.textMuted,
                   position: "relative",
-                  transition: "color 0.15s",
+                  transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
               >
-                {active && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: "28%",
-                      right: "28%",
-                      height: 2.5,
-                      background: isDark ? "#2997FF" : "#0071E3",
-                      borderRadius: "0 0 2px 2px",
-                    }}
-                  />
-                )}
                 <MobileIcon size={18} color="currentColor" />
                 <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
                 {t === "contacts" && dueReminders.length > 0 && (
                   <span
                     style={{
                       position: "absolute",
-                      top: 8,
-                      left: "55%",
+                      top: 4,
+                      right: 10,
                       background: "#ef4444",
                       color: "#fff",
                       borderRadius: "50%",

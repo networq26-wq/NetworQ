@@ -145,9 +145,20 @@ if (fs.existsSync(distPath)) {
   app.get("/waitlist.html", (req, res) => waitlistHandler(req, res));
   app.use(express.static(distPath));
   app.use((req, res) => {
+    if (req.path.startsWith("/api/")) {
+      return res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found.` });
+    }
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
+
+// ── Global API JSON Error Handler ─────────────────────────────────────────────
+app.use("/api", (err, req, res, next) => {
+  console.error("API Server Error:", err);
+  if (!res.headersSent) {
+    res.status(500).json({ error: err.message || "Internal API Error" });
+  }
+});
 
 // ── Multi-port listener for seamless local development ────────────────────────
 const primaryPort = parseInt(process.env.PORT || "3001", 10);
