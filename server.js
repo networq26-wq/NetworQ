@@ -29,7 +29,7 @@ try {
 }
 
 const defaultOrigins =
-  "http://localhost:8081,http://localhost:19006,http://localhost:8082,http://localhost:3000,http://localhost:3001,http://127.0.0.1:8081,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost,http://127.0.0.1,https://networq-app.surge.sh";
+  "http://localhost:8081,http://localhost:19006,http://localhost:8082,http://localhost:3000,http://localhost:3001,http://127.0.0.1:8081,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost,http://127.0.0.1,https://networq-app.surge.sh,https://www.networq.co.in,https://networq.co.in,https://networq-epf0.onrender.com";
 
 app.use(
   cors({
@@ -42,13 +42,18 @@ app.use(
         return callback(null, true);
       }
 
-      // Always allow surge.sh production frontend
-      if (origin === "https://networq-app.surge.sh") {
+      // Always allow production custom domains
+      if (
+        origin === "https://www.networq.co.in" ||
+        origin === "https://networq.co.in" ||
+        origin === "https://networq-epf0.onrender.com" ||
+        origin === "https://networq-app.surge.sh"
+      ) {
         return callback(null, true);
       }
 
-      // Allow any *.railway.app or *.up.railway.app (deployed backend self-calls)
-      if (/\.railway\.app$/.test(origin) || /\.up\.railway\.app$/.test(origin)) {
+      // Allow any *.onrender.com, *.railway.app
+      if (/\.onrender\.com$/.test(origin) || /\.railway\.app$/.test(origin)) {
         return callback(null, true);
       }
 
