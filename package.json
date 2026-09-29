@@ -3,17 +3,17 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
+    "start": "node server.js",
+    "build": "expo export --platform web && mkdir -p dist/illustrations && cp -r public/illustrations/* dist/illustrations/ && cp public/waitlist.html dist/waitlist.html",
     "dev": "./start.sh",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
     "serve": "node server.js",
-    "host": "npm run build:web && node server.js",
+    "host": "npm run build && node server.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "build:apk": "npx eas-cli@latest build --profile preview --platform android",
-    "test": "node --test api/_lib/*.test.js",
-    "start:server": "node server.js"
+    "test": "node --test api/_lib/*.test.js"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
