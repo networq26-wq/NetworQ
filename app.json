@@ -30,16 +30,16 @@
       "favicon": "./assets/favicon.png"
     },
     "updates": {
-      "url": "https://u.expo.dev/48b3a694-e695-429f-a990-587e0fb8d209"
+      "url": "https://u.expo.dev/0f767c6f-0b01-4a46-a364-8d6692683160"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "extra": {
       "eas": {
-        "projectId": "48b3a694-e695-429f-a990-587e0fb8d209"
+        "projectId": "0f767c6f-0b01-4a46-a364-8d6692683160"
       }
     },
-    "owner": "hruthik_chindam"
+    "owner": "networ-q"
   }
 }
