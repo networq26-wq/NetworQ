@@ -3641,8 +3641,8 @@ Be direct, helpful, and concise.`;
     }
     setAuthSubmitting(true);
     try {
-      const { error } = await supabase.from("profiles").upsert({
-        id: currentUser.id,
+      const updatedUser = {
+        ...currentUser,
         name: form.name || currentUser.name || "Networker",
         company: form.company,
         role: form.role,
@@ -3650,10 +3650,33 @@ Be direct, helpful, and concise.`;
         phone: form.phone,
         linkedin: form.linkedin,
         bio: form.bio,
-      });
-      if (error) throw error;
+      };
+
+      // Instant optimistic transition - no waiting!
+      setCurrentUser(updatedUser);
+      setScreen("app");
       triggerConfetti();
-      await loadUserData(currentUser.id, currentUser.email);
+
+      // Persist in background with upsert
+      (async () => {
+        try {
+          await supabase
+            .from("profiles")
+            .upsert({
+              id: currentUser.id,
+              name: updatedUser.name,
+              company: updatedUser.company,
+              role: updatedUser.role,
+              sector: updatedUser.sector,
+              phone: updatedUser.phone,
+              linkedin: updatedUser.linkedin,
+              bio: updatedUser.bio,
+            });
+          loadUserData(currentUser.id, currentUser.email);
+        } catch (err: any) {
+          console.warn("Background profile save notice:", err);
+        }
+      })();
     } catch (err: any) {
       setAuthMsg({ text: err.message || "Failed to save profile.", type: "error" });
     } finally {
@@ -4258,26 +4281,29 @@ Keep it punchy, sharp, and directly actionable.`;
 
   const updateProfile = async () => {
     setSavingProfile(true);
+    // Instant optimistic update — zero lag for user!
+    setCurrentUser((u: any) => ({ ...u, ...profileForm }));
+    setProfileModal(false);
+    triggerConfetti();
+    showToast("Profile updated.", "success");
+
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          name: profileForm.name,
-          company: profileForm.company,
-          role: profileForm.role,
-          sector: profileForm.sector,
-          phone: profileForm.phone,
-          linkedin: profileForm.linkedin,
-          bio: profileForm.bio,
-        })
-        .eq("id", currentUser.id);
-      if (error) throw error;
-      setCurrentUser((u: any) => ({ ...u, ...profileForm }));
-      setProfileModal(false);
-      triggerConfetti();
-      showToast("Profile updated.", "success");
+      if (currentUser?.id) {
+        await supabase
+          .from("profiles")
+          .upsert({
+            id: currentUser.id,
+            name: profileForm.name,
+            company: profileForm.company,
+            role: profileForm.role,
+            sector: profileForm.sector,
+            phone: profileForm.phone,
+            linkedin: profileForm.linkedin,
+            bio: profileForm.bio,
+          });
+      }
     } catch (err: any) {
-      showToast(err.message || "Failed to update profile.", "error");
+      console.warn("Background profile update notice:", err);
     } finally {
       setSavingProfile(false);
     }

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#6D28D9"/>
+    </linearGradient>
+    <linearGradient id="beamGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="rgba(192,132,252,0)"/>
+      <stop offset="50%" stop-color="#E9D5FF"/>
+      <stop offset="100%" stop-color="rgba(192,132,252,0)"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded squircle -->
+  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#purpleGrad)" />
+  <!-- Outer ring of Q -->
+  <circle cx="64" cy="58" r="32" fill="none" stroke="#FFFFFF" stroke-width="12" />
+  <!-- Tail of Q -->
+  <path d="M 76 74 L 100 98" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" />
+  <!-- Scanner laser beam inside Q cavity -->
+  <line x1="42" y1="58" x2="86" y2="58" stroke="url(#beamGrad)" stroke-width="4" stroke-linecap="round" />
+</svg>
