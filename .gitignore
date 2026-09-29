@@ -58,4 +58,5 @@ $RECYCLE.BIN/
 
 # Logs & Temporary files
 *.log
-*.tmp*.zip
+*.tmp
+*.zip
