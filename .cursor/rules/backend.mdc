@@ -1,0 +1,36 @@
+---
+description: Backend rules for NetworQ server and API
+---
+
+# Backend Rules
+
+## Security
+- NEVER expose GROQ_API_KEY, RESEND_API_KEY, or SUPABASE_SERVICE_ROLE_KEY to frontend
+- All AI and email routes MUST verify JWT via verifyAndLimit()
+- Dev bypass (local-dev-token) only in development
+
+## API Design
+- All routes return JSON with { ok: true, data } or { error: "message" }
+- Always handle OPTIONS for CORS preflight
+- Use try/catch on all async handlers — never let unhandled rejections crash server
+
+## Supabase
+- Use getSupabase() lazy init pattern (not module-level createClient)
+- Service role client only on server — never import in App.tsx
+- Rate limit email_generation and card_scan via increment_ai_usage RPC
+
+## Email
+- Use Resend API first (RESEND_API_KEY)
+- SMTP fallback if GMAIL_USER + GMAIL_APP_PASSWORD set
+- Dev log fallback if neither configured
+- Never fail silently — always log email errors
+
+## Reminder Engine
+- Uses setInterval(1 hour) — do not block with await at top level
+- Mark reminder_done=true after sending to prevent duplicate emails
+- Handle Supabase errors gracefully — log and continue
+
+## New Routes
+- Add to server.js with clear comment block
+- Add to docs/ARCHITECTURE.md route table
+- Add to docs/TEST_PLAN.md API section

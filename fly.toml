@@ -1,0 +1,41 @@
+# Fly.io configuration for NetworQ
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "networq-app"
+primary_region = "blr"   # Bangalore — closest to India 🇮🇳
+
+[build]
+  dockerfile = "Dockerfile"
+
+  # EXPO_PUBLIC_* vars are baked into the frontend bundle at build time
+  [build.args]
+    EXPO_PUBLIC_SUPABASE_URL      = "https://jpuxmkkuzqojqeatespa.supabase.co"
+    EXPO_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwdXhta2t1enFvanFlYXRlc3BhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5OTA5MDEsImV4cCI6MjEwMzU2NjkwMX0.eO4xWQyVlA0KzvnJugFADiVrahWXTRDEUq-k5uRcPp0"
+    EXPO_PUBLIC_GOOGLE_CLIENT_ID  = "274936901539-t47d6utprf99hrobaim7bre9ivm7dbf1.apps.googleusercontent.com"
+
+[env]
+  PORT        = "3000"
+  NODE_ENV    = "production"
+  ALLOWED_ORIGIN = "https://networq-app.fly.dev,https://networq.com,https://www.networq.com,https://networq-app.surge.sh"
+
+# HTTP service config
+[http_service]
+  internal_port       = 3000
+  force_https         = true
+  auto_stop_machines  = false   # NEVER sleep — keeps reminders running 24/7
+  auto_start_machines = true
+  min_machines_running = 1
+
+# Machine size (free tier)
+[[vm]]
+  memory   = "256mb"
+  cpu_kind = "shared"
+  cpus     = 1
+
+# Health check
+[[http_service.checks]]
+  grace_period = "10s"
+  interval     = "30s"
+  method       = "GET"
+  path         = "/api/health"
+  timeout      = "5s"

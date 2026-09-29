@@ -1,0 +1,33 @@
+---
+description: Frontend/UI rules for NetworQ
+---
+
+# Frontend Rules
+
+## Design System (from docs/DESIGN.md)
+- Primary color: #7C3AED (purple only)
+- Dark mode bg: #000000, surface: #1C1C1E
+- Light mode bg: #F2F2F7, surface: #FFFFFF
+- Font: -apple-system, BlinkMacSystemFont, SF Pro Text, Arial
+- NO rainbow/HSL colors on tags or role badges
+- Tags always neutral: rgba(255,255,255,0.06) dark / rgba(0,0,0,0.04) light
+- NO colored initials avatars — use Icons.User silhouette on #3A3A3C
+
+## Components
+- Use ContactAvatar for all contact photos (handles photo/fallback)
+- Use themeStyles object for all colors (not hardcoded)
+- Icons are in the Icons object in App.tsx — reuse, never add external icon libraries
+- Toast system: use showToast() — never use alert()
+
+## UX Requirements
+- Every async action MUST have a loading state
+- Every form MUST have an error state
+- Empty states MUST have a message + CTA button
+- Touch targets minimum 44×44px
+- All modals closeable via overlay click or X button
+
+## Prohibited
+- No vendor names in UI ("Groq", "Supabase", "Resend", "Expo")
+- No bright role badge colors
+- No inline `alert()` or `confirm()` — use Toast or modal
+- No hardcoded user data in production flows

@@ -1,0 +1,11 @@
+node_modules/
+.git/
+.gitignore
+*.log
+.env
+.env.*
+dist/
+.expo/
+voice_server/
+*.md
+.DS_Store

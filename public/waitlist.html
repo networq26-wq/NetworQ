@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,55 +7,57 @@
   <meta name="description" content="NetworQ scans business cards, drafts follow-ups, and reminds you to reconnect before people forget you." />
 
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
+
     /* ── Tokens (light by default) ─────────────────── */
     :root {
-      --bg:          #F4F6FC;
+      --bg:          #F3F4F8;
       --surface:     #FFFFFF;
-      --border:      #DDE3F0;
-      --text:        #0C0E14;
-      --muted:       #5A6B8A;
-      --accent:      #008F52;
-      --accent-glow: rgba(0, 143, 82, 0.14);
-      --accent-dim:  rgba(0, 143, 82, 0.08);
+      --border:      #E2E5F0;
+      --text:        #151A38;
+      --muted:       #5E657D;
+      --accent:      #6D35F5;
+      --accent-glow: rgba(109, 53, 245, 0.22);
+      --accent-dim:  rgba(109, 53, 245, 0.08);
       --danger:      #DC2626;
-      --radius:      10px;
+      --radius:      12px;
     }
 
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg:          #0C0E14;
-        --surface:     #161B26;
-        --border:      #252D42;
-        --text:        #F1F3FA;
-        --muted:       #6B7A9B;
-        --accent:      #3BFFA1;
-        --accent-glow: rgba(59, 255, 161, 0.18);
-        --accent-dim:  rgba(59, 255, 161, 0.09);
+        --bg:          #0D1022;
+        --surface:     #151A38;
+        --border:      #262E56;
+        --text:        #F3F4F8;
+        --muted:       #9DA3B4;
+        --accent:      #8E62F7;
+        --accent-glow: rgba(142, 98, 247, 0.25);
+        --accent-dim:  rgba(142, 98, 247, 0.1);
         --danger:      #FF6B6B;
       }
     }
 
     :root[data-theme="light"] {
-      --bg:          #F4F6FC;
+      --bg:          #F3F4F8;
       --surface:     #FFFFFF;
-      --border:      #DDE3F0;
-      --text:        #0C0E14;
-      --muted:       #5A6B8A;
-      --accent:      #008F52;
-      --accent-glow: rgba(0, 143, 82, 0.14);
-      --accent-dim:  rgba(0, 143, 82, 0.08);
+      --border:      #E2E5F0;
+      --text:        #151A38;
+      --muted:       #5E657D;
+      --accent:      #6D35F5;
+      --accent-glow: rgba(109, 53, 245, 0.22);
+      --accent-dim:  rgba(109, 53, 245, 0.08);
       --danger:      #DC2626;
     }
 
     :root[data-theme="dark"] {
-      --bg:          #0C0E14;
-      --surface:     #161B26;
-      --border:      #252D42;
-      --text:        #F1F3FA;
-      --muted:       #6B7A9B;
-      --accent:      #3BFFA1;
-      --accent-glow: rgba(59, 255, 161, 0.18);
-      --accent-dim:  rgba(59, 255, 161, 0.09);
+      --bg:          #0D1022;
+      --surface:     #151A38;
+      --border:      #262E56;
+      --text:        #F3F4F8;
+      --muted:       #9DA3B4;
+      --accent:      #8E62F7;
+      --accent-glow: rgba(142, 98, 247, 0.25);
+      --accent-dim:  rgba(142, 98, 247, 0.1);
       --danger:      #FF6B6B;
     }
 
@@ -64,7 +66,7 @@
 
     html, body {
       height: 100%;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
       background: var(--bg);
       color: var(--text);
       -webkit-font-smoothing: antialiased;
@@ -99,34 +101,26 @@
 
     /* ── Wordmark ───────────────────────────────────── */
     .wordmark {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 3px;
       margin-bottom: clamp(40px, 7vw, 64px);
-    }
-
-    .wordmark-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 9px;
-      background: var(--accent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-    }
-
-    .wordmark-icon svg {
-      width: 18px;
-      height: 18px;
+      user-select: none;
     }
 
     .wordmark-text {
-      font-family: Georgia, 'Times New Roman', serif;
-      font-size: 20px;
-      font-weight: 400;
-      letter-spacing: -0.01em;
+      font-family: 'Poppins', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
       color: var(--text);
+      line-height: 1;
+    }
+
+    .wordmark-svg {
+      width: 25px;
+      height: 25px;
+      display: block;
     }
 
     /* ── Eyebrow ────────────────────────────────────── */
@@ -363,17 +357,12 @@
   <div class="inner">
 
     <div class="wordmark">
-      <div class="wordmark-icon">
-        <!-- network link icon -->
-        <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="4" cy="9" r="2.5" fill="#0C0E14"/>
-          <circle cx="14" cy="4" r="2.5" fill="#0C0E14"/>
-          <circle cx="14" cy="14" r="2.5" fill="#0C0E14"/>
-          <line x1="6.2" y1="8" x2="11.8" y2="5" stroke="#0C0E14" stroke-width="1.5" stroke-linecap="round"/>
-          <line x1="6.2" y1="10" x2="11.8" y2="13" stroke="#0C0E14" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <span class="wordmark-text">NetworQ</span>
+      <span class="wordmark-text">Networ</span>
+      <svg class="wordmark-svg" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 19.63 0.00 C 8.79 0.00, 0.00 8.79, 0.00 19.63 L 0.00 69.33 C 0.00 80.17, 8.79 88.96, 19.63 88.96 L 39.41 88.96 L 39.41 67.96 L 24.59 67.96 C 22.61 67.96, 21.00 66.35, 21.00 64.37 L 21.00 24.59 C 21.00 22.60, 22.61 21.00, 24.59 21.00 L 39.41 21.00 L 39.41 0.00 Z" fill="var(--accent)" />
+        <path d="M 54.38 0.00 L 54.38 21.00 L 69.20 21.00 C 71.18 21.00, 72.79 22.60, 72.79 24.59 L 72.79 64.37 C 72.79 66.35, 71.18 67.96, 69.20 67.96 L 47.60 67.96 L 54.38 75.42 L 66.67 88.96 L 77.90 100.52 L 100.00 100.52 L 85.50 85.35 C 90.51 81.80, 93.79 75.95, 93.79 69.33 L 93.79 19.63 C 93.79 8.79, 85.00 0.00, 74.16 0.00 Z" fill="var(--accent)" />
+        <rect x="21.00" y="36.99" width="51.79" height="14.96" fill="var(--accent)" />
+      </svg>
     </div>
 
     <span class="eyebrow">Early Access</span>
@@ -414,7 +403,13 @@
       <div class="success-note" id="success-note">We'll email you at launch. First 100 get a full year free.</div>
     </div>
 
-    <p class="footer">© 2026 NetworQ</p>
+    <div style="display: flex; gap: 14px; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); flex-wrap: wrap;">
+      <div><strong style="color: var(--accent);">MEET</strong> · Capture context</div>
+      <div><strong style="color: var(--accent);">REMEMBER</strong> · Keep details accessible</div>
+      <div><strong style="color: var(--accent);">RECONNECT</strong> · Intelligent follow-ups</div>
+    </div>
+
+    <p class="footer">© 2026 NetworQ · Meaningful connections for a brighter tomorrow</p>
   </div>
 </main>
 

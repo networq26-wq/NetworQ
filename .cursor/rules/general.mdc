@@ -1,0 +1,32 @@
+---
+description: General coding rules for NetworQ
+---
+
+# General Rules
+
+## Before Making Changes
+- Read docs/PRD.md, docs/ARCHITECTURE.md, docs/DESIGN.md
+- Understand what already exists — do NOT duplicate logic
+- Make a plan for any change larger than 20 lines
+- Never modify unrelated files
+
+## Code Quality
+- Use TypeScript — no `any` types without justification
+- Keep functions focused and small
+- Reuse existing components and utilities
+- Prefer editing over rewriting
+
+## File Structure
+- Frontend: App.tsx (single file by design — do not split without explicit instruction)
+- Backend: server.js + api/*.js
+- Documentation: docs/
+
+## After Changes
+- Run `npx tsc --noEmit` — must pass
+- Run `npm run build:web` — must succeed
+- Update TASKS.md and docs/MEMORY.md
+
+## Git
+- Small, focused commits
+- Format: `feat:`, `fix:`, `chore:`, `docs:`
+- Never commit .env files

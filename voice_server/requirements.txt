@@ -1,0 +1,8 @@
+speech-to-speech>=0.1.0
+torch
+torchaudio
+transformers
+websockets
+fastapi
+uvicorn
+python-dotenv

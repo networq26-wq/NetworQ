@@ -11,6 +11,7 @@ create table if not exists profiles (
   phone       text,
   linkedin    text,
   bio         text,
+  calendly_url text,
   created_at  timestamptz default now()
 );
 
@@ -45,7 +46,8 @@ create table if not exists contacts (
   reminder_done boolean default false,
   email_sent    boolean default false,
   meet_link     text,
-  meet_date     text
+  meet_date     text,
+  tags          text[] default '{}'
 );
 
 alter table contacts enable row level security;
@@ -282,3 +284,43 @@ begin
   );
 end;
 $$;
+
+-- ── STORAGE BUCKETS & POLICIES ────────────────────────────────────────────────
+-- Create public bucket for business card uploads if it doesn't already exist
+insert into storage.buckets (id, name, public)
+values ('card-images', 'card-images', true)
+on conflict (id) do nothing;
+
+-- Storage RLS: Allow authenticated users to upload only into their own folder (${user_id}/...)
+create policy "Users can upload own card images"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'card-images' and
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Storage RLS: Allow users to update their own card images
+create policy "Users can update own card images"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'card-images' and
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Storage RLS: Allow users to delete their own card images
+create policy "Users can delete own card images"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'card-images' and
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+-- Storage RLS: Allow public read access to card images (for business card URLs & email shares)
+create policy "Public read access for card images"
+  on storage.objects for select
+  to public
+  using (bucket_id = 'card-images');
+

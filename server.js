@@ -2,57 +2,146 @@ const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
-const app = express();
+const aiHandler = require("./api/ai");
+const waitlistHandler = require("./api/waitlist");
+const enrichHandler = require("./api/enrich");
+const emailHandler = require("./api/email");
+const { startReminderEngine } = require("./api/reminders");
+const { isAllowedOrigin } = require("./api/_lib/cors");
 
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+const app = express();
 
 // Load .env manually — no dotenv dependency needed
 try {
-  fs.readFileSync(path.join(__dirname, ".env"), "utf8")
-    .split("\n")
-    .forEach(line => {
-      const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
-      if (m && !process.env[m[1].trim()]) {
-        process.env[m[1].trim()] = m[2].trim().replace(/^['"]|['"]$/g, "");
+  const envPath = path.join(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    fs.readFileSync(envPath, "utf8")
+      .split("\n")
+      .forEach((line) => {
+        const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
+        if (m && !process.env[m[1].trim()]) {
+          process.env[m[1].trim()] = m[2].trim().replace(/^['"]|['"]$/g, "");
+        }
+      });
+  }
+} catch (err) {
+  console.warn("Could not read .env file:", err.message);
+}
+
+const defaultOrigins =
+  "http://localhost:8081,http://localhost:19006,http://localhost:8082,http://localhost:3000,http://localhost:3001,http://127.0.0.1:8081,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost,http://127.0.0.1,https://networq-app.surge.sh";
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      // Always allow local development origins (localhost, 127.0.0.1, [::1])
+      if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Always allow surge.sh production frontend
+      if (origin === "https://networq-app.surge.sh") {
+        return callback(null, true);
+      }
+
+      // Allow any *.railway.app or *.up.railway.app (deployed backend self-calls)
+      if (/\.railway\.app$/.test(origin) || /\.up\.railway\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow configured origins from .env
+      if (isAllowedOrigin(origin, process.env.ALLOWED_ORIGIN || defaultOrigins)) {
+        return callback(null, true);
+      }
+
+      // Fallback: don't throw an unhandled 500 error, just disallow origin
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
+
+app.use(express.json({ limit: "10mb" }));
+
+// ── Health check ──────────────────────────────────────────────────────────────
+app.get("/api/health", (req, res) => {
+  res.json({
+    status: "ok",
+    app: "NetworQ",
+    version: "2.0.0",
+    timestamp: new Date().toISOString(),
+    services: {
+      ai: !!process.env.GROQ_API_KEY,
+      email: !!(process.env.GMAIL_USER || process.env.SMTP_HOST),
+      reminders: true,
+      supabase: !!process.env.EXPO_PUBLIC_SUPABASE_URL,
+    },
+  });
+});
+
+// ── Waitlist ──────────────────────────────────────────────────────────────────
+app.get("/waitlist", (req, res) => waitlistHandler(req, res));
+
+// ── Company enrichment ────────────────────────────────────────────────────────
+app.all("/api/enrich", async (req, res) => enrichHandler(req, res));
+
+// ── AI routes ─────────────────────────────────────────────────────────────────
+app.post("/api/ai", async (req, res) => aiHandler(req, res));
+app.post("/api/groq", async (req, res) => aiHandler(req, res));
+app.post("/api/claude", async (req, res) => aiHandler(req, res)); // backward compat
+app.get("/api/groq", (req, res) => {
+  res.json({
+    status: "ok",
+    provider: "groq",
+    models: { text: "qwen/qwen3.8-27b", vision: "meta-llama/llama-4-scout-17b-16e-instruct" },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// ── Email sending ─────────────────────────────────────────────────────────────
+app.post("/api/email", async (req, res) => emailHandler(req, res));
+app.options("/api/email", (req, res) => res.status(200).end());
+
+// ── Serve web frontend build if dist directory exists ─────────────────────────
+const distPath = path.join(__dirname, "dist");
+if (fs.existsSync(distPath)) {
+  app.get("/waitlist.html", (req, res) => waitlistHandler(req, res));
+  app.use(express.static(distPath));
+  app.use((req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+// ── Multi-port listener for seamless local development ────────────────────────
+const primaryPort = parseInt(process.env.PORT || "3001", 10);
+const targetPorts = [primaryPort, 3000, 8081].filter(
+  (p, idx, arr) => arr.indexOf(p) === idx
+);
+
+targetPorts.forEach((port) => {
+  try {
+    const srv = app.listen(port, "0.0.0.0", () => {
+      console.log(
+        `✅ NetworQ server live on http://localhost:${port} & http://127.0.0.1:${port}`
+      );
+    });
+    srv.on("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        console.log(`ℹ️  Port ${port} is in use by another process; skipping.`);
+      } else {
+        console.warn(`Server on port ${port} notice:`, err.message);
       }
     });
-} catch {}
-
-// Serve waitlist.html with Supabase credentials injected from .env
-app.get("/waitlist", (req, res) => {
-  const html = fs.readFileSync(path.join(__dirname, "public", "waitlist.html"), "utf8");
-  const injected = html
-    .replace("'REPLACE_WITH_YOUR_SUPABASE_URL'",      `'${process.env.EXPO_PUBLIC_SUPABASE_URL}'`)
-    .replace("'REPLACE_WITH_YOUR_SUPABASE_ANON_KEY'", `'${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}'`);
-  res.setHeader("Content-Type", "text/html");
-  res.send(injected);
-});
-
-app.post("/api/claude", async (req, res) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "ANTHROPIC_API_KEY is not set on the server." });
-  }
-  try {
-    const payload = {
-      ...req.body,
-      model: "claude-haiku-4-5-20251001",
-    };
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2025-01-21",
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+  } catch (err) {
+    // Ignore secondary binding errors
   }
 });
 
-app.listen(3001, () => console.log("✅ Proxy running on port 3001"));
+// ── Start background reminder engine ──────────────────────────────────────────
+// Only run on primary instance (not during Expo web build)
+if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  startReminderEngine();
+}
