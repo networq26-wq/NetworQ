@@ -29,11 +29,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "48b3a694-e695-429f-a990-587e0fb8d209"
-      }
-    },
-    "owner": "hruthik_chindam"
+    "owner": "networ-q"
   }
 }
