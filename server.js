@@ -75,7 +75,7 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
     services: {
       ai: !!process.env.GROQ_API_KEY,
-      email: !!(process.env.GMAIL_USER || process.env.SMTP_HOST),
+      email: !!(process.env.RESEND_API_KEY || process.env.GMAIL_USER || process.env.SMTP_HOST),
       reminders: true,
       supabase: !!process.env.EXPO_PUBLIC_SUPABASE_URL,
     },
