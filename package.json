@@ -13,6 +13,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "build:apk": "npx eas-cli@latest build --profile preview --platform android",
+    "update": "npx eas-cli@latest update --auto",
     "test": "node --test api/_lib/*.test.js"
   },
   "dependencies": {

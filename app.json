@@ -29,6 +29,17 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "networ-q"
+    "updates": {
+      "url": "https://u.expo.dev/48b3a694-e695-429f-a990-587e0fb8d209"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "48b3a694-e695-429f-a990-587e0fb8d209"
+      }
+    },
+    "owner": "hruthik_chindam"
   }
 }
