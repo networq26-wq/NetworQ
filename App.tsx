@@ -284,12 +284,12 @@ const Icons = {
         {/* Left bracket (Capture) - exact PDF vector */}
         <path
           d="M 115.08 352.76 C 115.08 363.63, 123.89 372.44, 134.76 372.44 L 216 372.44 L 216 487.53 L 107.59 487.53 C 48.17 487.53, 0 439.36, 0 379.94 L 0 107.57 C 0 48.17, 48.17 0, 107.59 0 L 216 0 L 216 115.08 L 134.76 115.08 C 123.89 115.08, 115.08 123.87, 115.08 134.74 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : brandColor}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#361DD9")}
         />
         {/* Right bracket with Q tail (Continuity) - exact PDF vector */}
         <path
           d="M 468.55 467.77 L 548.05 550.87 L 426.92 550.87 L 365.37 487.53 L 298.01 413.36 L 260.86 372.44 L 379.27 372.44 C 390.12 372.44, 398.93 363.63, 398.93 352.76 L 398.93 134.74 C 398.93 123.87, 390.12 115.08, 379.27 115.08 L 298.01 115.08 L 298.01 0 L 406.43 0 C 465.85 0, 514.01 48.17, 514.01 107.57 L 514.01 379.94 C 514.01 416.22, 496.05 448.31, 468.55 467.77 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : brandColor}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#5E35F5")}
         />
         {/* Center connector bar (Connection) - exact PDF vector */}
         <rect
@@ -297,7 +297,7 @@ const Icons = {
           y="202.75"
           width="283.85"
           height="82.01"
-          fill={gradient ? "url(#qPurpleGrad)" : brandColor}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#715DFC")}
         />
 
         {/* ── SCANNER BEAM INSIDE THE Q CAVITY ── */}
@@ -394,7 +394,7 @@ const Icons = {
         }}
       >
         <span>Networ</span>
-        <Icons.Logo size={Math.round(size * 0.94)} color="#7C3AED" scanning={scanning} />
+        <Icons.Logo size={Math.round(size * 0.94)} scanning={scanning} />
       </div>
     );
   },
