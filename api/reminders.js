@@ -18,7 +18,7 @@ async function sendReminderEmail({ to, contactName, reminderText, reminderDate }
         <p style="margin: 0; font-size: 15px; color: #3c3c43;">${reminderText}</p>
         ${reminderDate ? `<p style="margin: 8px 0 0; font-size: 13px; color: #8e8e93;">Due: ${reminderDate}</p>` : ""}
       </div>
-      <a href="https://networq-app.surge.sh" style="display: inline-block; background: #7C3AED; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 15px;">Open NetworQ →</a>
+      <a href="https://www.networq.co.in" style="display: inline-block; background: #7C3AED; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 15px;">Open NetworQ →</a>
       <hr style="border: none; border-top: 1px solid #e5e5ea; margin: 24px 0;" />
       <p style="font-size: 12px; color: #8e8e93;">NetworQ — Professional Network Intelligence</p>
     </div>
