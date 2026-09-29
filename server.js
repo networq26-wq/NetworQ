@@ -11,22 +11,51 @@ const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
 
-// Load .env manually — no dotenv dependency needed
+function parseEnvContent(content) {
+  if (!content) return;
+  content.split("\n").forEach((line) => {
+    const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
+    if (m && m[1]) {
+      const key = m[1].trim();
+      const val = m[2].trim().replace(/^['"]|['"]$/g, "");
+      if (!process.env[key] || process.env[key] === "") {
+        process.env[key] = val;
+      }
+    }
+  });
+}
+
+// 1. Read from local or root .env
 try {
   const envPath = path.join(__dirname, ".env");
   if (fs.existsSync(envPath)) {
-    fs.readFileSync(envPath, "utf8")
-      .split("\n")
-      .forEach((line) => {
-        const m = line.match(/^([^#=\s][^=]*)=(.*)$/);
-        if (m && !process.env[m[1].trim()]) {
-          process.env[m[1].trim()] = m[2].trim().replace(/^['"]|['"]$/g, "");
-        }
-      });
+    parseEnvContent(fs.readFileSync(envPath, "utf8"));
   }
 } catch (err) {
-  console.warn("Could not read .env file:", err.message);
+  console.warn("Could not read local .env file:", err.message);
 }
+
+// 2. Read from Render's /etc/secrets/ directory (Render Secret Files mount location)
+try {
+  const secretDir = "/etc/secrets";
+  if (fs.existsSync(secretDir)) {
+    fs.readdirSync(secretDir).forEach((file) => {
+      try {
+        const filePath = path.join(secretDir, file);
+        if (fs.statSync(filePath).isFile()) {
+          parseEnvContent(fs.readFileSync(filePath, "utf8"));
+        }
+      } catch (e) {}
+    });
+  }
+} catch (err) {}
+
+// 3. Parse if provided as a multi-line string variable in Render dashboard (e.g. Env-files)
+Object.keys(process.env).forEach((k) => {
+  if (k.toLowerCase().includes("env-file") || k.toLowerCase().includes("env_file") || k.toLowerCase().includes("envfiles")) {
+    parseEnvContent(process.env[k]);
+  }
+});
 
 const defaultOrigins =
   "http://localhost:8081,http://localhost:19006,http://localhost:8082,http://localhost:3000,http://localhost:3001,http://127.0.0.1:8081,http://127.0.0.1:3000,http://127.0.0.1:3001,http://localhost,http://127.0.0.1,https://networq-app.surge.sh,https://www.networq.co.in,https://networq.co.in,https://networq-epf0.onrender.com";
