@@ -3182,77 +3182,7 @@ function CommandPalette({
   );
 }
 
-// ── BRAND SEED CONTACTS (Official Brand Guideline Showcase) ───────────────────
-const BRAND_SEED_CONTACTS = [
-  {
-    id: "seed-priya",
-    name: "Priya Sharma",
-    title: "Product Designer",
-    company: "Stripe",
-    email: "priya.sharma@design.co",
-    phone: "+1 (555) 382-9104",
-    linkedin: "https://linkedin.com/in/priyasharma",
-    notes: "Great conversation about the future of collaborative tools and intuitive interfaces.",
-    bio: "Designing intuitive experiences that bring people and ideas closer.",
-    lastConnected: "3 days ago",
-    followUpDue: "In 2 days",
-    sharedInterests: ["Product", "Design", "Startups"],
-    tags: ["Product", "Design", "VIP"],
-    addedAt: "2026-08-25T10:00:00Z",
-    momentum: 88,
-  },
-  {
-    id: "seed-rohan",
-    name: "Rohan Mehta",
-    title: "Growth Lead",
-    company: "Supabase",
-    email: "rohan@supabase.io",
-    phone: "+1 (555) 721-8840",
-    linkedin: "https://linkedin.com/in/rohanmehta",
-    notes: "Discussed developer onboarding funnel optimizations and AI proxy pipelines.",
-    bio: "Scaling devtools and cloud infrastructure through community-driven growth.",
-    lastConnected: "3 days ago",
-    followUpDue: "Next week",
-    sharedInterests: ["Growth", "DevTools", "AI"],
-    tags: ["Growth", "Tech"],
-    addedAt: "2026-08-24T14:30:00Z",
-    momentum: 74,
-  },
-  {
-    id: "seed-ananya",
-    name: "Ananya Rao",
-    title: "Marketing Strategist",
-    company: "Figma",
-    email: "ananya.rao@figma.com",
-    phone: "+1 (555) 902-3312",
-    linkedin: "https://linkedin.com/in/ananyarao",
-    notes: "Met at Design & AI Summit. Keen to collaborate on community event marketing.",
-    bio: "Brand storyteller building connected product communities.",
-    lastConnected: "5 days ago",
-    followUpDue: "Next week",
-    sharedInterests: ["Community", "Branding", "Events"],
-    tags: ["Marketing", "Design"],
-    addedAt: "2026-08-22T09:15:00Z",
-    momentum: 65,
-  },
-  {
-    id: "seed-karan",
-    name: "Karan Malhotra",
-    title: "Founder",
-    company: "Stealth AI",
-    email: "karan@stealth.ai",
-    phone: "+1 (555) 441-2900",
-    linkedin: "https://linkedin.com/in/karanmalhotra",
-    notes: "Exploring autonomous agents and LLM tooling for relationship workflows.",
-    bio: "2x founder building the next generation of intelligent workflow systems.",
-    lastConnected: "1 week ago",
-    followUpDue: "In 4 days",
-    sharedInterests: ["AI Agents", "Venture", "Startups"],
-    tags: ["Founder", "AI", "Investor"],
-    addedAt: "2026-08-18T16:00:00Z",
-    momentum: 92,
-  },
-];
+
 
 // ── MAIN APPLICATION COMPONENT ────────────────────────────────────────────────
 export default function App() {
@@ -5912,10 +5842,10 @@ Keep it punchy, sharp, and directly actionable.`;
               }}
             >
               {[
-                { count: effectiveContacts.length > 0 ? effectiveContacts.length : 128, label: "People", icon: Icons.Users, color: isDark ? "#2997FF" : "#0071E3", bg: isDark ? "rgba(41, 151, 255, 0.12)" : "#EBF5FF" },
-                { count: dueReminders.length > 0 ? dueReminders.length : 24, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
-                { count: 12, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
-                { count: 8, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
+                { count: effectiveContacts.length, label: "People", icon: Icons.Users, color: isDark ? "#2997FF" : "#0071E3", bg: isDark ? "rgba(41, 151, 255, 0.12)" : "#EBF5FF" },
+                { count: dueReminders.length, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
               ].map((m) => (
                 <div
                   key={m.label}
