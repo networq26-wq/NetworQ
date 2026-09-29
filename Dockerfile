@@ -26,8 +26,12 @@ ENV EXPO_PUBLIC_EMAIL_PROXY_URL=$EXPO_PUBLIC_EMAIL_PROXY_URL
 ENV EXPO_NO_TELEMETRY=1
 
 RUN npm run build:web
-# Copy illustrations and waitlist into dist
-RUN mkdir -p dist/illustrations && cp -r public/illustrations/* dist/illustrations/ && cp public/waitlist.html dist/waitlist.html
+# Copy illustrations, waitlist, and exact brand favicons into dist
+RUN mkdir -p dist/illustrations && \
+    cp -r public/illustrations/* dist/illustrations/ && \
+    cp public/waitlist.html dist/waitlist.html && \
+    cp -f public/favicon.* dist/ && \
+    sed -i 's|</head>|<link rel="icon" type="image/svg+xml" href="/favicon.svg" /><link rel="icon" type="image/png" href="/favicon.png" /><link rel="shortcut icon" href="/favicon.ico" /></head>|g' dist/index.html
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM base AS runner
