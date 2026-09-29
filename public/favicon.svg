@@ -1,21 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-30 -30 608 611" width="128" height="128">
   <defs>
-    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8B5CF6"/>
-      <stop offset="100%" stop-color="#6D28D9"/>
-    </linearGradient>
-    <linearGradient id="beamGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="rgba(192,132,252,0)"/>
-      <stop offset="50%" stop-color="#E9D5FF"/>
-      <stop offset="100%" stop-color="rgba(192,132,252,0)"/>
+    <linearGradient id="networqBrandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5"/>
+      <stop offset="60%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#7C3AED"/>
     </linearGradient>
   </defs>
-  <!-- Background rounded squircle -->
-  <rect x="4" y="4" width="120" height="120" rx="30" fill="url(#purpleGrad)" />
-  <!-- Outer ring of Q -->
-  <circle cx="64" cy="58" r="32" fill="none" stroke="#FFFFFF" stroke-width="12" />
-  <!-- Tail of Q -->
-  <path d="M 76 74 L 100 98" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" />
-  <!-- Scanner laser beam inside Q cavity -->
-  <line x1="42" y1="58" x2="86" y2="58" stroke="url(#beamGrad)" stroke-width="4" stroke-linecap="round" />
+  <!-- Exact Brand PDF Vector for NetworQ Logo Mark -->
+  <!-- Left Bracket (Capture) -->
+  <path
+    d="M 115.08 352.76 C 115.08 363.63, 123.89 372.44, 134.76 372.44 L 216 372.44 L 216 487.53 L 107.59 487.53 C 48.17 487.53, 0 439.36, 0 379.94 L 0 107.57 C 0 48.17, 48.17 0, 107.59 0 L 216 0 L 216 115.08 L 134.76 115.08 C 123.89 115.08, 115.08 123.87, 115.08 134.74 Z"
+    fill="url(#networqBrandGrad)"
+  />
+  <!-- Right Bracket with Q-tail (Continuity) -->
+  <path
+    d="M 468.55 467.77 L 548.05 550.87 L 426.92 550.87 L 365.37 487.53 L 298.01 413.36 L 260.86 372.44 L 379.27 372.44 C 390.12 372.44, 398.93 363.63, 398.93 352.76 L 398.93 134.74 C 398.93 123.87, 390.12 115.08, 379.27 115.08 L 298.01 115.08 L 298.01 0 L 406.43 0 C 465.85 0, 514.01 48.17, 514.01 107.57 L 514.01 379.94 C 514.01 416.22, 496.05 448.31, 468.55 467.77 Z"
+    fill="url(#networqBrandGrad)"
+  />
+  <!-- Center Connector Bar (Connection) -->
+  <rect
+    x="115.08"
+    y="202.75"
+    width="283.85"
+    height="82.01"
+    fill="url(#networqBrandGrad)"
+  />
 </svg>

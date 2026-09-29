@@ -3641,8 +3641,8 @@ Be direct, helpful, and concise.`;
     }
     setAuthSubmitting(true);
     try {
-      const updatedUser = {
-        ...currentUser,
+      const { error } = await supabase.from("profiles").upsert({
+        id: currentUser.id,
         name: form.name || currentUser.name || "Networker",
         company: form.company,
         role: form.role,
@@ -3650,33 +3650,10 @@ Be direct, helpful, and concise.`;
         phone: form.phone,
         linkedin: form.linkedin,
         bio: form.bio,
-      };
-
-      // Instant optimistic transition - no waiting!
-      setCurrentUser(updatedUser);
-      setScreen("app");
+      });
+      if (error) throw error;
       triggerConfetti();
-
-      // Persist in background with upsert
-      (async () => {
-        try {
-          await supabase
-            .from("profiles")
-            .upsert({
-              id: currentUser.id,
-              name: updatedUser.name,
-              company: updatedUser.company,
-              role: updatedUser.role,
-              sector: updatedUser.sector,
-              phone: updatedUser.phone,
-              linkedin: updatedUser.linkedin,
-              bio: updatedUser.bio,
-            });
-          loadUserData(currentUser.id, currentUser.email);
-        } catch (err: any) {
-          console.warn("Background profile save notice:", err);
-        }
-      })();
+      await loadUserData(currentUser.id, currentUser.email);
     } catch (err: any) {
       setAuthMsg({ text: err.message || "Failed to save profile.", type: "error" });
     } finally {
@@ -4281,29 +4258,26 @@ Keep it punchy, sharp, and directly actionable.`;
 
   const updateProfile = async () => {
     setSavingProfile(true);
-    // Instant optimistic update — zero lag for user!
-    setCurrentUser((u: any) => ({ ...u, ...profileForm }));
-    setProfileModal(false);
-    triggerConfetti();
-    showToast("Profile updated.", "success");
-
     try {
-      if (currentUser?.id) {
-        await supabase
-          .from("profiles")
-          .upsert({
-            id: currentUser.id,
-            name: profileForm.name,
-            company: profileForm.company,
-            role: profileForm.role,
-            sector: profileForm.sector,
-            phone: profileForm.phone,
-            linkedin: profileForm.linkedin,
-            bio: profileForm.bio,
-          });
-      }
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          name: profileForm.name,
+          company: profileForm.company,
+          role: profileForm.role,
+          sector: profileForm.sector,
+          phone: profileForm.phone,
+          linkedin: profileForm.linkedin,
+          bio: profileForm.bio,
+        })
+        .eq("id", currentUser.id);
+      if (error) throw error;
+      setCurrentUser((u: any) => ({ ...u, ...profileForm }));
+      setProfileModal(false);
+      triggerConfetti();
+      showToast("Profile updated.", "success");
     } catch (err: any) {
-      console.warn("Background profile update notice:", err);
+      showToast(err.message || "Failed to update profile.", "error");
     } finally {
       setSavingProfile(false);
     }
@@ -4404,9 +4378,7 @@ Keep it punchy, sharp, and directly actionable.`;
   };
 
   const isMobile = windowWidth < 768;
-  const effectiveContacts = useMemo(() => {
-    return contacts.length > 0 ? contacts : BRAND_SEED_CONTACTS;
-  }, [contacts]);
+  const effectiveContacts = contacts;
 
   const greetingText = useMemo(() => {
     const hr = new Date().getHours();
@@ -5860,10 +5832,10 @@ Keep it punchy, sharp, and directly actionable.`;
               }}
             >
               {[
-                { count: effectiveContacts.length > 0 ? effectiveContacts.length : 128, label: "People", icon: Icons.Users, color: isDark ? "#2997FF" : "#0071E3", bg: isDark ? "rgba(41, 151, 255, 0.12)" : "#EBF5FF" },
-                { count: dueReminders.length > 0 ? dueReminders.length : 24, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
-                { count: 12, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
-                { count: 8, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
+                { count: contacts.length, label: "People", icon: Icons.Users, color: isDark ? "#2997FF" : "#0071E3", bg: isDark ? "rgba(41, 151, 255, 0.12)" : "#EBF5FF" },
+                { count: dueReminders.length, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
+                { count: contacts.filter((c) => c.meetLink).length, label: "Meetings", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
+                { count: contacts.filter((c) => c.emailSent).length, label: "Contacted", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
               ].map((m) => (
                 <div
                   key={m.label}
