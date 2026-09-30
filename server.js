@@ -1,4 +1,5 @@
 const express = require("express");
+const compression = require("compression");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
@@ -10,6 +11,7 @@ const { startReminderEngine } = require("./api/reminders");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
+app.use(compression());
 
 function parseEnvContent(content) {
   if (!content) return;
@@ -171,11 +173,30 @@ app.options("/api/email", (req, res) => res.status(200).end());
 const distPath = path.join(__dirname, "dist");
 if (fs.existsSync(distPath)) {
   app.get("/waitlist.html", (req, res) => waitlistHandler(req, res));
-  app.use(express.static(distPath));
+
+  // Serve static assets with high-performance caching (1 year for immutable hashed bundles)
+  app.use(
+    express.static(distPath, {
+      maxAge: "30d",
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("index.html")) {
+          // Always revalidate index.html so code updates are immediate
+          res.setHeader("Cache-Control", "no-cache, must-revalidate");
+        } else if (filePath.includes("/_expo/static/") || filePath.includes("/static/js/")) {
+          // Content-hashed bundles never change
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (filePath.endsWith(".apk")) {
+          res.setHeader("Cache-Control", "no-cache");
+        }
+      },
+    })
+  );
+
   app.use((req, res) => {
     if (req.path.startsWith("/api/")) {
       return res.status(404).json({ error: `API endpoint ${req.method} ${req.path} not found.` });
     }
+    res.setHeader("Cache-Control", "no-cache, must-revalidate");
     res.sendFile(path.join(distPath, "index.html"));
   });
 }

@@ -4011,8 +4011,10 @@ VOICE & ASSISTANT DIRECTIVES:
     });
 
     (async () => {
-      const splashDelay = new Promise<void>(resolve => setTimeout(resolve, 5000));
-      const { data: { session } } = await supabase.auth.getSession();
+      const splashDelay = new Promise<void>((resolve) => setTimeout(resolve, 600));
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user) {
         await Promise.all([loadUserData(session.user.id, session.user.email), splashDelay]);
       } else {

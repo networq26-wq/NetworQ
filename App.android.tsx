@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Platform,
   SafeAreaView,
-  PermissionsAndroid,
 } from "react-native";
 import { WebView } from "react-native-webview";
 
@@ -19,18 +18,6 @@ export default function App() {
   const webViewRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
-
-  // Request Android runtime permissions on mount
-  useEffect(() => {
-    if (Platform.OS === "android") {
-      PermissionsAndroid.requestMultiple([
-        PermissionsAndroid.PERMISSIONS.CAMERA,
-        PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-      ]).catch((err) => {
-        console.warn("Permissions request error:", err);
-      });
-    }
-  }, []);
 
   // Handle hardware Android back button
   useEffect(() => {
@@ -79,17 +66,7 @@ export default function App() {
           mediaPlaybackRequiresUserAction={false}
           geolocationEnabled={true}
           cacheEnabled={true}
-          allowFileAccess={true}
-          allowFileAccessFromFileURLs={true}
-          allowUniversalAccessFromFileURLs={true}
-          javaScriptCanOpenWindowsAutomatically={true}
-          mediaCapturePermissionGrantType="grant"
-          onPermissionRequest={(request) => {
-            request.grant(request.resources);
-          }}
-          scalesPageToFit={false}
-          showsVerticalScrollIndicator={false}
-          showsHorizontalScrollIndicator={false}
+          cacheMode="LOAD_DEFAULT"
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#6366F1" />
