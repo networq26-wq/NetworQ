@@ -158,7 +158,7 @@ app.get("/api/groq", (req, res) => {
   res.json({
     status: "ok",
     provider: "groq",
-    models: { text: "qwen/qwen3.8-27b", vision: "meta-llama/llama-4-scout-17b-16e-instruct" },
+    models: { text: "llama-3.3-70b-versatile", vision: "llama-3.2-11b-vision-preview" },
     timestamp: new Date().toISOString(),
   });
 });
