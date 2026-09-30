@@ -4015,12 +4015,29 @@ VOICE & ASSISTANT DIRECTIVES:
       const p1 = setTimeout(() => setSplashProgress(45), 120);
       const p2 = setTimeout(() => setSplashProgress(75), 280);
       const p3 = setTimeout(() => setSplashProgress(92), 440);
+      // Hard failsafe: force past 92% after 3s no matter what
+      const pForce = setTimeout(() => {
+        setSplashProgress(100);
+        setScreen("login");
+      }, 3000);
 
       const splashDelay = new Promise<void>((resolve) => setTimeout(resolve, 600));
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+
+      // Race supabase.auth.getSession() against a 4s timeout — never freeze
+      let session: any = null;
+      try {
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession().then((r: any) => r.data.session),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
+        session = sessionResult;
+      } catch {
+        session = null;
+      }
+
+      clearTimeout(pForce);
       setSplashProgress(100);
+
       if (session?.user) {
         await Promise.all([loadUserData(session.user.id, session.user.email), splashDelay]);
       } else {
