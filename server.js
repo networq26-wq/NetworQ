@@ -116,6 +116,34 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// ── App Version & Direct APK Download ─────────────────────────────────────────
+app.get("/api/version", (req, res) => {
+  res.json({
+    appName: "NetworQ",
+    version: "1.0.0",
+    versionCode: 1,
+    downloadUrl: "https://www.networq.co.in/download/NetworQ.apk",
+    otaChannel: "production",
+    updatedAt: new Date().toISOString(),
+  });
+});
+
+app.get(["/download/apk", "/download/NetworQ.apk", "/api/download/apk"], (req, res) => {
+  const apkPath = path.join(__dirname, "public/download/NetworQ.apk");
+  if (fs.existsSync(apkPath)) {
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Disposition", 'attachment; filename="NetworQ.apk"');
+    return res.sendFile(apkPath);
+  }
+  const distApkPath = path.join(__dirname, "dist/download/NetworQ.apk");
+  if (fs.existsSync(distApkPath)) {
+    res.setHeader("Content-Type", "application/vnd.android.package-archive");
+    res.setHeader("Content-Disposition", 'attachment; filename="NetworQ.apk"');
+    return res.sendFile(distApkPath);
+  }
+  return res.status(404).json({ error: "NetworQ APK is currently building or not found." });
+});
+
 // ── Waitlist ──────────────────────────────────────────────────────────────────
 app.get("/waitlist", (req, res) => waitlistHandler(req, res));
 
