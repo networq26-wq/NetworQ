@@ -1421,6 +1421,213 @@ function HoloCard3D({
   );
 }
 
+// ── LIVE CAMERA SCANNER MODAL ─────────────────────────────────────────────────
+function LiveCameraModal({
+  isOpen,
+  onClose,
+  onCapture,
+  isDark,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onCapture: (file: any) => void;
+  isDark: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState("");
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+      setReady(false);
+      return;
+    }
+
+    setCameraError("");
+    setReady(false);
+
+    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError("Live camera stream not supported directly by this browser. Tap Open Native Camera.");
+      return;
+    }
+
+    navigator.mediaDevices
+      .getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
+        audio: false,
+      })
+      .then((stream) => {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().then(() => setReady(true)).catch(console.warn);
+          };
+        }
+      })
+      .catch((err) => {
+        console.warn("Camera stream error:", err);
+        setCameraError(
+          err.name === "NotAllowedError"
+            ? "Camera permission denied. Please allow camera access in app settings."
+            : "Unable to start live camera feed. Please use native camera capture."
+        );
+      });
+
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSnap = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `card_scan_${Date.now()}.jpg`, { type: "image/jpeg" });
+        onCapture(file);
+        onClose();
+      }
+    }, "image/jpeg", 0.92);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 99999,
+        background: "rgba(0,0,0,0.85)",
+        backdropFilter: "blur(12px)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 480,
+          background: isDark ? "#1C1C1E" : "#FFFFFF",
+          borderRadius: 22,
+          overflow: "hidden",
+          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px" }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: isDark ? "#FFF" : "#000" }}>Live Card Scanner</div>
+            <div style={{ fontSize: 12, color: isDark ? "#8E8E93" : "#6E6E73" }}>Fit business card inside frame</div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
+              border: "none",
+              borderRadius: "50%",
+              width: 32,
+              height: 32,
+              cursor: "pointer",
+              color: isDark ? "#FFF" : "#000",
+              fontSize: 16,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ position: "relative", width: "100%", height: 320, background: "#000", overflow: "hidden" }}>
+          {cameraError ? (
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "#EF4444" }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{cameraError}</div>
+            </div>
+          ) : (
+            <>
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "25px 20px",
+                  border: "2px dashed rgba(255,255,255,0.85)",
+                  borderRadius: 14,
+                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
+                  pointerEvents: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div style={{ color: "#FFF", fontSize: 12, fontWeight: 600, background: "rgba(0,0,0,0.6)", padding: "5px 12px", borderRadius: 20 }}>
+                  Align Business Card
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, background: isDark ? "#161617" : "#F5F5F7" }}>
+          {!cameraError && (
+            <button
+              onClick={handleSnap}
+              disabled={!ready}
+              style={{
+                width: 62,
+                height: 62,
+                borderRadius: "50%",
+                background: ready ? "linear-gradient(135deg, #0071E3, #2997FF)" : "#8E8E93",
+                border: "4px solid rgba(255,255,255,0.8)",
+                boxShadow: "0 4px 14px rgba(0,113,227,0.4)",
+                cursor: ready ? "pointer" : "default",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#FFF",
+                fontSize: 22,
+              }}
+            >
+              📸
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── REAL TACTICAL RADAR CANVAS COMPONENT ──────────────────────────────────────
 interface RadarBlip {
   id: string;
@@ -1428,33 +1635,135 @@ interface RadarBlip {
   company: string;
   role: string;
   email: string;
+  phone?: string;
   angle: number; // 0 to 2PI
   distance: number; // 0.15 to 0.85
   lastSweepHit: number;
   contact: any;
+  isLiveDevice?: boolean;
 }
 
 function RealRadarCanvas({
   contacts,
+  currentUser,
   onSelectContact,
+  onExchangeContact,
   isDark,
+  showToast,
+  triggerConfetti,
 }: {
   contacts: any[];
+  currentUser?: any;
   onSelectContact: (c: any) => void;
+  onExchangeContact?: (peer: any) => void;
   isDark: boolean;
+  showToast?: (msg: string, type?: "success" | "error" | "info") => void;
+  triggerConfetti?: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [selectedBlip, setSelectedBlip] = useState<RadarBlip | null>(null);
   const [pingActive, setPingActive] = useState(false);
   const pingTimeRef = useRef<number>(0);
+  const [livePeers, setLivePeers] = useState<any[]>([]);
+
+  const myDeviceId = useMemo(() => {
+    if (currentUser?.id) return currentUser.id;
+    try {
+      let stored = localStorage.getItem("networq_radar_dev_id");
+      if (!stored) {
+        stored = "device_" + Math.random().toString(36).substring(2, 10);
+        localStorage.setItem("networq_radar_dev_id", stored);
+      }
+      return stored;
+    } catch {
+      return "device_" + Math.random().toString(36).substring(2, 10);
+    }
+  }, [currentUser?.id]);
+
+  // AirDrop / ShareIt Realtime Presence & Auto-Discovery
+  useEffect(() => {
+    const channel = supabase.channel("networq-radar-live", {
+      config: {
+        presence: {
+          key: myDeviceId,
+        },
+      },
+    });
+
+    const myProfile = {
+      id: myDeviceId,
+      name: currentUser?.name || "NetworQ Member",
+      company: currentUser?.company || "NetworQ User",
+      role: currentUser?.role || "Professional",
+      email: currentUser?.email || "",
+      phone: currentUser?.phone || "",
+      avatar: currentUser?.avatar || "",
+      onlineAt: Date.now(),
+    };
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        const detected: any[] = [];
+        Object.entries(state).forEach(([key, presences]: [string, any]) => {
+          if (key !== myDeviceId && presences && presences.length > 0) {
+            const latest = presences[presences.length - 1];
+            detected.push({ ...latest, id: key });
+          }
+        });
+        setLivePeers(detected);
+      })
+      .on("broadcast", { event: "card-exchange" }, ({ payload }) => {
+        if (payload && (payload.targetId === myDeviceId || !payload.targetId)) {
+          if (payload.sender && payload.sender.id !== myDeviceId) {
+            if (showToast) {
+              showToast(`🤝 Received contact card from ${payload.sender.name}!`, "success");
+            }
+            if (triggerConfetti) triggerConfetti();
+            if (onExchangeContact) onExchangeContact(payload.sender);
+          }
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track(myProfile);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [myDeviceId, currentUser]);
 
   const blips = useMemo<RadarBlip[]>(() => {
-    return contacts.map((c, i) => {
-      // Deterministic angle & distance based on hash
+    // 1. Live nearby phones detected via Realtime presence (AirDrop / ShareIt)
+    const liveBlips: RadarBlip[] = livePeers.map((peer, i) => {
+      const str = peer.name + peer.id;
+      let hash = 0;
+      for (let j = 0; j < str.length; j++) hash = (hash * 31 + str.charCodeAt(j)) & 0xffffffff;
+      const angle = (Math.abs(hash % 360) * Math.PI) / 180;
+      const distance = 0.22 + ((i % 3) * 0.22) + (Math.abs(hash % 15) / 100);
+      return {
+        id: peer.id,
+        name: peer.name || "Nearby Phone",
+        company: peer.company || "Live NetworQ Device",
+        role: peer.role || "Member",
+        email: peer.email || "",
+        phone: peer.phone || "",
+        angle,
+        distance: Math.min(0.85, distance),
+        lastSweepHit: 0,
+        contact: peer,
+        isLiveDevice: true,
+      };
+    });
+
+    // 2. Saved local contacts
+    const savedBlips: RadarBlip[] = contacts.map((c, i) => {
       const str = c.name + c.id;
       let hash = 0;
       for (let j = 0; j < str.length; j++) hash = (hash * 31 + str.charCodeAt(j)) & 0xffffffff;
-      const angle = Math.abs(hash % 360) * (Math.PI / 180);
+      const angle = (Math.abs(hash % 360) * Math.PI) / 180;
       const distance = 0.2 + (Math.abs((hash >> 8) % 65) / 100);
       return {
         id: c.id,
@@ -1462,19 +1771,45 @@ function RealRadarCanvas({
         company: c.company || "Attendee",
         role: c.title || "Networker",
         email: c.email || "",
+        phone: c.phone || "",
         angle,
         distance,
         lastSweepHit: 0,
         contact: c,
+        isLiveDevice: false,
       };
     });
-  }, [contacts]);
+
+    return [...liveBlips, ...savedBlips];
+  }, [livePeers, contacts]);
 
   const triggerSonarPing = () => {
     setPingActive(true);
     pingTimeRef.current = Date.now();
-    triggerConfetti(window.innerWidth / 2, window.innerHeight * 0.45);
+    if (triggerConfetti) triggerConfetti();
     setTimeout(() => setPingActive(false), 2400);
+  };
+
+  const sendCardToPeer = async (peer: any) => {
+    const channel = supabase.channel("networq-radar-live");
+    await channel.send({
+      type: "broadcast",
+      event: "card-exchange",
+      payload: {
+        sender: {
+          id: myDeviceId,
+          name: currentUser?.name || "NetworQ Member",
+          company: currentUser?.company || "NetworQ User",
+          role: currentUser?.role || "Professional",
+          email: currentUser?.email || "",
+          phone: currentUser?.phone || "",
+        },
+        targetId: peer.id,
+      },
+    });
+    if (onExchangeContact) onExchangeContact(peer);
+    if (showToast) showToast(`Card shared with ${peer.name} via AirDrop!`, "success");
+    if (triggerConfetti) triggerConfetti();
   };
 
   useEffect(() => {
@@ -1492,7 +1827,7 @@ function RealRadarCanvas({
       const cy = h / 2;
       const maxRadius = Math.min(cx, cy) - 24;
 
-      // Apple Clean Scope background
+      // Clean Scope background
       ctx.fillStyle = isDark ? "#161617" : "#FFFFFF";
       ctx.fillRect(0, 0, w, h);
 
@@ -1500,7 +1835,7 @@ function RealRadarCanvas({
       const now = Date.now();
       const sweepAngle = ((now * 0.0012) % (Math.PI * 2));
 
-      // Draw concentric range rings (Apple minimalist design)
+      // Concentric range rings
       const rings = [0.25, 0.5, 0.75, 1.0];
       const ringLabels = ["10m", "25m", "50m", "100m"];
 
@@ -1514,7 +1849,6 @@ function RealRadarCanvas({
         ctx.lineWidth = idx === 3 ? 1.5 : 1;
         ctx.stroke();
 
-        // Distance text
         ctx.fillStyle = isDark ? "#86868B" : "#8E8E93";
         ctx.font = "500 10px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.textAlign = "left";
@@ -1561,7 +1895,7 @@ function RealRadarCanvas({
         }
       }
 
-      // Rotating Sweep Beam with subtle Apple Blue gradient cone
+      // Rotating Sweep Beam
       const sweepTailAngle = 0.55;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
       grad.addColorStop(0, isDark ? "rgba(41, 151, 255, 0.22)" : "rgba(0, 113, 227, 0.15)");
@@ -1584,12 +1918,11 @@ function RealRadarCanvas({
       ctx.stroke();
       ctx.restore();
 
-      // Draw Blips (Apple Find My style dots)
+      // Draw Blips
       blips.forEach((b) => {
         const bx = cx + Math.cos(b.angle) * (b.distance * maxRadius);
         const by = cy + Math.sin(b.angle) * (b.distance * maxRadius);
 
-        // Check if sweep passed over this blip
         const diff = (sweepAngle - b.angle + Math.PI * 2) % (Math.PI * 2);
         if (diff < 0.15) {
           b.lastSweepHit = now;
@@ -1597,11 +1930,19 @@ function RealRadarCanvas({
 
         const timeSinceHit = now - b.lastSweepHit;
         const hitGlow = Math.max(0, 1 - timeSinceHit / 2200);
-
         const isSelected = selectedBlip?.id === b.id;
 
-        // Blip outer pulse ring
-        if (hitGlow > 0 || isSelected) {
+        // Live AirDrop device aura
+        if (b.isLiveDevice) {
+          const pulse = (Math.sin(now * 0.006) + 1) * 3;
+          ctx.beginPath();
+          ctx.arc(bx, by, 10 + pulse, 0, Math.PI * 2);
+          ctx.fillStyle = isDark ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.2)";
+          ctx.fill();
+          ctx.strokeStyle = "#10B981";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        } else if (hitGlow > 0 || isSelected) {
           ctx.beginPath();
           ctx.arc(bx, by, isSelected ? 12 : 7 + hitGlow * 5, 0, Math.PI * 2);
           ctx.fillStyle = isSelected
@@ -1612,8 +1953,10 @@ function RealRadarCanvas({
 
         // Blip core dot
         ctx.beginPath();
-        ctx.arc(bx, by, isSelected ? 5.5 : 4, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected
+        ctx.arc(bx, by, b.isLiveDevice ? 6 : (isSelected ? 5.5 : 4), 0, Math.PI * 2);
+        ctx.fillStyle = b.isLiveDevice
+          ? "#10B981"
+          : isSelected
           ? (isDark ? "#2997FF" : "#0071E3")
           : (isDark ? "#FFFFFF" : "#1D1D1F");
         ctx.fill();
@@ -1622,25 +1965,27 @@ function RealRadarCanvas({
         ctx.stroke();
 
         // Selected Target Reticle & Label
-        if (isSelected) {
-          ctx.strokeStyle = isDark ? "#2997FF" : "#0071E3";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(bx, by, 10, 0, Math.PI * 2);
-          ctx.stroke();
+        if (isSelected || b.isLiveDevice) {
+          if (isSelected) {
+            ctx.strokeStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3");
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(bx, by, 11, 0, Math.PI * 2);
+            ctx.stroke();
+          }
 
           // Connecting Leader Line
           ctx.beginPath();
           ctx.moveTo(bx + 8, by - 8);
-          ctx.lineTo(bx + 22, by - 20);
-          ctx.lineTo(bx + 75, by - 20);
-          ctx.strokeStyle = isDark ? "#2997FF" : "#0071E3";
+          ctx.lineTo(bx + 20, by - 18);
+          ctx.lineTo(bx + 75, by - 18);
+          ctx.strokeStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3");
           ctx.stroke();
 
-          ctx.fillStyle = isDark ? "#FFFFFF" : "#1D1D1F";
+          ctx.fillStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#FFFFFF" : "#1D1D1F");
           ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
           ctx.textAlign = "left";
-          ctx.fillText(b.name, bx + 24, by - 24);
+          ctx.fillText(b.name + (b.isLiveDevice ? " (Live)" : ""), bx + 22, by - 22);
         }
       });
 
@@ -1649,7 +1994,7 @@ function RealRadarCanvas({
       ctx.arc(cx, cy, 5, 0, Math.PI * 2);
       ctx.fillStyle = isDark ? "#2997FF" : "#0071E3";
       ctx.fill();
-      ctx.strokeStyle = isDark ? "#FFFFFF" : "#FFFFFF";
+      ctx.strokeStyle = "#FFFFFF";
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -1675,7 +2020,7 @@ function RealRadarCanvas({
       const bx = cx + Math.cos(b.angle) * (b.distance * maxRadius);
       const by = cy + Math.sin(b.angle) * (b.distance * maxRadius);
       const dist = Math.sqrt((bx - x) ** 2 + (by - y) ** 2);
-      return dist <= 14;
+      return dist <= 18;
     });
 
     if (clicked) {
@@ -1687,6 +2032,31 @@ function RealRadarCanvas({
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+      {/* Live Peers Status Badge */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "6px 14px",
+          borderRadius: 20,
+          background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+        }}
+      >
+        {livePeers.length > 0 ? (
+          <span style={{ color: "#10B981", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", display: "inline-block", boxShadow: "0 0 8px #10B981" }} />
+            {livePeers.length} Active Phone{livePeers.length > 1 ? "s" : ""} Nearby (AirDrop Auto-Detect)
+          </span>
+        ) : (
+          <span style={{ fontSize: 12, color: isDark ? "#86868B" : "#6E6E73", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.5s infinite" }} />
+            Broadcasting presence & listening for nearby phones…
+          </span>
+        )}
+      </div>
+
       {/* Proximity Network Map Screen */}
       <div
         style={{
@@ -1737,11 +2107,11 @@ function RealRadarCanvas({
           }}
         >
           <Icons.Radar size={15} />
-          <span>Scan Nearby (100m)</span>
+          <span>Ping Sonar</span>
         </button>
 
         <span style={{ fontSize: 13, color: isDark ? "#86868B" : "#6E6E73", fontWeight: 500 }}>
-          Active Nearby: <strong style={{ color: isDark ? "#F5F5F7" : "#1D1D1F" }}>{contacts.length} people</strong>
+          Total On Scope: <strong style={{ color: isDark ? "#F5F5F7" : "#1D1D1F" }}>{blips.length}</strong>
         </span>
       </div>
 
@@ -1752,7 +2122,7 @@ function RealRadarCanvas({
             width: "100%",
             maxWidth: 440,
             background: isDark ? "#1C1C1E" : "#FFFFFF",
-            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA"}`,
+            border: `1px solid ${selectedBlip.isLiveDevice ? "#10B981" : (isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA")}`,
             borderRadius: 14,
             padding: "16px 20px",
             boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.06)",
@@ -1763,8 +2133,8 @@ function RealRadarCanvas({
           }}
         >
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#2997FF" : "#0071E3", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              Selected Contact
+            <div style={{ fontSize: 11, fontWeight: 700, color: selectedBlip.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3"), letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              {selectedBlip.isLiveDevice ? "✨ Live AirDrop Device" : "Saved Contact"}
             </div>
             <div style={{ fontWeight: 700, fontSize: 16, marginTop: 2, color: isDark ? "#F5F5F7" : "#1D1D1F" }}>
               {selectedBlip.name}
@@ -1775,21 +2145,43 @@ function RealRadarCanvas({
           </div>
 
           <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={() => onSelectContact(selectedBlip.contact)}
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                background: isDark ? "#2997FF" : "#0071E3",
-                color: "#fff",
-                border: "none",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              View Profile ↗
-            </button>
+            {selectedBlip.isLiveDevice ? (
+              <button
+                onClick={() => sendCardToPeer(selectedBlip.contact)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: "linear-gradient(135deg, #10B981, #059669)",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
+                }}
+              >
+                <span>🤝 AirDrop Card</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => onSelectContact(selectedBlip.contact)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  background: isDark ? "#2997FF" : "#0071E3",
+                  color: "#fff",
+                  border: "none",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                View Profile ↗
+              </button>
+            )}
             <button
               onClick={() => setSelectedBlip(null)}
               style={{
@@ -3297,7 +3689,9 @@ export default function App() {
   const [prepBrief, setPrepBrief] = useState<string | null>(null);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const fileRef = useRef<any>(null);
+  const cameraFileRef = useRef<any>(null);
   const qrFileRef = useRef<any>(null);
+  const [liveCameraOpen, setLiveCameraOpen] = useState(false);
 
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -3389,7 +3783,7 @@ export default function App() {
     );
   };
 
-  const playJarvisVoice = (speechText: string, forcedPersona?: "siri" | "jarvis") => {
+  const playAiVoice = (speechText: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
 
@@ -3406,35 +3800,24 @@ export default function App() {
     if (!cleanText) return;
 
     const utter = new SpeechSynthesisUtterance(cleanText);
-    const persona = forcedPersona || voicePersona;
-    const targetVoice = getPersonaVoice(persona, speechVoices);
+    const targetVoice =
+      speechVoices.find((v) => /(natural|samantha|ava|google us english|daniel|george)/i.test(v.name)) ||
+      speechVoices.find((v) => v.lang.startsWith("en-US")) ||
+      speechVoices.find((v) => v.lang.startsWith("en")) ||
+      speechVoices[0];
 
     if (targetVoice) {
       utter.voice = targetVoice;
     }
-
-    if (persona === "siri") {
-      utter.rate = 1.0;
-      utter.pitch = 1.02;
-    } else {
-      utter.rate = 0.98;
-      utter.pitch = 0.96;
-    }
+    utter.rate = 1.0;
+    utter.pitch = 1.0;
 
     utter.onend = () => setIsSpeakingReply(false);
     utter.onerror = () => setIsSpeakingReply(false);
     setIsSpeakingReply(true);
     window.speechSynthesis.speak(utter);
   };
-
-  const previewVoicePersona = (persona: "siri" | "jarvis") => {
-    setVoicePersona(persona);
-    const sample =
-      persona === "siri"
-        ? "Hello! I am Siri, your NetworQ executive voice assistant."
-        : "Jarvis online. Ready to organize your network, meetings, and follow-ups.";
-    playJarvisVoice(sample, persona);
-  };
+  const playJarvisVoice = playAiVoice;
 
   const sendAiQuery = async (queryText?: string, wasSpoken = false) => {
     const text = (queryText || aiInput).trim();
@@ -3453,7 +3836,7 @@ export default function App() {
         `- ${c.name} (${c.roleCategory || c.role || "Executive"} at ${c.company || "Company"}). Email: ${c.email || "No email"}. Scheduled reminder: ${c.reminder && c.reminderDate ? c.reminderDate : "none"}. Follow-up email: ${c.emailSent ? "already sent" : "needs email"}. Notes: ${c.notes || "None"}.`
       ).join("\n");
 
-      const systemPrompt = `You are ${voicePersona === "siri" ? "Siri" : "Jarvis"}, NetworQ's Elite AI & Voice Executive Assistant for ${currentUser?.name || "the user"}.
+      const systemPrompt = `You are NetworQ's Elite AI Assistant for ${currentUser?.name || "the user"}.
 You have direct, real-time access to the user's live NetworQ CRM database:
 
 CURRENT REAL-TIME CRM DATA:
@@ -3480,7 +3863,7 @@ VOICE & ASSISTANT DIRECTIVES:
      A) Scheduled Reminders: Clearly name each person with their company, reminder date, and purpose.
      B) Pending Emails: Clearly name each person who needs a follow-up email along with their email address.
      Conclude with a proactive offer: "Would you like me to draft a follow-up email or open their contact card right now?"
-2. Voice Persona: Sound like ${voicePersona === "siri" ? "Apple Siri" : "Jarvis"} — articulate, calm, executive, warm, and highly intelligent.
+2. Tone & Voice: Articulate, calm, executive, warm, and highly intelligent.
 3. Conversational Audio Formatting: Do NOT use complex markdown tables or excessive symbols. Keep sentences crisp, natural, and rhythmic so it sounds exceptional over voice synthesis.`;
 
       const responseText = await callAI(
@@ -4464,7 +4847,11 @@ Keep it punchy, sharp, and directly actionable.`;
     showToast(`Successfully dispatched ${sentCount} automated follow-up emails!`, "success");
   };
 
-  const isMobile = windowWidth < 768;
+  const isMobile =
+    windowWidth < 880 ||
+    (typeof window !== "undefined" && window.screen && window.screen.width < 880) ||
+    (typeof navigator !== "undefined" &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent));
   const effectiveContacts = contacts;
 
   const greetingText = useMemo(() => {
@@ -6968,8 +7355,52 @@ Keep it punchy, sharp, and directly actionable.`;
                     ? contacts.filter((c) => c.event?.toLowerCase().includes(radarEventFilter.toLowerCase()))
                     : contacts
                 }
+                currentUser={currentUser}
                 onSelectContact={(c) => setModal(c)}
+                onExchangeContact={(peer) => {
+                  const newContact = {
+                    id: peer.id || `peer-${Date.now()}`,
+                    name: peer.name || "Nearby Member",
+                    company: peer.company || "",
+                    role: peer.role || peer.title || "",
+                    email: peer.email || "",
+                    phone: peer.phone || "",
+                    website: "",
+                    linkedin: "",
+                    event: "Live Radar Auto-Detect",
+                    notes: `Connected via NetworQ Live Radar on ${new Date().toLocaleDateString()}`,
+                    tags: ["Radar", "Nearby"],
+                    reminder: "",
+                    reminderDate: "",
+                    reminderDone: false,
+                    emailSent: false,
+                  };
+                  setContacts((prev) => {
+                    if (prev.some((c) => (c.email && c.email === newContact.email) || c.id === newContact.id)) return prev;
+                    return [newContact, ...prev];
+                  });
+                  if (currentUser?.id) {
+                    supabase
+                      .from("contacts")
+                      .insert({
+                        user_id: currentUser.id,
+                        name: newContact.name,
+                        company: newContact.company,
+                        title: newContact.role,
+                        email: newContact.email,
+                        phone: newContact.phone,
+                        event: "Live Radar Auto-Detect",
+                        notes: newContact.notes,
+                        tags: newContact.tags,
+                      })
+                      .then(({ error }) => {
+                        if (error) console.warn("Could not save peer contact to database:", error);
+                      });
+                  }
+                }}
                 isDark={isDark}
+                showToast={showToast}
+                triggerConfetti={triggerConfetti}
               />
             </div>
           </div>
@@ -6978,19 +7409,72 @@ Keep it punchy, sharp, and directly actionable.`;
         {/* ── SCAN TAB ── */}
         {tab === "scan" && (
           <div style={{ maxWidth: 580, margin: "0 auto" }}>
+            <LiveCameraModal
+              isOpen={liveCameraOpen}
+              onClose={() => setLiveCameraOpen(false)}
+              onCapture={(f) => handleFile(f)}
+              isDark={isDark}
+            />
+
             <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 28, marginBottom: 4, letterSpacing: "-0.02em" }}>
               Scan Business Card
             </h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
-              Upload or capture a photo of a physical card to parse contact details.
+              Use your device camera or upload a business card photo to automatically extract contact details.
             </p>
+
+            {/* Quick Action Camera Buttons */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <button
+                onClick={() => cameraFileRef.current?.click()}
+                style={{
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, #0071E3, #2997FF)",
+                  color: "#FFFFFF",
+                  border: "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                  boxShadow: "0 4px 14px rgba(0, 113, 227, 0.3)",
+                }}
+              >
+                <Icons.Camera size={18} color="#FFFFFF" />
+                <span>Open Device Camera</span>
+              </button>
+
+              <button
+                onClick={() => setLiveCameraOpen(true)}
+                style={{
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  background: isDark ? "rgba(255, 255, 255, 0.08)" : "#F5F5F7",
+                  color: isDark ? "#FFFFFF" : "#1D1D1F",
+                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "#E5E5EA"}`,
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 10,
+                }}
+              >
+                <Icons.Scan size={18} color={isDark ? "#2997FF" : "#0071E3"} />
+                <span>Live Viewfinder Scan</span>
+              </button>
+            </div>
 
             <div style={S.card}>
               <div
                 style={{
                   border: `2px dashed ${isDark ? "rgba(255,255,255,0.15)" : "#D2D2D7"}`,
                   borderRadius: 14,
-                  padding: "44px 20px",
+                  padding: "36px 20px",
                   textAlign: "center",
                   cursor: "pointer",
                   background: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFC",
@@ -7033,15 +7517,32 @@ Keep it punchy, sharp, and directly actionable.`;
                         filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
                       }}
                     />
-                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: themeStyles.text }}>Drop business card photo</div>
+                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: themeStyles.text }}>Choose from Gallery or Drop Card</div>
                     <div style={{ color: themeStyles.textMuted, fontSize: 12 }}>
-                      or <span style={{ color: isDark ? "#2997FF" : "#0071E3", fontWeight: 600 }}>click to select</span> · PNG, JPG
+                      or <span style={{ color: isDark ? "#2997FF" : "#0071E3", fontWeight: 600 }}>browse files</span> · PNG, JPG
                     </div>
                   </div>
                 )}
               </div>
 
-              <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e: any) => handleFile(e.target.files[0])} />
+              {/* Native device camera input with capture attribute */}
+              <input
+                ref={cameraFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={(e: any) => handleFile(e.target.files[0])}
+              />
+
+              {/* Standard photo library input */}
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: "none" }}
+                onChange={(e: any) => handleFile(e.target.files[0])}
+              />
 
               {scanErr && (
                 <div
@@ -8261,61 +8762,14 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             </div>
 
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              {/* Voice Persona Selector (Siri / Jarvis) */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  background: isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)",
-                  borderRadius: 980,
-                  padding: 2,
-                  border: isDark ? "1px solid rgba(255, 255, 255, 0.1)" : "1px solid rgba(0, 0, 0, 0.06)",
-                }}
-              >
-                <button
-                  onClick={() => previewVoicePersona("siri")}
-                  title="Switch to Apple Siri Natural Voice"
-                  style={{
-                    border: "none",
-                    borderRadius: 980,
-                    padding: "3px 9px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: voicePersona === "siri" ? "linear-gradient(135deg, #7C3AED, #6366F1)" : "transparent",
-                    color: voicePersona === "siri" ? "#FFFFFF" : themeStyles.textMuted,
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  Siri
-                </button>
-                <button
-                  onClick={() => previewVoicePersona("jarvis")}
-                  title="Switch to British Jarvis Voice"
-                  style={{
-                    border: "none",
-                    borderRadius: 980,
-                    padding: "3px 9px",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    background: voicePersona === "jarvis" ? "linear-gradient(135deg, #7C3AED, #6366F1)" : "transparent",
-                    color: voicePersona === "jarvis" ? "#FFFFFF" : themeStyles.textMuted,
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  Jarvis
-                </button>
-              </div>
-
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {/* TTS Voice Toggle Button */}
               <button
                 onClick={toggleSpeechPlayback}
                 title={voiceReplyEnabled ? "Disable Voice Audio Responses" : "Enable Voice Audio Responses"}
                 style={{
-                  width: 30,
-                  height: 30,
+                  width: 32,
+                  height: 32,
                   borderRadius: 8,
                   border: "none",
                   cursor: "pointer",
@@ -8330,7 +8784,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   color: voiceReplyEnabled ? "#7C3AED" : themeStyles.textMuted,
                 }}
               >
-                {voiceReplyEnabled ? <Icons.Volume2 size={15} color="#7C3AED" /> : <Icons.VolumeX size={15} />}
+                {voiceReplyEnabled ? <Icons.Volume2 size={16} color="#7C3AED" /> : <Icons.VolumeX size={16} />}
               </button>
 
               {/* Close / Minimize Button */}
@@ -8383,7 +8837,7 @@ Keep it punchy, sharp, and directly actionable.`;
             >
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ animation: "pulse 1s infinite", display: "inline-block" }}>●</span>
-                <span>{voicePersona === "siri" ? "Siri Voice" : "Jarvis"} Speaking...</span>
+                <span>NetworQ AI Speaking...</span>
               </div>
               <button
                 onClick={() => {
@@ -8531,7 +8985,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           gap: 3,
                         }}
                       >
-                        {isSpeakingReply ? "■ Stop" : (voicePersona === "siri" ? "▶ Siri Speak" : "▶ Jarvis Speak")}
+                        {isSpeakingReply ? "■ Stop" : "▶ Listen"}
                       </button>
                     )}
                     {m.time && <span style={{ fontSize: 10, color: themeStyles.textMuted }}>{m.time}</span>}

@@ -1,5 +1,5 @@
-const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
-const TEXT_MODEL = "qwen/qwen3.8-27b";
+const VISION_MODEL = "llama-3.2-11b-vision-preview";
+const TEXT_MODEL = "llama-3.3-70b-versatile";
 
 function buildGroqRequestBody({ system, messages, max_tokens, action }) {
   const model = action === "card_scan" ? VISION_MODEL : TEXT_MODEL;
