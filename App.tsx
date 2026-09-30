@@ -3600,6 +3600,7 @@ export default function App() {
   const [screen, setScreen] = useState<
     "splash" | "login" | "signup" | "forgot_password" | "reset_password" | "complete_profile" | "check_email" | "app"
   >("splash");
+  const [splashProgress, setSplashProgress] = useState(15);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
@@ -4011,16 +4012,24 @@ VOICE & ASSISTANT DIRECTIVES:
     });
 
     (async () => {
+      const p1 = setTimeout(() => setSplashProgress(45), 120);
+      const p2 = setTimeout(() => setSplashProgress(75), 280);
+      const p3 = setTimeout(() => setSplashProgress(92), 440);
+
       const splashDelay = new Promise<void>((resolve) => setTimeout(resolve, 600));
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      setSplashProgress(100);
       if (session?.user) {
         await Promise.all([loadUserData(session.user.id, session.user.email), splashDelay]);
       } else {
         await splashDelay;
         setScreen("login");
       }
+      clearTimeout(p1);
+      clearTimeout(p2);
+      clearTimeout(p3);
     })();
 
     return () => {
@@ -5167,32 +5176,44 @@ Keep it punchy, sharp, and directly actionable.`;
             <Icons.Wordmark size={44} isDark={isDark} scanning={true} />
           </div>
 
-          {/* High-tech Scanner Status Pill */}
-          <div
-            style={{
-              marginTop: 28,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 9,
-              padding: "7px 16px",
-              borderRadius: 980,
-              background: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
-              border: isDark ? "1px solid rgba(255, 255, 255, 0.08)" : "1px solid rgba(0, 0, 0, 0.06)",
-            }}
-          >
-            <span
+          {/* High-tech Loading Progress Bar */}
+          <div style={{ marginTop: 28, width: 240, margin: "28px auto 0" }}>
+            <div
               style={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                background: "#7C3AED",
-                boxShadow: "0 0 10px #7C3AED",
-                animation: "pulse 1.2s ease infinite",
+                width: "100%",
+                height: 6,
+                borderRadius: 980,
+                background: isDark ? "rgba(255, 255, 255, 0.1)" : "rgba(0, 0, 0, 0.08)",
+                overflow: "hidden",
+                position: "relative",
               }}
-            />
-            <span style={{ fontSize: 12, fontWeight: 500, color: themeStyles.textMuted }}>
-              Scanning workspace & proximity nodes…
-            </span>
+            >
+              <div
+                style={{
+                  height: "100%",
+                  width: `${splashProgress}%`,
+                  borderRadius: 980,
+                  background: "linear-gradient(90deg, #7C3AED, #6366F1, #2997FF)",
+                  transition: "width 0.25s ease-out",
+                  boxShadow: "0 0 12px rgba(124, 58, 237, 0.6)",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginTop: 10,
+                fontSize: 11,
+                color: themeStyles.textMuted,
+                fontWeight: 600,
+              }}
+            >
+              <span>{splashProgress < 75 ? "Loading NetworQ…" : "Ready…"}</span>
+              <span style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{splashProgress}%</span>
+            </div>
           </div>
         </div>
       </div>

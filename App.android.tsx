@@ -66,7 +66,6 @@ export default function App() {
           mediaPlaybackRequiresUserAction={false}
           geolocationEnabled={true}
           cacheEnabled={true}
-          cacheMode="LOAD_DEFAULT"
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#6366F1" />
