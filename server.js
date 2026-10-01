@@ -12,6 +12,8 @@ const emailHandler = require("./api/email");
 const { startReminderEngine } = require("./api/reminders");
 const { createAccountRouter, productionDeps, purgeDeletedAccounts } = require("./api/account");
 const { createEventsRouter, productionDeps: eventsDeps } = require("./api/events");
+const { startEventsCrawler } = require("./api/eventsCrawler");
+const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
@@ -207,6 +209,7 @@ app.use("/legal", express.static(legalDir, { maxAge: "1d" }));
 app.get("/privacy", (req, res) => res.sendFile(path.join(legalDir, "privacy.html")));
 app.get("/terms", (req, res) => res.sendFile(path.join(legalDir, "terms.html")));
 app.get("/delete-account", (req, res) => res.sendFile(path.join(legalDir, "delete-account.html")));
+app.get("/bot", (req, res) => res.sendFile(path.join(legalDir, "bot.html")));
 
 // ── Waitlist ──────────────────────────────────────────────────────────────────
 app.get("/waitlist", (req, res) => waitlistHandler(req, res));
@@ -323,10 +326,15 @@ function startServer() {
   // Only run on primary instance (not during Expo web build)
   let reminderTimer = null;
   let purgeTimer = null;
+  let stopCrawler = null;
   if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     reminderTimer = startReminderEngine();
     purgeDeletedAccounts().catch(console.error);
     purgeTimer = setInterval(() => purgeDeletedAccounts().catch(console.error), 60 * 60 * 1000);
+    if (process.env.EVENTS_CRAWLER !== "off") {
+      const admin = createSupabaseClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+      stopCrawler = startEventsCrawler(admin);
+    }
   }
 
   // ── Graceful shutdown: finish in-flight requests on deploy/restart ──────────
@@ -337,6 +345,7 @@ function startServer() {
     console.log(`${signal} received — shutting down gracefully`);
     if (reminderTimer) clearInterval(reminderTimer);
     if (purgeTimer) clearInterval(purgeTimer);
+    if (stopCrawler) stopCrawler();
     let open = servers.length;
     if (!open) process.exit(0);
     servers.forEach((srv) =>
