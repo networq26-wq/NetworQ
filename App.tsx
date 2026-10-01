@@ -3663,7 +3663,7 @@ function CommandPalette({
 
 
 // ── MAIN APPLICATION COMPONENT ────────────────────────────────────────────────
-export default function App() {
+function NetworQApp() {
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("networq_theme");
@@ -9381,5 +9381,62 @@ Keep it punchy, sharp, and directly actionable.`;
         </div>
       )}
     </div>
+  );
+}
+
+
+// ── ERROR BOUNDARY ────────────────────────────────────────────────────────────
+// A render error anywhere used to unmount the whole tree (blank screen that looks
+// like the app restarted). Catch it and offer a recovery path instead.
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("NetworQ crashed:", error, info.componentStack);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div
+        role="alert"
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 14,
+          padding: 24,
+          background: "#000000",
+          color: "#FFFFFF",
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial, sans-serif",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 22, fontWeight: 700 }}>Something went wrong</div>
+        <div style={{ fontSize: 14, color: "#AEAEB2", maxWidth: 360 }}>
+          Your data is safe. Reload to continue where you left off.
+        </div>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ minHeight: 44, padding: "10px 22px", borderRadius: 12, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer" }}
+        >
+          Reload NetworQ
+        </button>
+      </div>
+    );
+  }
+}
+
+export default function App() {
+  return (
+    <AppErrorBoundary>
+      <NetworQApp />
+    </AppErrorBoundary>
   );
 }
