@@ -154,8 +154,7 @@ create table if not exists waitlist (
 -- Public insert only — no auth required for sign-ups
 alter table waitlist enable row level security;
 
-create policy "Anyone can join waitlist"
-  on waitlist for insert with check (true);
+-- No direct insert policy: sign-ups go through join_waitlist (security definer)
 
 -- Returns {already_exists: boolean, position: int, show_position: boolean}
 -- show_position is false until the waitlist has at least 20 signups.
@@ -225,7 +224,7 @@ end;
 $$;
 
 revoke execute on function join_waitlist(text) from public;
-grant  execute on function join_waitlist(text) to   anon;
+grant  execute on function join_waitlist(text) to   anon, authenticated;
 
 -- Returns {allowed: boolean, remaining: integer}
 -- Increments the counter atomically; returns false if the daily limit is exceeded.
@@ -320,9 +319,12 @@ create policy "Users can delete own card images"
     (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- Storage RLS: Allow public read access to card images (for business card URLs & email shares)
-create policy "Public read access for card images"
+-- Storage RLS: files are served by public URL (public bucket); only owners can list their folder
+create policy "Users can list own card images"
   on storage.objects for select
-  to public
-  using (bucket_id = 'card-images');
+  to authenticated
+  using (
+    bucket_id = 'card-images' and
+    (storage.foldername(name))[1] = auth.uid()::text
+  );
 

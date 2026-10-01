@@ -50,6 +50,10 @@ COPY public/ ./public/
 # Copy built frontend from builder stage
 COPY --from=builder /app/dist ./dist
 
+# Run as the unprivileged user that ships with the node image
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 CMD ["node", "server.js"]

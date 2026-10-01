@@ -123,7 +123,7 @@ async function checkAndSendReminders() {
 function startReminderEngine() {
   console.log("[Reminders] 🔔 Reminder engine started — checking every hour");
   checkAndSendReminders().catch(console.error);
-  setInterval(() => checkAndSendReminders().catch(console.error), 60 * 60 * 1000);
+  return setInterval(() => checkAndSendReminders().catch(console.error), 60 * 60 * 1000);
 }
 
 module.exports = { startReminderEngine, escapeHtml };

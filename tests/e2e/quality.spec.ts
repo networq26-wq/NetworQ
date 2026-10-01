@@ -70,3 +70,18 @@ test("API health endpoint is live", async ({ request }) => {
   expect(res.ok()).toBeTruthy();
   expect((await res.json()).status).toBe("ok");
 });
+
+test("Digital Pass QR is generated on-device (no profile data sent to third parties)", async ({ page, db }) => {
+  db.addUser("asha@acme.test", PASSWORD, { profile: PROFILE });
+  const external: string[] = [];
+  page.on("request", (r) => {
+    const host = new URL(r.url()).hostname;
+    if (!["localhost", "127.0.0.1"].includes(host) && !host.endsWith(".supabase.co")) external.push(r.url());
+  });
+  await login(page, "asha@acme.test");
+  const nav = isMobileProject() ? page.locator("body") : page.getByRole("complementary");
+  await nav.getByRole("button", { name: isMobileProject() ? /^3D Pass/ : /^Digital Pass/ }).last().click();
+  const qr = page.getByRole("img", { name: "QR Code" });
+  await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);
+  expect(external.filter((u) => u.includes("qrserver"))).toEqual([]);
+});

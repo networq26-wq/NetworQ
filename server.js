@@ -1,5 +1,7 @@
 const express = require("express");
 const compression = require("compression");
+const helmet = require("helmet");
+const { rateLimit } = require("express-rate-limit");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
@@ -11,7 +13,56 @@ const { startReminderEngine } = require("./api/reminders");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
+app.set("trust proxy", 1); // Render / Fly / Railway sit behind one proxy hop — needed for per-IP limits
+app.disable("x-powered-by");
 app.use(compression());
+
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: false, // set per-route below (the waitlist page needs inline scripts)
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" }, // Google sign-in popup
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
+const APP_CSP = [
+  "default-src 'self'",
+  "script-src 'self' https://accounts.google.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob:",
+  "connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://www.googleapis.com https://accounts.google.com https://www.networq.co.in",
+  "frame-src https://accounts.google.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/") && !req.path.startsWith("/waitlist")) {
+    res.setHeader("Content-Security-Policy", APP_CSP);
+  }
+  next();
+});
+
+// ── Rate limits (per IP; per-user daily caps live in increment_ai_usage) ──────
+const limiter = (windowMs, limit) =>
+  rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: { error: "Too many requests. Please slow down and try again shortly." },
+  });
+app.use("/api/", limiter(15 * 60 * 1000, 600));
+app.use("/api/enrich", limiter(60 * 1000, 30));
+app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
+app.use("/api/email", limiter(60 * 1000, 20));
 
 function parseEnvContent(content) {
   if (!content) return;
@@ -205,7 +256,10 @@ if (fs.existsSync(distPath)) {
 app.use("/api", (err, req, res, next) => {
   console.error("API Server Error:", err);
   if (!res.headersSent) {
-    res.status(500).json({ error: err.message || "Internal API Error" });
+    const status = err.status || err.statusCode || 500;
+    // Never leak internals to clients in production
+    const message = status < 500 || process.env.NODE_ENV !== "production" ? err.message : "Internal server error";
+    res.status(status).json({ error: message || "Internal API Error" });
   }
 });
 
@@ -218,6 +272,7 @@ function startServer() {
       ? [primaryPort]
       : [primaryPort, 3000, 8081].filter((p, idx, arr) => arr.indexOf(p) === idx);
 
+  const servers = [];
   targetPorts.forEach((port) => {
     try {
       const srv = app.listen(port, "0.0.0.0", () => {
@@ -225,6 +280,7 @@ function startServer() {
           `✅ NetworQ server live on http://localhost:${port} & http://127.0.0.1:${port}`
         );
       });
+      servers.push(srv);
       srv.on("error", (err) => {
         if (err.code === "EADDRINUSE") {
           console.log(`ℹ️  Port ${port} is in use by another process; skipping.`);
@@ -239,9 +295,30 @@ function startServer() {
 
   // ── Start background reminder engine ────────────────────────────────────────
   // Only run on primary instance (not during Expo web build)
+  let reminderTimer = null;
   if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    startReminderEngine();
+    reminderTimer = startReminderEngine();
   }
+
+  // ── Graceful shutdown: finish in-flight requests on deploy/restart ──────────
+  let shuttingDown = false;
+  const shutdown = (signal) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`${signal} received — shutting down gracefully`);
+    if (reminderTimer) clearInterval(reminderTimer);
+    let open = servers.length;
+    if (!open) process.exit(0);
+    servers.forEach((srv) =>
+      srv.close(() => {
+        open -= 1;
+        if (open === 0) process.exit(0);
+      })
+    );
+    setTimeout(() => process.exit(0), 10_000).unref();
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 if (require.main === module) {

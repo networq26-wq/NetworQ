@@ -33,8 +33,17 @@ export const test = base.extend<Fixtures>({
   },
   page: async ({ page, pageErrors }, use) => {
     page.on("pageerror", (err) => pageErrors.push(err.message));
+    // Fail on anything the production Content-Security-Policy blocks
+    await page.addInitScript(() => {
+      (window as any).__cspViolations = [];
+      document.addEventListener("securitypolicyviolation", (e) => {
+        (window as any).__cspViolations.push(`${e.violatedDirective} ← ${e.blockedURI}`);
+      });
+    });
     await use(page);
     expect(pageErrors, "uncaught errors in the page").toEqual([]);
+    const csp = await page.evaluate(() => (window as any).__cspViolations || []).catch(() => []);
+    expect(csp, "Content-Security-Policy violations").toEqual([]);
   },
 });
 

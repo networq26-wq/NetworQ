@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "./supabase";
+import QRCode from "qrcode";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -816,8 +817,40 @@ async function sendEmailViaServer(payload: {
   return d;
 }
 
-function qrUrl(data: string) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(data)}`;
+// Phone photos are 3–8 MB; scale to max 1280px JPEG before upload/storage/AI
+function downscaleImage(dataUrl: string, maxSide = 1280, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") return resolve(dataUrl);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return resolve(dataUrl);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const out = canvas.toDataURL("image/jpeg", quality);
+      resolve(out.length < dataUrl.length ? out : dataUrl);
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+// QR codes are generated on-device — the profile data never leaves the browser
+function useQrDataUrl(data: string) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    QRCode.toDataURL(data, { width: 260, margin: 1, errorCorrectionLevel: "M" })
+      .then((u) => !cancelled && setUrl(u))
+      .catch((err) => console.warn("QR generation failed:", err));
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
+  return url;
 }
 
 // Jitsi Meet rooms are created on first join, so a random room name is a real, working link
@@ -1169,6 +1202,7 @@ function HoloCard3D({
   const [flipped, setFlipped] = useState(false);
   const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50 });
   const cardRef = useRef<HTMLDivElement>(null);
+  const qrImage = useQrDataUrl(qrData);
 
   const theme = CARD_THEMES[themeIdx];
 
@@ -1341,7 +1375,11 @@ function HoloCard3D({
             }}
           >
             <div style={{ background: "#ffffff", padding: 8, borderRadius: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>
-              <img src={qrUrl(qrData)} alt="QR Code" style={{ width: 115, height: 115, display: "block" }} />
+              {qrImage ? (
+                <img src={qrImage} alt="QR Code" style={{ width: 115, height: 115, display: "block" }} />
+              ) : (
+                <div style={{ width: 115, height: 115 }} />
+              )}
             </div>
 
             <div style={{ flex: 1, textAlign: "left" }}>
@@ -4324,7 +4362,9 @@ VOICE & ASSISTANT DIRECTIVES:
         setScanErr("");
         setScanning(true);
         try {
-          const base64 = e.target.result.split(",")[1];
+          const dataUrl = await downscaleImage(e.target.result);
+          const mimeType = dataUrl.slice(5, dataUrl.indexOf(";")) || file.type;
+          const base64 = dataUrl.split(",")[1];
 
           if (currentUser?.id) {
             await checkAndIncrementUsage(supabase, currentUser.id, "card_scan");
@@ -4332,20 +4372,20 @@ VOICE & ASSISTANT DIRECTIVES:
 
           const [imageUrl, cardData] = await Promise.all([
             (async () => {
-              if (!currentUser?.id) return e.target.result;
-              const ext = file.type.split("/")[1] || "jpg";
+              if (!currentUser?.id) return dataUrl;
+              const ext = mimeType.split("/")[1] || "jpg";
               const fileName = `${currentUser.id}/${Date.now()}.${ext}`;
-              const blob = await fetch(e.target.result).then((r) => r.blob());
+              const blob = await fetch(dataUrl).then((r) => r.blob());
               const { error } = await supabase.storage
                 .from("card-images")
-                .upload(fileName, blob, { contentType: file.type });
+                .upload(fileName, blob, { contentType: mimeType });
               if (error) {
                 console.warn("Storage upload failed, falling back to data URL:", error.message);
-                return e.target.result;
+                return dataUrl;
               }
               return supabase.storage.from("card-images").getPublicUrl(fileName).data.publicUrl;
             })(),
-            extractCard(base64, file.type),
+            extractCard(base64, mimeType),
           ]);
 
           setScanPreview(imageUrl);
@@ -4407,23 +4447,29 @@ VOICE & ASSISTANT DIRECTIVES:
         if (code) {
           try {
             const data = JSON.parse(code.data);
-            if (data) {
-              triggerConfetti();
-              setAddForm((f) => ({ ...f, ...data }));
-              setAddStep("preview");
-              setTab("add");
+            if (!data || typeof data !== "object") throw new Error("not a profile");
+            // Only accept known string fields from an untrusted QR payload
+            const fields = ["name", "title", "company", "email", "phone", "website", "linkedin"] as const;
+            const picked: Record<string, string> = {};
+            for (const k of fields) {
+              if (typeof data[k] === "string") picked[k] = data[k].slice(0, 300);
             }
+            if (!picked.name) throw new Error("missing name");
+            triggerConfetti();
+            setAddForm((f) => ({ ...f, ...picked }));
+            setAddStep("preview");
+            setTab("add");
           } catch {
-            alert("QR code found but could not read NetworQ profile.");
+            showToast("QR code found but could not read a NetworQ profile.", "error");
           }
         } else {
-          alert("No QR code detected. Try a clearer image.");
+          showToast("No QR code detected. Try a clearer image.", "error");
         }
       };
       img.src = e.target.result;
     };
     reader.readAsDataURL(file);
-  }, []);
+  }, [showToast]);
 
   const saveContact = async () => {
     setSaving(true);

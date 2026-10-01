@@ -64,3 +64,4 @@ $RECYCLE.BIN/
 # Playwright
 playwright-report/
 test-results/
+qa-logs/

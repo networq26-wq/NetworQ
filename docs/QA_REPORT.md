@@ -1,6 +1,6 @@
 # QA Report — NetworQ
 
-**Date:** 2026-10-01  **Scope:** web app, Express API, Supabase data layer, Android WebView shell
+**Date:** 2026-10-01 (two passes)  **Scope:** web app, Express API, Supabase data layer, Android WebView shell
 
 ## Verdict: CONDITIONAL GO
 
@@ -9,15 +9,20 @@ The code is release-ready: every automated check passes. Three configuration ste
 | Area | Result | Evidence |
 |---|---|---|
 | Type check | ✅ 0 errors (was 7) | `npx tsc --noEmit` |
-| Unit + API + security tests | ✅ 36 / 36 | `npm test` |
+| Unit + API + security tests | ✅ 40 / 40 | `npm test` |
 | Production build | ✅ | `npm run build` |
-| Browser E2E (desktop + Pixel 7) | ✅ 47 / 47 (94 / 94 over 2 runs, 0 flaky) | `npm run test:e2e` |
+| Browser E2E (desktop + Pixel 7), CSP enforced | ✅ 49 / 49, 0 CSP violations | `npm run test:e2e` |
 | Live Supabase RLS | ⚠️ 13 / 14 (passes after migration) | `npm run test:rls` |
 | Secrets in bundle | ✅ none | grep of `dist/_expo/static/js/web/*.js` |
+| Dependency audit (prod) | ⚠️ 10 (build-time only, not in server runtime) — was 27 | `npm audit --omit=dev` |
 
 ## Required before launch (owner action)
 
-1. **Run `supabase/migrations/20261001_security_hardening.sql`** in the Supabase SQL editor, then re-run `npm run test:rls` (expect 14 / 14).
+1. **Run both migrations in the Supabase SQL editor**, in order:
+   - `supabase/migrations/20261001_security_hardening.sql`
+   - `supabase/migrations/20261001b_restore_waitlist_and_storage.sql` (the live project is missing `join_waitlist()` and the `card-images` bucket)
+
+   Then re-run `npm run test:rls` (expect 14 / 14).
 2. **Verify a sending domain in Resend** (e.g. `networq.co.in`) and set `RESEND_FROM_EMAIL=NetworQ <noreply@networq.co.in>`. The current `onboarding@resend.dev` sandbox only delivers to the Resend account owner.
 3. **Rebuild the Android APK** (`npm run build:apk`). The OTA update URL now points at the current EAS project (`48b3a694…`), so APKs built earlier cannot receive updates.
 
@@ -46,6 +51,23 @@ The code is release-ready: every automated check passes. Three configuration ste
 | 19 | P2 | Production bound 3 ports; `compression` not declared | Single `$PORT`; dependency declared |
 | 20 | P2 | Icon-only buttons had no accessible name | `aria-label`s added |
 | 21 | P2 | Native shell failed type-check | Typed WebView refs and events |
+
+### Second pass (2026-10-01) — audit methods from external skill packs
+
+Checklists used: `levnikolaevich/claude-code-skills` (codebase, test-suite and persistence auditors) and `zhaoxuya520/reverse-skill` (API security, supply chain, JS bundle review). Only methodology was applied; no third-party tools or scripts were run.
+
+| # | Sev | Defect | Fix |
+|---|---|---|---|
+| 22 | P1 | Live DB is missing `join_waitlist()`, so every waitlist sign-up fails | Migration `20261001b` |
+| 23 | P1 | Live project has no storage buckets; card photos are saved as ~2.7 MB data URLs in `contacts.image` and downloaded on every login | Migration creates the bucket; photos are downscaled to ≤1280px JPEG before upload or storage |
+| 24 | P1 | Digital Pass sent the user's name, email and company to `api.qrserver.com` | QR generated on-device (`qrcode`) |
+| 25 | P1 | Storage policy let anyone list every user's card images | Owner-only listing |
+| 26 | P2 | No security headers (clickjacking, HSTS, nosniff); X-Powered-By exposed | `helmet` + strict CSP on the app, verified by E2E |
+| 27 | P2 | No per-IP rate limit on public endpoints | `express-rate-limit` (enrich 30/min, AI 60/min, email 20/min) |
+| 28 | P2 | 5xx responses leaked internal error messages | Generic message in production |
+| 29 | P2 | QR import spread untrusted JSON into the form; used `alert()` | Field whitelist, toasts |
+| 30 | P2 | Waitlist table allowed direct anonymous inserts, bypassing validation | Insert policy removed; RPC only |
+| 31 | P3 | Container ran as root; no graceful shutdown; unused `@emailjs/browser` | `USER node`, SIGTERM drain, dependency removed |
 
 ## Test assets
 

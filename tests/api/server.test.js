@@ -102,3 +102,33 @@ test("Responses are compressed", async () => {
   const res = await fetch(base + "/api/health", { headers: { "Accept-Encoding": "gzip" } });
   assert.equal(res.status, 200);
 });
+
+test("security headers are set and X-Powered-By is hidden", async () => {
+  const res = await fetch(base + "/api/health");
+  assert.equal(res.headers.get("x-powered-by"), null);
+  assert.equal(res.headers.get("x-content-type-options"), "nosniff");
+  assert.ok(res.headers.get("strict-transport-security"));
+  assert.ok(res.headers.get("x-frame-options"));
+});
+
+test("the web app is served with a strict Content-Security-Policy", { skip: !fs.existsSync(path.join(__dirname, "../../dist/index.html")) }, async () => {
+  const res = await fetch(base + "/");
+  const csp = res.headers.get("content-security-policy") || "";
+  assert.match(csp, /default-src 'self'/);
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
+});
+
+test("API responses carry no page CSP; the waitlist page is exempt", async () => {
+  assert.equal((await fetch(base + "/api/health")).headers.get("content-security-policy"), null);
+  assert.equal((await fetch(base + "/waitlist")).headers.get("content-security-policy"), null);
+});
+
+test("/api/enrich is rate limited per IP", async () => {
+  const statuses = [];
+  for (let i = 0; i < 35; i++) {
+    statuses.push((await post("/api/enrich", { url: "http://127.0.0.1/" })).status);
+  }
+  assert.ok(statuses.includes(429), `expected a 429, got ${[...new Set(statuses)]}`);
+});
