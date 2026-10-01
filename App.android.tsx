@@ -16,6 +16,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useRadarBridge } from "./radar/shellBridge";
+import { SHELL_CAPABILITIES_JS, useGoogleAuthBridge } from "./shell/googleAuth";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
@@ -33,6 +34,7 @@ function Shell() {
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
   const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
+  const googleAuth = useGoogleAuthBridge(webViewRef, TARGET_URL);
 
   // Handle hardware Android back button
   useEffect(() => {
@@ -91,7 +93,11 @@ function Shell() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
-          onMessage={radarBridge.onMessage}
+          injectedJavaScriptBeforeContentLoaded={SHELL_CAPABILITIES_JS}
+          onMessage={(e) => {
+            radarBridge.onMessage(e);
+            googleAuth.onMessage(e);
+          }}
           cacheEnabled={true}
           renderLoading={() => (
             <View style={styles.loadingContainer}>

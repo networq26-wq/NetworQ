@@ -87,7 +87,15 @@ function createAccountRouter(deps) {
     await deps.store.upsertDevice(user.id, hash, ua);
 
     if (firstLogin) {
-      await mail(user.email, emails.welcome({ name: profile.name, appUrl: deps.appUrl }));
+      const providers = user.app_metadata?.providers || [];
+      let setPasswordUrl = null;
+      if (providers.length && !providers.includes("email") && deps.store.passwordSetupLink) {
+        setPasswordUrl = await deps.store.passwordSetupLink(user.email).catch((err) => {
+          console.warn("[Account] password setup link failed:", err.message);
+          return null;
+        });
+      }
+      await mail(user.email, emails.welcome({ name: profile.name, appUrl: deps.appUrl, setPasswordUrl }));
     } else if (newDevice && profile.notification_prefs?.login_alerts !== false) {
       const city = req.headers["cf-ipcity"] || req.headers["x-vercel-ip-city"];
       await mail(
@@ -182,6 +190,11 @@ function productionDeps() {
       setDeletion: async (userId, at) => must(await admin.from("profiles").update({ deletion_scheduled_at: at }).eq("id", userId)),
       revokeSessions: async (userId) => must(await admin.rpc("revoke_all_sessions", { p_user_id: userId })),
       getEmail: async (userId) => must(await admin.auth.admin.getUserById(userId)).user?.email,
+      passwordSetupLink: async (email) => {
+        const { data, error } = await admin.auth.admin.generateLink({ type: "recovery", email, options: { redirectTo: process.env.PUBLIC_APP_URL || "https://www.networq.co.in" } });
+        if (error) throw new Error(error.message);
+        return data.properties.action_link;
+      },
       sendPasswordReset: async (email) => must(await anon.auth.resetPasswordForEmail(email, { redirectTo: process.env.PUBLIC_APP_URL || "https://www.networq.co.in" })),
     },
     send: sendTransactional,

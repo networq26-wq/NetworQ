@@ -45,8 +45,8 @@ function Layout({ preview, heading, lines, cta, footnote, appUrl }) {
 
 const first = (name) => (name ? String(name).trim().split(/\s+/)[0] : "there");
 
-function welcome({ name, appUrl }) {
-  return {
+function welcome({ name, appUrl, setPasswordUrl }) {
+  const base = {
     subject: "Welcome to NetworQ",
     appUrl,
     preview: "Scan a card, join an event, never lose a connection.",
@@ -56,6 +56,14 @@ function welcome({ name, appUrl }) {
       "Scan a business card to save a contact in seconds, set follow-up reminders, and open Event Radar at your next event to see who's nearby.",
     ],
     cta: { label: "Open NetworQ", url: appUrl },
+  };
+  if (!setPasswordUrl) return base;
+  // Google sign-ups: offer a password via a one-time link — never send a password by email
+  return {
+    ...base,
+    lines: [...base.lines, "You signed up with Google. If you'd also like to sign in with your email address and a password, set one now:"],
+    cta: { label: "Set a password", url: setPasswordUrl },
+    footnote: `This one-time link expires in 1 hour. You can also set a password any time in Settings → Security, or keep using Continue with Google. Open NetworQ: ${appUrl}`,
   };
 }
 

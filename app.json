@@ -45,6 +45,10 @@
     },
     "runtimeVersion": {
       "policy": "appVersion"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ],
+    "scheme": "networq"
   }
 }

@@ -47,8 +47,11 @@ test("every template renders HTML + text with its CTA and escapes user input", a
 
 // ── Endpoint harness with fakes ───────────────────────────────────────────────
 function harness() {
-  const users = { "tok-asha": { id: "asha", email: "asha@acme.test" } };
-  const state = { devices: [], profiles: { asha: { name: "Asha Rao", notification_prefs: { login_alerts: true }, deletion_scheduled_at: null } }, revoked: [], resets: [], sent: [] };
+  const users = {
+    "tok-asha": { id: "asha", email: "asha@acme.test", app_metadata: { providers: ["email"] } },
+    "tok-gina": { id: "gina", email: "gina@gmail.test", app_metadata: { providers: ["google"] } },
+  };
+  const state = { devices: [], profiles: { asha: { name: "Asha Rao", notification_prefs: { login_alerts: true }, deletion_scheduled_at: null }, gina: { name: "Gina Paul", notification_prefs: { login_alerts: true } } }, revoked: [], resets: [], sent: [], setupLinks: [] };
   const deps = {
     secret: SECRET,
     appUrl: "https://app.test",
@@ -75,6 +78,10 @@ function harness() {
       },
       async sendPasswordReset(email) {
         state.resets.push(email);
+      },
+      async passwordSetupLink(email) {
+        state.setupLinks.push(email);
+        return "https://jp.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=https://app.test";
       },
       async getEmail(userId) {
         return Object.values(users).find((u) => u.id === userId)?.email;
@@ -207,6 +214,33 @@ test("signed-in cancel works too", async () => {
     const r = await h.call("/account/cancel-deletion", { token: "tok-asha" });
     assert.equal(r.status, 200);
     assert.equal(h.state.profiles.asha.deletion_scheduled_at, null);
+  } finally {
+    h.close();
+  }
+});
+
+test("Google sign-ups get a welcome email with a secure 'Set a password' link (never a password)", async () => {
+  const h = harness();
+  try {
+    await h.call("/auth/session-event", { token: "tok-gina", body: { type: "signed_in" } });
+    const mail = h.state.sent[0];
+    assert.equal(mail.to, "gina@gmail.test");
+    assert.match(mail.subject, /Welcome/);
+    assert.match(mail.html, /Set a password/);
+    assert.ok(mail.html.includes("type=recovery"), "contains the one-time setup link");
+    assert.deepEqual(h.state.setupLinks, ["gina@gmail.test"]);
+    assert.doesNotMatch(mail.text, /password:\s*\S+/i, "no password in the email");
+  } finally {
+    h.close();
+  }
+});
+
+test("email/password sign-ups get the normal welcome (no setup link)", async () => {
+  const h = harness();
+  try {
+    await h.call("/auth/session-event", { token: "tok-asha", body: { type: "signed_in" } });
+    assert.doesNotMatch(h.state.sent[0].html, /Set a password/);
+    assert.deepEqual(h.state.setupLinks, []);
   } finally {
     h.close();
   }

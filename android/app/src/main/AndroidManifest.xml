@@ -31,6 +31,13 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="exp+networq"/>
       </intent-filter>
+      <!-- Google sign-in returns here from the system browser (PKCE code) -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="networq" android:host="auth-callback"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>

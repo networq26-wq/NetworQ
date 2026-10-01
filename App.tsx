@@ -19,6 +19,9 @@ const AI_PROXY =
 
 // Google blocks OAuth inside embedded WebViews, so the Android/iOS shell uses email login only
 const IS_NATIVE_WEBVIEW = typeof window !== "undefined" && !!(window as any).ReactNativeWebView;
+// Newer Android shells sign in with Google through the system browser (PKCE) and hand the session back
+const NATIVE_GOOGLE_AUTH = IS_NATIVE_WEBVIEW && !!(window as any).__NETWORQ_SHELL__?.googleAuth;
+const GOOGLE_SIGNIN_AVAILABLE = !IS_NATIVE_WEBVIEW || NATIVE_GOOGLE_AUTH;
 
 const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
 
@@ -2623,6 +2626,24 @@ VOICE & ASSISTANT DIRECTIVES:
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setAuthMsg(null);
+    if (NATIVE_GOOGLE_AUTH) {
+      const onNative = async (e: Event) => {
+        const msg = (e as CustomEvent).detail;
+        if (msg?.type !== "auth:session" && msg?.type !== "auth:error") return;
+        window.removeEventListener("networq-native", onNative);
+        if (msg.type === "auth:error") {
+          setAuthMsg({ text: msg.message, type: "error" });
+          setGoogleLoading(false);
+          return;
+        }
+        const { error } = await supabase.auth.setSession({ access_token: msg.access_token, refresh_token: msg.refresh_token });
+        if (error) setAuthMsg({ text: error.message, type: "error" });
+        setGoogleLoading(false);
+      };
+      window.addEventListener("networq-native", onNative);
+      window.ReactNativeWebView?.postMessage(JSON.stringify({ type: "auth:google" }));
+      return;
+    }
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -4028,7 +4049,7 @@ Keep it punchy, sharp, and directly actionable.`;
           </div>
 
           <div style={S.card}>
-            {!IS_NATIVE_WEBVIEW && (
+            {GOOGLE_SIGNIN_AVAILABLE && (
             <>
             <button
               style={{
@@ -4156,7 +4177,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={S.card}>
             {signupStep === 1 && (
               <>
-                {!IS_NATIVE_WEBVIEW && (
+                {GOOGLE_SIGNIN_AVAILABLE && (
                 <>
                 <button
                   style={{
