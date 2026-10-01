@@ -9,13 +9,15 @@ import {
   TouchableOpacity,
   Platform,
   SafeAreaView,
+  Linking,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
 
 export default function App() {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
 
@@ -33,6 +35,13 @@ export default function App() {
     const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => subscription.remove();
   }, [canGoBack]);
+
+  // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
+  const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
+    if (/^(https?|about|data|blob):/i.test(request.url)) return true;
+    Linking.openURL(request.url).catch(() => {});
+    return false;
+  }, []);
 
   const handleRetry = useCallback(() => {
     setHasError(false);
@@ -64,7 +73,9 @@ export default function App() {
           allowsBackForwardNavigationGestures={true}
           allowsInlineMediaPlayback={true}
           mediaPlaybackRequiresUserAction={false}
-          geolocationEnabled={true}
+          mediaCapturePermissionGrantType="grant"
+          originWhitelist={["*"]}
+          onShouldStartLoadWithRequest={handleShouldStartLoad}
           cacheEnabled={true}
           renderLoading={() => (
             <View style={styles.loadingContainer}>
@@ -72,11 +83,11 @@ export default function App() {
               <Text style={styles.loadingText}>Loading NetworQ…</Text>
             </View>
           )}
-          onNavigationStateChange={(navState) => {
+          onNavigationStateChange={(navState: WebViewNavigation) => {
             setCanGoBack(navState.canGoBack);
           }}
           onError={() => setHasError(true)}
-          onHttpError={(syntheticEvent) => {
+          onHttpError={(syntheticEvent: WebViewHttpErrorEvent) => {
             const { nativeEvent } = syntheticEvent;
             if (nativeEvent.statusCode >= 500) {
               setHasError(true);

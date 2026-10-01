@@ -31,9 +31,7 @@ RUN mkdir -p dist/illustrations && \
     cp -r public/illustrations/* dist/illustrations/ && \
     cp public/waitlist.html dist/waitlist.html && \
     cp -f public/favicon.* dist/ && \
-    cp -f public/manifest.json dist/ && \
-    cp -f public/sw.js dist/ && \
-    sed -i 's|</head>|<link rel="icon" type="image/svg+xml" href="/favicon.svg" /><link rel="icon" type="image/png" href="/favicon.png" /><link rel="shortcut icon" href="/favicon.ico" /><link rel="manifest" href="/manifest.json" /><meta name="theme-color" content="#7C3AED" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" /><meta name="apple-mobile-web-app-title" content="NetworQ" /><link rel="apple-touch-icon" href="/favicon.png" /></head>|g' dist/index.html
+    sed -i 's|</head>|<link rel="icon" type="image/svg+xml" href="/favicon.svg" /><link rel="icon" type="image/png" href="/favicon.png" /><link rel="shortcut icon" href="/favicon.ico" /></head>|g' dist/index.html
 
 # ── Production image ──────────────────────────────────────────────────────────
 FROM base AS runner

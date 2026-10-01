@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "./supabase";
-import emailjs from "@emailjs/browser";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -11,6 +10,11 @@ const AI_PROXY =
         ? "/api/ai"
         : "https://www.networq.co.in/api/ai"
     : "https://www.networq.co.in/api/ai");
+
+// Google blocks OAuth inside embedded WebViews, so the Android/iOS shell uses email login only
+const IS_NATIVE_WEBVIEW = typeof window !== "undefined" && !!(window as any).ReactNativeWebView;
+
+const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
 
 // ── CONFETTI PARTICLE SYSTEM ──────────────────────────────────────────────────
 interface ConfettiParticle {
@@ -449,7 +453,13 @@ const Icons = {
       <line x1="7" y1="12" x2="17" y2="12" />
     </svg>
   ),
-  QrCode: ({ size = 18, color = "currentColor", style }: IconProps) => (
+  Camera: ({ size = 18, color = "currentColor", style }: IconProps) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  ),
+  QrCode:({ size = 18, color = "currentColor", style }: IconProps) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <rect x="3" y="3" width="7" height="7" rx="1.5" />
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
@@ -773,14 +783,48 @@ async function callAI(
   return d.choices?.[0]?.message?.content || d.content?.[0]?.text || "";
 }
 
+// ── EMAIL SENDER (server-side via /api/email — never from the browser) ───────
+async function sendEmailViaServer(payload: {
+  to: string;
+  subject: string;
+  body: string;
+  fromName?: string;
+  replyTo?: string;
+}) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+  if (!token) throw new Error("Your session has expired. Please sign in again.");
+
+  let res: Response;
+  try {
+    res = await fetch(EMAIL_PROXY, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        to: payload.to,
+        subject: payload.subject,
+        body: payload.body,
+        from_name: payload.fromName,
+        reply_to: payload.replyTo,
+      }),
+    });
+  } catch (netErr: any) {
+    throw new Error(`Connection error: ${netErr.message || "Failed to reach email service"}`);
+  }
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || !d.ok) throw new Error(d.error || `Email service error ${res.status}`);
+  return d;
+}
+
 function qrUrl(data: string) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(data)}`;
 }
 
+// Jitsi Meet rooms are created on first join, so a random room name is a real, working link
 function genMeetLink() {
-  const chars = "abcdefghijklmnopqrstuvwxyz";
+  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
   const seg = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `https://meet.google.com/${seg(3)}-${seg(4)}-${seg(3)}`;
+  return `https://meet.jit.si/NetworQ-${seg(4)}-${seg(4)}-${seg(4)}`;
 }
 
 function avatar(name?: string, isDark = false) {
@@ -985,6 +1029,7 @@ function loadGISScript(): Promise<void> {
     s.src = "https://accounts.google.com/gsi/client";
     s.async = true;
     s.onload = () => resolve();
+    s.onerror = () => resolve();
     document.head.appendChild(s);
   });
 }
@@ -1003,6 +1048,9 @@ async function createCalendarEvent({
   attendeeEmail: string;
 }): Promise<{ meetLink: string; eventLink: string }> {
   await loadGISScript();
+  if (!(window as any).google?.accounts?.oauth2) {
+    throw new Error("Google Calendar is unavailable in this browser.");
+  }
   return new Promise((resolve, reject) => {
     const client = (window as any).google.accounts.oauth2.initTokenClient({
       client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
@@ -3267,7 +3315,7 @@ Return ONLY a valid JSON array of objects with this schema:
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.025em" }}>Host / Add Event</div>
-              <button onClick={() => setHostModalOpen(false)} style={{ ...S.btnSmOut, padding: "5px 8px", borderRadius: 10 }}>
+              <button aria-label="Close" onClick={() => setHostModalOpen(false)} style={{ ...S.btnSmOut, padding: "5px 8px", borderRadius: 10 }}>
                 <Icons.Close size={15} />
               </button>
             </div>
@@ -3630,6 +3678,8 @@ export default function App() {
     bio: "",
   });
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  useEffect(() => setConfirmDeleteId(null), [modal?.id]);
   const [forgotEmail, setForgotEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -3963,14 +4013,41 @@ VOICE & ASSISTANT DIRECTIVES:
     showToast(!voiceReplyEnabled ? "Voice speech responses: ON" : "Voice speech responses: OFF", "info");
   };
 
+  // Which user's data is loaded — prevents duplicate loads from login + auth events
+  const loadedUserRef = useRef<string | null>(null);
+
   const loadUserData = useCallback(
     async (userId: string, userEmail?: string) => {
+      loadedUserRef.current = userId;
       setContactsLoading(true);
       try {
         const [profileRes, contactsRes] = await Promise.all([
           supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
           supabase.from("contacts").select("*").eq("user_id", userId).order("added_at", { ascending: false }),
         ]);
+
+        // First login after email confirmation: create the profile from signup metadata
+        if (!profileRes.data?.company) {
+          const { data: userRes } = await supabase.auth.getUser();
+          const meta = userRes?.user?.user_metadata || {};
+          if (meta.company) {
+            const { data: created, error: createErr } = await supabase
+              .from("profiles")
+              .upsert({
+                id: userId,
+                name: meta.name || meta.full_name || "",
+                company: meta.company,
+                role: meta.role || null,
+                sector: meta.sector || null,
+                phone: meta.phone || null,
+                linkedin: meta.linkedin || null,
+                bio: meta.bio || null,
+              })
+              .select()
+              .single();
+            if (!createErr && created) profileRes.data = created;
+          }
+        }
 
         if (!profileRes.data || !profileRes.data.company) {
           setCurrentUser({ id: userId, email: userEmail, ...(profileRes.data || {}) });
@@ -3989,6 +4066,7 @@ VOICE & ASSISTANT DIRECTIVES:
         setContacts((contactsRes.data || []).map(dbToContact));
         setScreen("app");
       } catch (err: any) {
+        loadedUserRef.current = null;
         console.error("Failed to load user data:", err);
         showToast(err.message || "Failed to load profile", "error");
       } finally {
@@ -3999,12 +4077,18 @@ VOICE & ASSISTANT DIRECTIVES:
   );
 
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Never await Supabase calls inside this callback: supabase-js runs it while holding its
+    // auth lock, so any query here deadlocks getSession() (the old "splash stuck at 92%" bug).
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setScreen("reset_password");
       } else if (event === "SIGNED_IN" && session?.user) {
-        await loadUserData(session.user.id, session.user.email);
+        const { id, email } = session.user;
+        setTimeout(() => {
+          if (loadedUserRef.current !== id) loadUserData(id, email);
+        }, 0);
       } else if (event === "SIGNED_OUT") {
+        loadedUserRef.current = null;
         setCurrentUser(null);
         setContacts([]);
         setScreen("login");
@@ -4015,11 +4099,11 @@ VOICE & ASSISTANT DIRECTIVES:
       const p1 = setTimeout(() => setSplashProgress(45), 120);
       const p2 = setTimeout(() => setSplashProgress(75), 280);
       const p3 = setTimeout(() => setSplashProgress(92), 440);
-      // Hard failsafe: force past 92% after 3s no matter what
+      // Hard failsafe: force past 92% if the 4s session race below somehow never settles
       const pForce = setTimeout(() => {
         setSplashProgress(100);
         setScreen("login");
-      }, 3000);
+      }, 4500);
 
       const splashDelay = new Promise<void>((resolve) => setTimeout(resolve, 600));
 
@@ -4039,7 +4123,10 @@ VOICE & ASSISTANT DIRECTIVES:
       setSplashProgress(100);
 
       if (session?.user) {
-        await Promise.all([loadUserData(session.user.id, session.user.email), splashDelay]);
+        await Promise.all([
+          loadedUserRef.current === session.user.id ? Promise.resolve() : loadUserData(session.user.id, session.user.email),
+          splashDelay,
+        ]);
       } else {
         await splashDelay;
         setScreen("login");
@@ -4098,9 +4185,23 @@ VOICE & ASSISTANT DIRECTIVES:
     setAuthSubmitting(true);
     setAuthMsg(null);
     try {
+      const profileFields = {
+        name: form.name,
+        company: form.company,
+        role: form.role,
+        sector: form.sector,
+        phone: form.phone,
+        linkedin: form.linkedin,
+        bio: form.bio,
+      };
       const { data, error } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,
+        options: {
+          // Kept in user metadata so the profile can be created after email confirmation
+          data: profileFields,
+          emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        },
       });
       if (error) throw error;
 
@@ -4111,16 +4212,8 @@ VOICE & ASSISTANT DIRECTIVES:
           return;
         }
 
-        await supabase.from("profiles").insert({
-          id: data.user.id,
-          name: form.name,
-          company: form.company,
-          role: form.role,
-          sector: form.sector,
-          phone: form.phone,
-          linkedin: form.linkedin,
-          bio: form.bio,
-        });
+        const { error: profileErr } = await supabase.from("profiles").upsert({ id: data.user.id, ...profileFields });
+        if (profileErr) throw profileErr;
 
         triggerConfetti();
         await loadUserData(data.user.id, form.email);
@@ -4173,7 +4266,7 @@ VOICE & ASSISTANT DIRECTIVES:
         }
         throw new Error("Invalid email or password.");
       }
-      if (data.user) {
+      if (data.user && loadedUserRef.current !== data.user.id) {
         await loadUserData(data.user.id, data.user.email);
       }
     } catch (err: any) {
@@ -4559,19 +4652,13 @@ Keep it punchy, sharp, and directly actionable.`;
     setEmailSending(true);
     try {
       const { subject, body } = parseEmailDraft(generatedEmail);
-      await emailjs.send(
-        process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID!,
-        process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID!,
-        {
-          to_email: emailModal.email,
-          to_name: emailModal.name || "",
-          from_name: currentUser?.name || "",
-          reply_to: currentUser?.email || "",
-          subject,
-          message: body,
-        },
-        process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY
-      );
+      await sendEmailViaServer({
+        to: emailModal.email,
+        subject,
+        body,
+        fromName: currentUser?.name || "",
+        replyTo: currentUser?.email || "",
+      });
       await supabase.from("follow_up_emails").insert({
         user_id: currentUser?.id,
         contact_id: emailModal.id,
@@ -4586,7 +4673,7 @@ Keep it punchy, sharp, and directly actionable.`;
       showToast(`Email sent to ${emailModal.email}`, "success");
       setTimeout(() => setEmailModal(null), 2000);
     } catch (err: any) {
-      console.error("EmailJS error:", err);
+      console.error("Email send error:", err);
       showToast(err?.text || err?.message || "Failed to send email.", "error");
     } finally {
       setEmailSending(false);
@@ -4606,17 +4693,25 @@ Keep it punchy, sharp, and directly actionable.`;
         !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID &&
         process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
 
+      let calendarInviteSent = false;
       if (useGCal) {
-        const result = await createCalendarEvent({
-          title: `Meeting with ${meetModal.name}`,
-          description: meetDetails.notes || `Scheduled via NetworQ by ${currentUser?.name}`,
-          date: meetDetails.date,
-          time: meetDetails.time,
-          attendeeEmail: meetModal.email,
-        });
-        link = result.meetLink;
-      } else {
-        link = genMeetLink();
+        try {
+          const result = await createCalendarEvent({
+            title: `Meeting with ${meetModal.name}`,
+            description: meetDetails.notes || `Scheduled via NetworQ by ${currentUser?.name}`,
+            date: meetDetails.date,
+            time: meetDetails.time,
+            attendeeEmail: meetModal.email,
+          });
+          link = result.meetLink;
+          calendarInviteSent = true;
+        } catch (calErr: any) {
+          console.warn("Calendar invite failed, falling back to email invite:", calErr?.message);
+        }
+      }
+
+      if (!calendarInviteSent || !link) {
+        link = link || genMeetLink();
         const messageBody = [
           `Hi ${meetModal.name},`,
           "",
@@ -4624,7 +4719,7 @@ Keep it punchy, sharp, and directly actionable.`;
           "",
           `Date: ${meetDetails.date}`,
           `Time: ${meetDetails.time}`,
-          `Google Meet: ${link}`,
+          `Video call: ${link}`,
           meetDetails.notes ? `\nAgenda:\n${meetDetails.notes}` : "",
           "",
           `Looking forward to connecting!`,
@@ -4632,19 +4727,13 @@ Keep it punchy, sharp, and directly actionable.`;
           currentUser?.name,
         ].join("\n");
 
-        await emailjs.send(
-          process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID!,
-          process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID!,
-          {
-            to_email: meetModal.email,
-            to_name: meetModal.name || "",
-            from_name: currentUser?.name || "",
-            reply_to: currentUser?.email || "",
-            subject: `Meeting invite from ${currentUser?.name} — ${meetDetails.date} at ${meetDetails.time}`,
-            message: messageBody,
-          },
-          process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY
-        );
+        await sendEmailViaServer({
+          to: meetModal.email,
+          subject: `Meeting invite from ${currentUser?.name} — ${meetDetails.date} at ${meetDetails.time}`,
+          body: messageBody,
+          fromName: currentUser?.name || "",
+          replyTo: currentUser?.email || "",
+        });
       }
 
       await supabase.from("meetings").insert({
@@ -4659,7 +4748,7 @@ Keep it punchy, sharp, and directly actionable.`;
       setContacts((prev) => prev.map((c) => (c.id === meetModal.id ? { ...c, meetLink: link, meetDate: meetDateStr } : c)));
       setMeetSent(true);
       triggerConfetti();
-      showToast(useGCal ? `Calendar invite sent to ${meetModal.email}` : `Meeting invite sent to ${meetModal.email}`, "success");
+      showToast(calendarInviteSent ? `Calendar invite sent to ${meetModal.email}` : `Meeting invite sent to ${meetModal.email}`, "success");
       setTimeout(() => {
         setMeetModal(null);
         setMeetSent(false);
@@ -4677,7 +4766,11 @@ Keep it punchy, sharp, and directly actionable.`;
     const contact = contacts.find((c) => c.id === id);
     if (!contact) return;
     const newVal = !contact.reminderDone;
-    await supabase.from("contacts").update({ reminder_done: newVal }).eq("id", id);
+    const { error } = await supabase.from("contacts").update({ reminder_done: newVal }).eq("id", id);
+    if (error) {
+      showToast(error.message || "Failed to update reminder.", "error");
+      return;
+    }
     const updated = contacts.map((c) => (c.id === id ? { ...c, reminderDone: newVal } : c));
     setContacts(updated);
     if (modal?.id === id) setModal(updated.find((c) => c.id === id));
@@ -4685,7 +4778,11 @@ Keep it punchy, sharp, and directly actionable.`;
   };
 
   const deleteContact = async (id: string) => {
-    await supabase.from("contacts").delete().eq("id", id);
+    const { error } = await supabase.from("contacts").delete().eq("id", id);
+    if (error) {
+      showToast(error.message || "Failed to delete contact.", "error");
+      return;
+    }
     setContacts((prev) => prev.filter((c) => c.id !== id));
     setModal(null);
     showToast("Contact deleted.", "success");
@@ -4831,9 +4928,7 @@ Keep it punchy, sharp, and directly actionable.`;
     if (!bulkDrafts.length || bulkSending) return;
     setBulkSending(true);
     let sentCount = 0;
-    const emailServiceId = process.env.EXPO_PUBLIC_EMAILJS_SERVICE_ID;
-    const emailTemplateId = process.env.EXPO_PUBLIC_EMAILJS_TEMPLATE_ID;
-    const emailPubKey = process.env.EXPO_PUBLIC_EMAILJS_PUBLIC_KEY;
+    let failedCount = 0;
 
     for (let i = 0; i < bulkDrafts.length; i++) {
       const draft = bulkDrafts[i];
@@ -4842,21 +4937,14 @@ Keep it punchy, sharp, and directly actionable.`;
       setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sending" } : d)));
 
       try {
-        if (emailServiceId && emailTemplateId && emailPubKey && emailServiceId !== "your_service_id") {
-          await emailjs.send(
-            emailServiceId,
-            emailTemplateId,
-            {
-              to_email: draft.contact.email,
-              to_name: draft.contact.name || "",
-              from_name: currentUser?.name || "Executive",
-              reply_to: currentUser?.email || "",
-              subject: draft.subject,
-              message: draft.body,
-            },
-            emailPubKey
-          );
-        }
+        if (!draft.contact.email) throw new Error("Contact has no email address.");
+        await sendEmailViaServer({
+          to: draft.contact.email,
+          subject: draft.subject,
+          body: draft.body,
+          fromName: currentUser?.name || "",
+          replyTo: currentUser?.email || "",
+        });
         if (draft.contact.id) {
           await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
         }
@@ -4864,15 +4952,18 @@ Keep it punchy, sharp, and directly actionable.`;
         setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sent" } : d)));
         sentCount++;
       } catch (err: any) {
-        console.warn("Dispatched email locally for", draft.contact.name, err);
-        setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
-        setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sent" } : d)));
-        sentCount++;
+        console.warn("Bulk email failed for", draft.contact.name, err);
+        setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "ready" } : d)));
+        failedCount++;
       }
     }
     setBulkSending(false);
-    triggerConfetti();
-    showToast(`Successfully dispatched ${sentCount} automated follow-up emails!`, "success");
+    if (sentCount > 0) triggerConfetti();
+    if (failedCount === 0) {
+      showToast(`Sent ${sentCount} follow-up email${sentCount === 1 ? "" : "s"}.`, "success");
+    } else {
+      showToast(`Sent ${sentCount}, failed ${failedCount}. Failed emails can be retried.`, "error");
+    }
   };
 
   const isMobile =
@@ -5498,6 +5589,8 @@ Keep it punchy, sharp, and directly actionable.`;
           </div>
 
           <div style={S.card}>
+            {!IS_NATIVE_WEBVIEW && (
+            <>
             <button
               style={{
                 ...S.btnOutline,
@@ -5518,6 +5611,8 @@ Keep it punchy, sharp, and directly actionable.`;
               <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>OR</span>
               <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
             </div>
+            </>
+            )}
 
             <div style={{ marginBottom: 14 }}>
               <label style={S.label}>Email Address</label>
@@ -5617,6 +5712,8 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={S.card}>
             {signupStep === 1 && (
               <>
+                {!IS_NATIVE_WEBVIEW && (
+                <>
                 <button
                   style={{
                     ...S.btnOutline,
@@ -5637,6 +5734,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>OR</span>
                   <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
                 </div>
+                </>
+                )}
 
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
                   <div>
@@ -5692,9 +5791,35 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
                 </div>
 
+                {authMsg && (
+                  <div
+                    style={{
+                      color: authMsg.type === "error" ? "#ef4444" : "#10b981",
+                      fontSize: 13,
+                      marginBottom: 14,
+                      background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
+                      border: `1px solid ${authMsg.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)"}`,
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                    }}
+                  >
+                    {authMsg.text}
+                  </div>
+                )}
                 <button
                   style={{ ...S.btn, width: "100%" }}
-                  onClick={() => form.name && form.email && form.password && setSignupStep(2)}
+                  onClick={() => {
+                    if (!form.name.trim() || !form.email.trim() || !form.password) {
+                      setAuthMsg({ text: "Please fill in your name, email and password.", type: "error" });
+                    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+                      setAuthMsg({ text: "Please enter a valid email address.", type: "error" });
+                    } else if (form.password.length < 8) {
+                      setAuthMsg({ text: "Password must be at least 8 characters.", type: "error" });
+                    } else {
+                      setAuthMsg(null);
+                      setSignupStep(2);
+                    }
+                  }}
                 >
                   Continue →
                 </button>
@@ -7601,7 +7726,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 >
                   <Icons.AlertCircle size={15} />
                   <span>{scanErr}</span>
-                  <button
+                  <button aria-label="Close"
                     onClick={() => { setScanErr(""); setScanPreview(null); }}
                     style={{ marginLeft: "auto", background: "none", border: "none", color: "#ef4444", cursor: "pointer", display: "flex" }}
                   >
@@ -7984,6 +8109,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   setPrepBrief(null);
                 }}
                 style={{ ...S.btnSmOut, padding: "6px 9px" }}
+                title="Close"
+                aria-label="Close"
               >
                 <Icons.Close size={15} />
               </button>
@@ -8144,11 +8271,29 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <Icons.Download size={13} />
               </button>
-              <button style={S.btnSmOut} onClick={() => openEdit(modal)}>
+              <button style={S.btnSmOut} onClick={() => openEdit(modal)} title="Edit contact" aria-label="Edit contact">
                 <Icons.Edit size={13} />
               </button>
-              <button style={{ ...S.btnSmOut, color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.3)" }} onClick={() => deleteContact(modal.id)}>
+              <button
+                style={{
+                  ...S.btnSmOut,
+                  color: confirmDeleteId === modal.id ? "#FFFFFF" : "#ef4444",
+                  background: confirmDeleteId === modal.id ? "#ef4444" : (S.btnSmOut as any).background,
+                  borderColor: "rgba(239, 68, 68, 0.3)",
+                }}
+                title={confirmDeleteId === modal.id ? "Tap again to delete" : "Delete contact"}
+                aria-label={confirmDeleteId === modal.id ? "Confirm delete" : "Delete contact"}
+                onClick={() => {
+                  if (confirmDeleteId === modal.id) {
+                    setConfirmDeleteId(null);
+                    deleteContact(modal.id);
+                  } else {
+                    setConfirmDeleteId(modal.id);
+                  }
+                }}
+              >
                 <Icons.Trash size={13} />
+                {confirmDeleteId === modal.id && <span style={{ fontSize: 12, fontWeight: 600 }}>Confirm</span>}
               </button>
             </div>
           </div>
@@ -8176,7 +8321,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ ...S.card, maxWidth: 540, width: "100%", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Intro Email to {emailModal.name}</div>
-              <button onClick={() => setEmailModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
+              <button aria-label="Close" onClick={() => setEmailModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
             </div>
@@ -8239,7 +8384,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ ...S.card, maxWidth: 460, width: "100%", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Schedule Meeting</div>
-              <button onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
+              <button aria-label="Close" onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
             </div>
@@ -8248,7 +8393,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ textAlign: "center", padding: "32px 0" }}>
                 <Icons.CheckCircle size={44} style={{ margin: "0 auto 10px" }} />
                 <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Invite Sent</div>
-                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Google Meet invite delivered to {meetModal.email}</div>
+                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Meeting invite delivered to {meetModal.email}</div>
               </div>
             ) : (
               <>
@@ -8275,7 +8420,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   />
                 </div>
                 <div style={{ background: "rgba(99, 102, 241, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12 }}>
-                  <span style={{ color: "#818cf8", fontWeight: 700 }}>Google Meet video link attached automatically</span>
+                  <span style={{ color: "#818cf8", fontWeight: 700 }}>Video meeting link attached automatically</span>
                 </div>
                 <button
                   style={{ ...S.btn, width: "100%", opacity: !meetDetails.date || !meetDetails.time || meetSending ? 0.6 : 1 }}
@@ -8315,7 +8460,7 @@ Keep it punchy, sharp, and directly actionable.`;
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Account Profile</div>
-              <button onClick={() => setProfileModal(false)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
+              <button aria-label="Close" onClick={() => setProfileModal(false)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
             </div>
@@ -8575,7 +8720,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 </div>
               </div>
 
-              <button
+              <button aria-label="Close"
                 onClick={() => setBulkEmailModalOpen(false)}
                 disabled={bulkSending}
                 style={{ ...S.btnSmOut, padding: "6px 8px" }}

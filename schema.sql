@@ -123,11 +123,11 @@ create policy "Users can insert own meetings"
 
 -- ── AI USAGE ──────────────────────────────────────────────────────────────────
 -- Tracks per-user daily usage for email_generation and card_scan actions.
--- Limits: 5 email generations / day, 10 card scans / day.
+-- Limits: 5 email generations / day, 10 card scans / day, 50 sent emails / day.
 create table if not exists ai_usage (
   id          uuid primary key default gen_random_uuid(),
   user_id     uuid references auth.users(id) on delete cascade not null,
-  action      text not null check (action in ('email_generation', 'card_scan')),
+  action      text not null check (action in ('email_generation', 'card_scan', 'email_send')),
   used_date   date not null default current_date,
   count       integer not null default 0,
   unique (user_id, action, used_date)
@@ -138,11 +138,7 @@ alter table ai_usage enable row level security;
 create policy "Users can read own ai_usage"
   on ai_usage for select using (auth.uid() = user_id);
 
-create policy "Users can insert own ai_usage"
-  on ai_usage for insert with check (auth.uid() = user_id);
-
-create policy "Users can update own ai_usage"
-  on ai_usage for update using (auth.uid() = user_id);
+-- No insert/update policies: rows are written only by increment_ai_usage (security definer)
 
 -- ── WAITLIST ──────────────────────────────────────────────────────────────────
 create sequence if not exists waitlist_position_seq;
@@ -237,28 +233,32 @@ create or replace function increment_ai_usage(p_user_id uuid, p_action text)
 returns jsonb
 language plpgsql
 security definer
+set search_path = public
 as $$
 declare
   v_limit    integer;
   v_count    integer;
   v_allowed  boolean;
 begin
-  -- Determine per-action daily limit
+  if auth.uid() is not null and auth.uid() <> p_user_id then
+    raise exception 'Not allowed to update usage for another user';
+  end if;
+
   if p_action = 'email_generation' then
     v_limit := 5;
   elsif p_action = 'card_scan' then
     v_limit := 10;
+  elsif p_action = 'email_send' then
+    v_limit := 50;
   else
     raise exception 'Unknown action: %', p_action;
   end if;
 
-  -- Upsert today's row and increment atomically
   insert into ai_usage (user_id, action, used_date, count)
     values (p_user_id, p_action, current_date, 1)
   on conflict (user_id, action, used_date)
     do update set count = ai_usage.count + 1;
 
-  -- Read back the count just written
   select count into v_count
     from ai_usage
    where user_id = p_user_id
@@ -267,7 +267,6 @@ begin
 
   v_allowed := v_count <= v_limit;
 
-  -- If over the limit, roll back the increment so the count stays at the cap
   if not v_allowed then
     update ai_usage
        set count = v_limit
@@ -284,6 +283,9 @@ begin
   );
 end;
 $$;
+
+revoke execute on function increment_ai_usage(uuid, text) from public, anon;
+grant  execute on function increment_ai_usage(uuid, text) to authenticated, service_role;
 
 -- ── STORAGE BUCKETS & POLICIES ────────────────────────────────────────────────
 -- Create public bucket for business card uploads if it doesn't already exist

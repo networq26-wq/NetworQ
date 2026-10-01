@@ -1,6 +1,8 @@
 const https = require("https");
 const http = require("http");
 const { URL } = require("url");
+const dns = require("dns").promises;
+const net = require("net");
 const { isAllowedOrigin } = require("./_lib/cors");
 
 function cleanText(str) {
@@ -15,10 +17,40 @@ function cleanText(str) {
     .trim();
 }
 
-function fetchHtml(targetUrl, timeoutMs = 5000) {
+// ── SSRF guard: only public internet hosts may be scraped ─────────────────────
+function isPrivateAddress(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split(".").map(Number);
+    return (
+      a === 0 || a === 10 || a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  const lower = ip.toLowerCase();
+  if (lower.startsWith("::ffff:")) return isPrivateAddress(lower.slice(7));
+  return lower === "::" || lower === "::1" || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower);
+}
+
+async function assertPublicUrl(parsed) {
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error("Only http(s) URLs are allowed");
+  }
+  const host = parsed.hostname.replace(/^\[|\]$/g, "");
+  const addresses = net.isIP(host) ? [{ address: host }] : await dns.lookup(host, { all: true });
+  if (addresses.some(({ address }) => isPrivateAddress(address))) {
+    throw new Error("Target host is not allowed");
+  }
+}
+
+async function fetchHtml(targetUrl, timeoutMs = 5000, redirectsLeft = 3) {
+  const parsed = new URL(targetUrl);
+  await assertPublicUrl(parsed);
   return new Promise((resolve, reject) => {
     try {
-      const parsed = new URL(targetUrl);
       const client = parsed.protocol === "http:" ? http : https;
       const req = client.get(
         parsed,
@@ -31,8 +63,10 @@ function fetchHtml(targetUrl, timeoutMs = 5000) {
         },
         (res) => {
           if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            res.resume();
+            if (redirectsLeft <= 0) return reject(new Error("Too many redirects"));
             const redirectUrl = new URL(res.headers.location, targetUrl).href;
-            return fetchHtml(redirectUrl, timeoutMs).then(resolve).catch(reject);
+            return fetchHtml(redirectUrl, timeoutMs, redirectsLeft - 1).then(resolve).catch(reject);
           }
           if (res.statusCode !== 200) {
             return reject(new Error(`HTTP ${res.statusCode}`));
@@ -138,3 +172,6 @@ module.exports = async function enrichHandler(req, res) {
     });
   }
 };
+
+module.exports.isPrivateAddress = isPrivateAddress;
+module.exports.assertPublicUrl = assertPublicUrl;

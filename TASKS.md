@@ -58,9 +58,9 @@
   fly deploy
   ```
 - [ ] TASK-604: Connect GoDaddy domain to Fly.io via Cloudflare DNS
-- [ ] TASK-605: Add Supabase RLS policies (docs/SECURITY.md)
-- [ ] TASK-606: Add increment_ai_usage SQL function (docs/SECURITY.md)
-- [ ] TASK-607: Full production QA using TEST_PLAN.md
+- [x] TASK-605: Add Supabase RLS policies — verified live (13/14); run supabase/migrations/20261001_security_hardening.sql for the last one
+- [x] TASK-606: Add increment_ai_usage SQL function — hardened in supabase/migrations/20261001_security_hardening.sql
+- [x] TASK-607: Full production QA — see docs/QA_REPORT.md
 
 ---
 
@@ -74,7 +74,7 @@
 - [ ] TASK-707: Subscription payments (Stripe)
 - [ ] TASK-708: App Store + Play Store submission
 - [ ] TASK-709: Refactor App.tsx into separate feature files
-- [ ] TASK-710: Add Playwright E2E tests
+- [x] TASK-710: Add Playwright E2E tests (`npm run test:e2e`)
 
 ---
 

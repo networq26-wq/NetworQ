@@ -7,16 +7,28 @@
 
 const { createClient } = require("@supabase/supabase-js");
 
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function sendReminderEmail({ to, contactName, reminderText, reminderDate }) {
+  const safeName = escapeHtml(contactName);
+  const safeText = escapeHtml(reminderText);
+  const safeDate = reminderDate ? escapeHtml(reminderDate) : "";
   const apiKey = process.env.RESEND_API_KEY;
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
       <div style="margin-bottom: 16px;"><span style="font-size: 22px; font-weight: 700; color: #7C3AED;">NetworQ</span></div>
       <h2 style="font-size: 20px; font-weight: 600; color: #1c1c1e; margin: 0 0 12px;">⏰ Reminder Due Today</h2>
       <div style="background: #f2f2f7; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
-        <p style="margin: 0 0 4px; font-size: 17px; font-weight: 600; color: #1c1c1e;">${contactName}</p>
-        <p style="margin: 0; font-size: 15px; color: #3c3c43;">${reminderText}</p>
-        ${reminderDate ? `<p style="margin: 8px 0 0; font-size: 13px; color: #8e8e93;">Due: ${reminderDate}</p>` : ""}
+        <p style="margin: 0 0 4px; font-size: 17px; font-weight: 600; color: #1c1c1e;">${safeName}</p>
+        <p style="margin: 0; font-size: 15px; color: #3c3c43;">${safeText}</p>
+        ${safeDate ? `<p style="margin: 8px 0 0; font-size: 13px; color: #8e8e93;">Due: ${safeDate}</p>` : ""}
       </div>
       <a href="https://www.networq.co.in" style="display: inline-block; background: #7C3AED; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 15px;">Open NetworQ →</a>
       <hr style="border: none; border-top: 1px solid #e5e5ea; margin: 24px 0;" />
@@ -114,5 +126,5 @@ function startReminderEngine() {
   setInterval(() => checkAndSendReminders().catch(console.error), 60 * 60 * 1000);
 }
 
-module.exports = { startReminderEngine };
+module.exports = { startReminderEngine, escapeHtml };
 

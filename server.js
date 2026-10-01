@@ -27,10 +27,10 @@ function parseEnvContent(content) {
   });
 }
 
-// 1. Read from local or root .env
+// 1. Read from local or root .env (tests set NETWORQ_SKIP_DOTENV to stay hermetic)
 try {
   const envPath = path.join(__dirname, ".env");
-  if (fs.existsSync(envPath)) {
+  if (!process.env.NETWORQ_SKIP_DOTENV && fs.existsSync(envPath)) {
     parseEnvContent(fs.readFileSync(envPath, "utf8"));
   }
 } catch (err) {
@@ -210,32 +210,42 @@ app.use("/api", (err, req, res, next) => {
 });
 
 // ── Multi-port listener for seamless local development ────────────────────────
-const primaryPort = parseInt(process.env.PORT || "3001", 10);
-const targetPorts = [primaryPort, 3000, 8081].filter(
-  (p, idx, arr) => arr.indexOf(p) === idx
-);
+// Production binds only $PORT; local dev also tries the legacy 3000/8081 ports.
+function startServer() {
+  const primaryPort = parseInt(process.env.PORT || "3001", 10);
+  const targetPorts =
+    process.env.NODE_ENV === "production"
+      ? [primaryPort]
+      : [primaryPort, 3000, 8081].filter((p, idx, arr) => arr.indexOf(p) === idx);
 
-targetPorts.forEach((port) => {
-  try {
-    const srv = app.listen(port, "0.0.0.0", () => {
-      console.log(
-        `✅ NetworQ server live on http://localhost:${port} & http://127.0.0.1:${port}`
-      );
-    });
-    srv.on("error", (err) => {
-      if (err.code === "EADDRINUSE") {
-        console.log(`ℹ️  Port ${port} is in use by another process; skipping.`);
-      } else {
-        console.warn(`Server on port ${port} notice:`, err.message);
-      }
-    });
-  } catch (err) {
-    // Ignore secondary binding errors
+  targetPorts.forEach((port) => {
+    try {
+      const srv = app.listen(port, "0.0.0.0", () => {
+        console.log(
+          `✅ NetworQ server live on http://localhost:${port} & http://127.0.0.1:${port}`
+        );
+      });
+      srv.on("error", (err) => {
+        if (err.code === "EADDRINUSE") {
+          console.log(`ℹ️  Port ${port} is in use by another process; skipping.`);
+        } else {
+          console.warn(`Server on port ${port} notice:`, err.message);
+        }
+      });
+    } catch (err) {
+      // Ignore secondary binding errors
+    }
+  });
+
+  // ── Start background reminder engine ────────────────────────────────────────
+  // Only run on primary instance (not during Expo web build)
+  if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    startReminderEngine();
   }
-});
-
-// ── Start background reminder engine ──────────────────────────────────────────
-// Only run on primary instance (not during Expo web build)
-if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  startReminderEngine();
 }
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;

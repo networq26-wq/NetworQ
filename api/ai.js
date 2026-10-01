@@ -20,25 +20,28 @@ module.exports = async function handler(req, res) {
     const accessToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
     const { action, system, messages, max_tokens } = req.body || {};
 
+    // Every AI call must carry a valid session — the Groq key is billed per request
+    if (!accessToken) return res.status(401).json({ error: "Missing Authorization token." });
     const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
     const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-    if (supabaseUrl && supabaseAnonKey && accessToken && accessToken !== "local-dev-token") {
-      try {
-        const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const supabase = supabaseUrl && supabaseAnonKey
+      ? createClient(supabaseUrl, supabaseAnonKey, {
           global: { headers: { Authorization: `Bearer ${accessToken}` } },
           auth: { persistSession: false, autoRefreshToken: false },
-        });
-        const check = await verifyAndCheckLimit(supabase, { accessToken, action });
-        if (!check.ok) {
-          if (action === "chat") {
-            console.warn("Notice: Chat request proceeding for guest/unauthenticated user");
-          } else {
-            return res.status(check.status).json({ error: check.error });
-          }
-        }
-      } catch (limitErr) {
-        console.warn("Notice: Rate limit verification bypass:", limitErr.message);
+        })
+      : null;
+    if (!supabase && process.env.NODE_ENV === "production") {
+      return res.status(500).json({ error: "Authentication is not configured on the server." });
+    }
+    if (supabase) {
+      let check;
+      try {
+        check = await verifyAndCheckLimit(supabase, { accessToken, action });
+      } catch (verifyErr) {
+        console.warn("AI auth verification failed:", verifyErr.message);
+        return res.status(503).json({ error: "Could not verify your session. Please try again." });
       }
+      if (!check.ok) return res.status(check.status).json({ error: check.error });
     }
 
     const apiKey = process.env.GROQ_API_KEY;

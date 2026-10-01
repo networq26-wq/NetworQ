@@ -14,11 +14,15 @@
     "ios": "expo start --ios",
     "build:apk": "npx eas-cli@latest build --profile preview --platform android",
     "update": "npx eas-cli@latest update --auto",
-    "test": "node --test api/_lib/*.test.js"
+    "test": "node --test api/_lib/*.test.js tests/api/*.test.js",
+    "test:rls": "QA_LIVE_SUPABASE=1 node --test tests/integration/*.test.js",
+    "test:e2e": "playwright test",
+    "test:all": "npx tsc --noEmit && npm test && npm run build && playwright test"
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
     "@supabase/supabase-js": "^2.105.4",
+    "compression": "^1.8.2",
     "cors": "^2.8.6",
     "expo": "~55.0.8",
     "expo-dev-client": "^57.0.16",
@@ -34,6 +38,7 @@
     "react-native-webview": "^14.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.0",
     "@types/react": "~19.2.2",
     "typescript": "~5.9.2"
   },

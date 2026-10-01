@@ -8,19 +8,23 @@ const { verifyAndCheckLimit } = require("./_lib/verifyAndLimit");
 const { createClient } = require("@supabase/supabase-js");
 
 function getSupabase() {
+  if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
   return createClient(
     process.env.EXPO_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 }
 
+const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
+
 // ── Resend HTTP API (no npm package needed) ───────────────────────────────────
-async function sendViaResend({ to, subject, html, text, fromName }) {
+async function sendViaResend({ to, subject, html, text, fromName, replyTo }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY not set");
 
   const fromEmail = process.env.RESEND_FROM_EMAIL || "NetworQ <noreply@networq.app>";
-  const from = fromName ? `${fromName} via NetworQ <${fromEmail.match(/<(.+)>/)?.[1] || "noreply@networq.app"}>` : fromEmail;
+  const fromAddress = fromEmail.match(/<(.+)>/)?.[1] || fromEmail.trim();
+  const from = fromName ? `${fromName} via NetworQ <${fromAddress}>` : fromEmail;
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -28,7 +32,7 @@ async function sendViaResend({ to, subject, html, text, fromName }) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from, to, subject, html, text }),
+    body: JSON.stringify({ from, to, subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
   });
 
   const data = await res.json();
@@ -37,7 +41,7 @@ async function sendViaResend({ to, subject, html, text, fromName }) {
 }
 
 // ── Nodemailer SMTP fallback ──────────────────────────────────────────────────
-async function sendViaSMTP({ to, subject, html, text, fromName }) {
+async function sendViaSMTP({ to, subject, html, text, fromName, replyTo }) {
   const nodemailer = require("nodemailer");
 
   let transporter;
@@ -61,6 +65,7 @@ async function sendViaSMTP({ to, subject, html, text, fromName }) {
   await transporter.sendMail({
     from: `"${fromName || "NetworQ"}" <${fromEmail}>`,
     to, subject, html, text,
+    ...(replyTo ? { replyTo } : {}),
   });
 }
 
@@ -84,21 +89,38 @@ module.exports = async function emailHandler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   const supabase = getSupabase();
-  const accessToken = (req.headers.authorization || "").replace("Bearer ", "");
-  const verify = await verifyAndCheckLimit(supabase, { accessToken, action: "email_send" });
+  const accessToken = (req.headers.authorization || "").replace("Bearer ", "").trim();
+  if (!supabase && process.env.NODE_ENV === "production") {
+    return res.status(500).json({ error: "Authentication is not configured on the server." });
+  }
+  let verify;
+  try {
+    verify = await verifyAndCheckLimit(supabase, { accessToken, action: "email_send" });
+  } catch (err) {
+    console.warn("[Email] Session verification failed:", err.message);
+    return res.status(503).json({ error: "Could not verify your session. Please try again." });
+  }
   if (!verify.ok) return res.status(verify.status).json({ error: verify.error });
 
-  const { to, subject, body, from_name } = req.body || {};
+  const { to, subject, body, from_name, reply_to } = req.body || {};
   if (!to || !subject || !body) {
     return res.status(400).json({ error: "Missing required fields: to, subject, body" });
   }
+  if (typeof to !== "string" || !EMAIL_RE.test(to.trim())) {
+    return res.status(400).json({ error: "Recipient must be a single valid email address." });
+  }
+  if (typeof subject !== "string" || subject.length > 300 || typeof body !== "string" || body.length > 20000) {
+    return res.status(400).json({ error: "Subject or body is too long." });
+  }
+  const replyTo = typeof reply_to === "string" && EMAIL_RE.test(reply_to.trim()) ? reply_to.trim() : undefined;
+  const fromName = typeof from_name === "string" ? from_name.replace(/[<>"\r\n]/g, "").slice(0, 80) : undefined;
 
   const html = buildHtml(body);
 
   // Try Resend first
   if (process.env.RESEND_API_KEY) {
     try {
-      const data = await sendViaResend({ to, subject, html, text: body, fromName: from_name });
+      const data = await sendViaResend({ to: to.trim(), subject, html, text: body, fromName, replyTo });
       return res.json({ ok: true, provider: "resend", id: data.id });
     } catch (err) {
       console.warn("[Email] Resend failed:", err.message, "— trying SMTP fallback");
@@ -108,7 +130,7 @@ module.exports = async function emailHandler(req, res) {
   // Try SMTP fallback
   if (process.env.SMTP_HOST || (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)) {
     try {
-      await sendViaSMTP({ to, subject, html, text: body, fromName: from_name });
+      await sendViaSMTP({ to: to.trim(), subject, html, text: body, fromName, replyTo });
       return res.json({ ok: true, provider: "smtp" });
     } catch (err) {
       console.warn("[Email] SMTP failed:", err.message);
