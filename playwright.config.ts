@@ -3,7 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 const PORT = Number(process.env.E2E_PORT || 4173);
 
 export default defineConfig({
-  testDir: "tests/e2e",
+  testDir: "tests",
+  testMatch: /(e2e|unit)\/.*\.spec\.ts$/,
   timeout: 45_000,
   expect: { timeout: 10_000 },
   fullyParallel: true,
@@ -15,8 +16,9 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "desktop-chrome", use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
-    { name: "mobile-chrome", use: { ...devices["Pixel 7"] } },
+    { name: "unit", testDir: "tests/unit" },
+    { name: "desktop-chrome", testIgnore: /unit\//, use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
+    { name: "mobile-chrome", testIgnore: /unit\//, use: { ...devices["Pixel 7"] } },
   ],
   webServer: {
     // Serves the production build from dist/ with no .env — Supabase is mocked in the browser
