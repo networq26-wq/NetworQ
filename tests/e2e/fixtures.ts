@@ -96,12 +96,19 @@ export async function login(page: Page, email: string, password = PASSWORD) {
 }
 
 export async function logout(page: Page) {
-  await signOutButton(page).click();
+  // Phones: Sign out lives in Settings; desktop: header button
+  if (isMobileProject()) {
+    await page.getByRole("button", { name: "Profile & Settings" }).click();
+    await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  } else {
+    await page.getByRole("banner").getByRole("button", { name: "Sign out" }).click();
+  }
   await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
 }
 
+/** Visible whenever a user is signed in (header avatar on desktop and phones). */
 export function signOutButton(page: Page) {
-  return page.getByRole("button", { name: "Sign out" });
+  return page.getByRole("button", { name: "Profile & Settings" });
 }
 
 export const isMobileProject = () => test.info().project.name.includes("mobile");

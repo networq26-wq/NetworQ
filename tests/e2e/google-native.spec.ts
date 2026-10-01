@@ -25,7 +25,7 @@ test.describe("Google sign-in inside the Android app", () => {
       return r.json();
     });
     await page.evaluate((s) => window.dispatchEvent(new CustomEvent("networq-native", { detail: { type: "auth:session", access_token: s.access_token, refresh_token: s.refresh_token } })), session);
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Profile & Settings" })).toBeVisible();
   });
 
   test("native errors are shown on the sign-in screen", async ({ page }) => {

@@ -47,6 +47,8 @@ export function SettingsScreen({
   onProfileUpdated,
   onSignedOut,
   onExportContacts,
+  onToggleTheme,
+  onSignOut,
 }: {
   supabase: SupabaseClient;
   account: AccountApi;
@@ -56,6 +58,8 @@ export function SettingsScreen({
   onProfileUpdated: (patch: Record<string, unknown>) => void;
   onSignedOut: (message?: string) => void;
   onExportContacts: () => void;
+  onToggleTheme: () => void;
+  onSignOut: () => void;
 }) {
   const t = theme(isDark);
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
@@ -248,7 +252,12 @@ export function SettingsScreen({
           {avatar ? (
             <img src={avatar} alt="Your profile photo" width={72} height={72} style={{ borderRadius: 36, objectFit: "cover" }} />
           ) : (
-            <div aria-hidden="true" style={{ width: 72, height: 72, borderRadius: 36, background: "#3A3A3C" }} />
+            <div aria-hidden="true" style={{ width: 72, height: 72, borderRadius: 36, background: "#3A3A3C", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#AEAEB2" strokeWidth="1.8" strokeLinecap="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
+              </svg>
+            </div>
           )}
           <div>
             <button style={btn("ghost")} onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -313,6 +322,25 @@ export function SettingsScreen({
         <Switch id="product_updates" title="Product updates" hint="Occasional news about new NetworQ features." />
       </section>
 
+      <section style={card} aria-labelledby="settings-appearance">
+        <h3 id="settings-appearance" style={{ margin: "0 0 4px", fontSize: 18 }}>Appearance</h3>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>Dark mode</div>
+            <div style={{ color: t.muted, fontSize: 13 }}>Easier on the eyes at evening events.</div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={isDark}
+            aria-label="Dark mode"
+            onClick={onToggleTheme}
+            style={{ width: 52, minWidth: 52, height: 32, borderRadius: 16, border: "none", padding: 2, cursor: "pointer", background: isDark ? PURPLE : t.raised, boxShadow: `inset 0 0 0 1px ${t.border}` }}
+          >
+            <span style={{ display: "block", width: 28, height: 28, borderRadius: 14, background: "#FFFFFF", transform: `translateX(${isDark ? 20 : 0}px)`, transition: "transform 0.2s" }} />
+          </button>
+        </div>
+      </section>
+
       <section style={card} aria-labelledby="settings-data">
         <h3 id="settings-data" style={{ margin: "0 0 12px", fontSize: 18 }}>Your data</h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -327,6 +355,10 @@ export function SettingsScreen({
           </a>
         </div>
       </section>
+
+      <button style={{ ...btn("ghost"), width: "100%" }} onClick={onSignOut}>
+        Sign out
+      </button>
 
       <section style={{ ...card, borderColor: "rgba(255,59,48,0.35)" }} aria-labelledby="settings-delete">
         <h3 id="settings-delete" style={{ margin: "0 0 6px", fontSize: 18, color: "#FF3B30" }}>Delete account</h3>

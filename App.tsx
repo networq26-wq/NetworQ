@@ -948,45 +948,30 @@ Use null for missing fields.`;
       sys,
       { action: "card_scan" }
     );
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+    // Models sometimes wrap JSON in prose, code fences or <think> blocks — take the first object
+    const cleaned = text.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/```json|```/g, "");
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    const parsed = match ? JSON.parse(match[0]) : null;
     if (parsed && (parsed.name || parsed.email || parsed.phone || parsed.company)) {
-      return parsed;
+      const clean = (v: unknown) => (typeof v === "string" && v.trim() && v.trim().toLowerCase() !== "null" ? v.trim() : "");
+      return {
+        name: clean(parsed.name),
+        title: clean(parsed.title),
+        company: clean(parsed.company),
+        email: clean(parsed.email),
+        phone: clean(parsed.phone),
+        website: clean(parsed.website),
+        linkedin: clean(parsed.linkedin),
+      };
     }
   } catch (err) {
-    console.warn("Vision extraction error, using fallback extractor:", err);
+    console.warn("Card extraction failed:", err);
+    throw err;
   }
-  return {
-    name: "New Connection",
-    title: "Executive",
-    company: "Organization",
-    email: "",
-    phone: "",
-    website: "",
-    linkedin: "",
-  };
+  // Never invent a contact — the caller shows "Could not read card details"
+  return null;
 }
 
-async function checkAndIncrementUsage(supabaseClient: any, userId: string, action: "email_generation" | "card_scan") {
-  try {
-    const { data, error } = await supabaseClient.rpc("increment_ai_usage", { p_user_id: userId, p_action: action });
-    if (error) {
-      if (error.message && (error.message.includes("function") || error.message.includes("schema cache"))) {
-        return; // Optional DB limiter not installed — proceed gracefully
-      }
-      console.warn("Usage limit check warning:", error.message);
-      return;
-    }
-    if (data && data.allowed === false) {
-      const limit = action === "email_generation" ? 5 : 10;
-      throw new Error(
-        `Daily limit reached: ${limit} actions per day. Please try again tomorrow.`
-      );
-    }
-  } catch (err: any) {
-    if (err.message && err.message.includes("Daily limit")) throw err;
-    // Otherwise permit action to prevent user lock-out
-  }
-}
 
 function generateExecutiveFollowUp(fromUser: any, toContact: any, customAngle?: string) {
   const firstName = (toContact?.name || "there").split(" ")[0];
@@ -1702,9 +1687,9 @@ function LiveCameraModal({
                 width: 62,
                 height: 62,
                 borderRadius: "50%",
-                background: ready ? "linear-gradient(135deg, #0071E3, #2997FF)" : "#8E8E93",
+                background: ready ? "linear-gradient(135deg, #7C3AED, #A78BFA)" : "#8E8E93",
                 border: "4px solid rgba(255,255,255,0.8)",
-                boxShadow: "0 4px 14px rgba(0,113,227,0.4)",
+                boxShadow: "0 4px 14px rgba(124, 58, 237,0.4)",
                 cursor: ready ? "pointer" : "default",
                 display: "flex",
                 alignItems: "center",
@@ -2045,8 +2030,8 @@ function CommandPalette({
                       padding: "8px 14px",
                       borderRadius: 10,
                       cursor: "pointer",
-                      background: isSel ? (isDark ? "rgba(41, 151, 255, 0.18)" : "rgba(0, 113, 227, 0.1)") : "transparent",
-                      color: isSel ? (isDark ? "#2997FF" : "#0071E3") : isDark ? "#f8fafc" : "#0f172a",
+                      background: isSel ? (isDark ? "rgba(167, 139, 250, 0.18)" : "rgba(124, 58, 237, 0.1)") : "transparent",
+                      color: isSel ? (isDark ? "#A78BFA" : "#7C3AED") : isDark ? "#f8fafc" : "#0f172a",
                       fontSize: 13,
                     }}
                   >
@@ -2604,6 +2589,64 @@ VOICE & ASSISTANT DIRECTIVES:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, inviteCode]);
 
+  // ── Android back button (handled by the app shell via window.__networqHandleBack) ──
+  // Closes the top-most overlay first, then walks back through visited tabs.
+  const tabHistory = useRef<string[]>([]);
+  const navigatingBack = useRef(false);
+  const lastTab = useRef(tab);
+  useEffect(() => {
+    if (lastTab.current !== tab) {
+      if (!navigatingBack.current) tabHistory.current = [...tabHistory.current, lastTab.current].slice(-20);
+      navigatingBack.current = false;
+      lastTab.current = tab;
+    }
+  }, [tab]);
+
+  const backState = useRef<() => boolean>(() => false);
+  backState.current = () => {
+    // Sheets/dialogs inside feature screens close on Escape
+    const openDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+    if (openDialog) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      return true;
+    }
+    if (liveCameraOpen) return setLiveCameraOpen(false), true;
+    if (emailModal) return setEmailModal(null), true;
+    if (meetModal) return setMeetModal(null), true;
+    if (bulkEmailModalOpen) return setBulkEmailModalOpen(false), true;
+    if (modal) return setModal(null), setPrepBrief(null), true;
+    if (nameDropOpen) return setNameDropOpen(false), true;
+    if (commandOpen) return setCommandOpen(false), true;
+    if (aiOpen) return setAiOpen(false), true;
+    if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
+    const prev = tabHistory.current.pop();
+    if (screen === "app" && prev) {
+      navigatingBack.current = true;
+      setTab(prev as typeof tab);
+      return true;
+    }
+    if (screen === "app" && tab !== "contacts") {
+      navigatingBack.current = true;
+      setTab("contacts");
+      return true;
+    }
+    return false;
+  };
+  useEffect(() => {
+    (window as any).__networqHandleBack = () => backState.current();
+    return () => {
+      delete (window as any).__networqHandleBack;
+    };
+  }, []);
+
+  // In the Android app, ask for camera permission up front on the Scan screen so the
+  // camera capture and live viewfinder work on the first tap (WebView fails silently otherwise).
+  useEffect(() => {
+    if (tab === "scan" && IS_NATIVE_WEBVIEW) {
+      window.ReactNativeWebView?.postMessage(JSON.stringify({ type: "perm:camera" }));
+    }
+  }, [tab]);
+
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
     const handleCmdK = (e: KeyboardEvent) => {
@@ -2808,10 +2851,6 @@ VOICE & ASSISTANT DIRECTIVES:
           const dataUrl = await downscaleImage(e.target.result);
           const mimeType = dataUrl.slice(5, dataUrl.indexOf(";")) || file.type;
           const base64 = dataUrl.split(",")[1];
-
-          if (currentUser?.id) {
-            await checkAndIncrementUsage(supabase, currentUser.id, "card_scan");
-          }
 
           const [imageUrl, cardData] = await Promise.all([
             (async () => {
@@ -3063,9 +3102,6 @@ VOICE & ASSISTANT DIRECTIVES:
     setGeneratedEmail("");
     setGeneratingEmail(true);
     try {
-      if (currentUser?.id) {
-        await checkAndIncrementUsage(supabase, currentUser.id, "email_generation");
-      }
       const text = await genIntroEmail(currentUser, contact, angle);
       setGeneratedEmail(text);
     } catch (err: any) {
@@ -3518,9 +3554,9 @@ Keep it punchy, sharp, and directly actionable.`;
           color: "#F5F5F7",
         },
         accentBtn: {
-          background: "#2997FF",
+          background: "#7C3AED",
           color: "#FFFFFF",
-          boxShadow: "0 2px 8px rgba(41, 151, 255, 0.3)",
+          boxShadow: "none",
         },
         btnOutline: {
           background: "transparent",
@@ -3558,9 +3594,9 @@ Keep it punchy, sharp, and directly actionable.`;
           color: "#1D1D1F",
         },
         accentBtn: {
-          background: "#0071E3",
+          background: "#7C3AED",
           color: "#FFFFFF",
-          boxShadow: "0 2px 6px rgba(0, 113, 227, 0.2)",
+          boxShadow: "none",
         },
         btnOutline: {
           background: "#FFFFFF",
@@ -3590,13 +3626,17 @@ Keep it punchy, sharp, and directly actionable.`;
       background-color: ${isDark ? "#000000" : "#F5F5F7"};
     }
     
+    button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
+    button:not(:disabled):active, [role="button"]:active { opacity: 0.6; transform: scale(0.98); transition: opacity 0.08s, transform 0.08s; }
+    button:disabled { cursor: default; }
+
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
 
     input:focus, textarea:focus, select:focus {
-      border-color: ${isDark ? "#2997FF" : "#0071E3"} !important;
-      box-shadow: 0 0 0 3px ${isDark ? "rgba(41, 151, 255, 0.25)" : "rgba(0, 113, 227, 0.2)"} !important;
+      border-color: #7C3AED !important;
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22) !important;
       outline: none;
     }
     
@@ -3652,9 +3692,10 @@ Keep it punchy, sharp, and directly actionable.`;
       },
       btn: {
         border: "none",
-        borderRadius: 10,
-        padding: "10px 18px",
-        fontSize: 13,
+        borderRadius: isMobile ? 12 : 10,
+        padding: isMobile ? "12px 18px" : "10px 18px",
+        minHeight: isMobile ? 44 : undefined,
+        fontSize: isMobile ? 15 : 13,
         fontWeight: 600,
         cursor: "pointer",
         display: "inline-flex",
@@ -3665,9 +3706,10 @@ Keep it punchy, sharp, and directly actionable.`;
         transition: "all 0.15s ease",
       },
       btnOutline: {
-        borderRadius: 10,
-        padding: "9px 16px",
-        fontSize: 13,
+        borderRadius: isMobile ? 12 : 10,
+        padding: isMobile ? "11px 16px" : "9px 16px",
+        minHeight: isMobile ? 44 : undefined,
+        fontSize: isMobile ? 15 : 13,
         fontWeight: 600,
         cursor: "pointer",
         display: "inline-flex",
@@ -3720,7 +3762,7 @@ Keep it punchy, sharp, and directly actionable.`;
         letterSpacing: "-0.01em",
       },
     }),
-    [themeStyles]
+    [themeStyles, isMobile]
   );
 
   const renderBackgroundOrbs = () => null;
@@ -3767,7 +3809,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   height: "100%",
                   width: `${splashProgress}%`,
                   borderRadius: 980,
-                  background: "linear-gradient(90deg, #7C3AED, #6366F1, #2997FF)",
+                  background: "linear-gradient(90deg, #7C3AED, #6366F1, #A78BFA)",
                   transition: "width 0.25s ease-out",
                   boxShadow: "0 0 12px rgba(124, 58, 237, 0.6)",
                 }}
@@ -4467,8 +4509,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   style={{
                     fontSize: 10,
                     fontWeight: 700,
-                    color: isDark ? "#2997FF" : "#0071E3",
-                    background: isDark ? "rgba(41, 151, 255, 0.12)" : "rgba(0, 113, 227, 0.08)",
+                    color: isDark ? "#A78BFA" : "#7C3AED",
+                    background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(124, 58, 237, 0.08)",
                     padding: "2px 7px",
                     borderRadius: 980,
                     letterSpacing: "0.02em",
@@ -4545,7 +4587,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
-                      <item.icon size={17} color={item.isActive ? (isDark ? "#2997FF" : "#0071E3") : "currentColor"} />
+                      <item.icon size={17} color={item.isActive ? (isDark ? "#A78BFA" : "#7C3AED") : "currentColor"} />
                       <span>{item.label}</span>
                     </div>
                     {item.count !== undefined && (
@@ -4644,7 +4686,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       transition: "all 0.15s ease",
                     }}
                   >
-                    <item.icon size={17} color={item.isActive ? (isDark ? "#2997FF" : "#0071E3") : "currentColor"} />
+                    <item.icon size={17} color={item.isActive ? (isDark ? "#A78BFA" : "#7C3AED") : "currentColor"} />
                     <span>{item.label}</span>
                   </button>
                 ))}
@@ -4803,6 +4845,18 @@ Keep it punchy, sharp, and directly actionable.`;
                 )}
               </button>
 
+              {isMobile && (
+                <button
+                  onClick={() => setAiOpen(true)}
+                  title="AI Assistant"
+                  aria-label="AI Assistant"
+                  style={{ width: 44, height: 44, borderRadius: 12, border: "none", background: "rgba(124,58,237,0.12)", color: "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  <Icons.Sparkles size={20} color="#7C3AED" />
+                </button>
+              )}
+
+              {!isMobile && (
               <button
                 onClick={toggleTheme}
                 title={`Switch to ${isDark ? "Light" : "Dark"} mode`}
@@ -4821,6 +4875,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 {isDark ? <Icons.Sun size={16} /> : <Icons.Moon size={16} />}
               </button>
+              )}
 
               {!isMobile && (
                 <button
@@ -4839,6 +4894,8 @@ Keep it punchy, sharp, and directly actionable.`;
               <div
                 onClick={openProfileModal}
                 title="Profile & Settings"
+                role="button"
+                aria-label="Profile & Settings"
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -4858,6 +4915,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 )}
               </div>
 
+              {!isMobile && (
               <button
                 onClick={async () => {
                   await supabase.auth.signOut();
@@ -4874,6 +4932,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 Sign out
               </button>
+              )}
             </div>
           </header>
 
@@ -4881,7 +4940,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div
             style={{
               flex: 1,
-              padding: isMobile ? "16px 12px 100px" : "28px 36px 60px",
+              padding: isMobile ? "16px 16px calc(130px + env(safe-area-inset-bottom))" : "28px 36px 60px",
               maxWidth: 1280,
               width: "100%",
               margin: "0 auto",
@@ -4942,7 +5001,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
               {!isMobile && (
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: isDark ? "#2997FF" : "#0071E3", textTransform: "uppercase" }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: isDark ? "#A78BFA" : "#7C3AED", textTransform: "uppercase" }}>
                     PEOPLE · POSSIBILITIES · PROGRESS
                   </div>
                   <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4 }}>
@@ -4962,7 +5021,7 @@ Keep it punchy, sharp, and directly actionable.`;
               }}
             >
               {[
-                { count: effectiveContacts.length, label: "People", icon: Icons.Users, color: isDark ? "#2997FF" : "#0071E3", bg: isDark ? "rgba(41, 151, 255, 0.12)" : "#EBF5FF" },
+                { count: effectiveContacts.length, label: "People", icon: Icons.Users, color: isDark ? "#A78BFA" : "#7C3AED", bg: isDark ? "rgba(167, 139, 250, 0.12)" : "#EBF5FF" },
                 { count: dueReminders.length, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
                 { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
                 { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
@@ -5034,14 +5093,14 @@ Keep it punchy, sharp, and directly actionable.`;
                     width: 36,
                     height: 36,
                     borderRadius: "50%",
-                    background: isDark ? "#2997FF" : "#0071E3",
+                    background: isDark ? "#A78BFA" : "#7C3AED",
                     color: "#fff",
                     border: "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(0, 113, 227, 0.25)",
+                    boxShadow: "0 2px 8px rgba(124, 58, 237, 0.25)",
                   }}
                 >
                   <Icons.ArrowRight size={16} color="#fff" />
@@ -5067,12 +5126,12 @@ Keep it punchy, sharp, and directly actionable.`;
                       Recent People
                     </h2>
                     <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4 }}>
-                      {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#2997FF" : "#0071E3" }}>{momentumScore}/100</strong>
+                      {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
                     </div>
                   </div>
 
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
-                <div style={{ position: "relative", flex: isMobile ? "1" : "none" }}>
+                <div style={{ position: "relative", flex: isMobile ? "1 1 100%" : "none" }}>
                   <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
                     <Icons.Search size={15} />
                   </span>
@@ -5126,7 +5185,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           alignItems: "center",
                           justifyContent: "center",
                           background: viewMode === m ? (isDark ? "#2C2C2E" : "#fff") : "transparent",
-                          color: viewMode === m ? (isDark ? "#fff" : "#0071E3") : themeStyles.textMuted,
+                          color: viewMode === m ? (isDark ? "#fff" : "#7C3AED") : themeStyles.textMuted,
                           boxShadow: viewMode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
                         }}
                       >
@@ -5141,7 +5200,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     ...S.btn,
                     fontSize: 13,
                     padding: "9px 15px",
-                    background: isDark ? "#2997FF" : "#0071E3",
+                    background: isDark ? "#A78BFA" : "#7C3AED",
                   }}
                   onClick={openBulkFollowUpModal}
                   title="Generate & Dispatch Automated Follow-ups"
@@ -5329,7 +5388,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       key={tag}
                       onClick={() => setSelectedTag(active ? null : tag)}
                       style={{
-                        background: active ? (isDark ? "#2997FF" : "#0071E3") : tc.bg,
+                        background: active ? (isDark ? "#A78BFA" : "#7C3AED") : tc.bg,
                         color: active ? "#ffffff" : tc.color,
                         border: `1px solid ${active ? "transparent" : tc.border}`,
                         borderRadius: 14,
@@ -5354,7 +5413,7 @@ Keep it punchy, sharp, and directly actionable.`;
             {/* Contacts Table / Cards */}
             {contactsLoading ? (
               <div style={{ ...S.card, textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${isDark ? "rgba(41, 151, 255, 0.2)" : "rgba(0, 113, 227, 0.2)"}`, borderTopColor: isDark ? "#2997FF" : "#0071E3", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
+                <div style={{ width: 36, height: 36, border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`, borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
                 <div style={{ color: themeStyles.textMuted, fontSize: 13 }}>Loading relationships…</div>
               </div>
             ) : filtered.length === 0 ? (
@@ -5478,7 +5537,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <a
                                   href={`mailto:${c.email}`}
                                   onClick={(e) => e.stopPropagation()}
-                                  style={{ color: isDark ? "#2997FF" : "#0071E3", textDecoration: "none", fontSize: 12, fontWeight: 500 }}
+                                  style={{ color: isDark ? "#A78BFA" : "#7C3AED", textDecoration: "none", fontSize: 12, fontWeight: 500 }}
                                 >
                                   {c.email}
                                 </a>
@@ -5613,8 +5672,8 @@ Keep it punchy, sharp, and directly actionable.`;
                       </div>
 
                       {c.email && (
-                        <div style={{ fontSize: 12, color: isDark ? "#2997FF" : "#0071E3", marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
-                          <Icons.Mail size={12} color={isDark ? "#2997FF" : "#0071E3"} />
+                        <div style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#7C3AED", marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+                          <Icons.Mail size={12} color={isDark ? "#A78BFA" : "#7C3AED"} />
                           <span>{c.email}</span>
                         </div>
                       )}
@@ -5759,11 +5818,11 @@ Keep it punchy, sharp, and directly actionable.`;
                       style={{
                         background: "none",
                         border: "none",
-                        borderBottom: isActive ? `2px solid ${isDark ? "#2997FF" : "#0071E3"}` : "2px solid transparent",
+                        borderBottom: isActive ? `2px solid ${isDark ? "#A78BFA" : "#7C3AED"}` : "2px solid transparent",
                         padding: "8px 10px",
                         fontSize: 12,
                         fontWeight: isActive ? 700 : 500,
-                        color: isActive ? (isDark ? "#ffffff" : "#0071E3") : themeStyles.textMuted,
+                        color: isActive ? (isDark ? "#ffffff" : "#7C3AED") : themeStyles.textMuted,
                         cursor: "pointer",
                         transition: "all 0.15s ease",
                       }}
@@ -5784,7 +5843,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius: 12, padding: "10px 12px" }}>
                       <div style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-                        <Icons.Send size={12} color={isDark ? "#2997FF" : "#0071E3"} /> Last connected
+                        <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Last connected
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
                         {selectedContact.lastConnected || "3 days ago"}
@@ -5849,7 +5908,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       <div style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
                         ✓ REMEMBER
                       </div>
-                      <div style={{ background: isDark ? "rgba(41, 151, 255, 0.2)" : "rgba(0, 113, 227, 0.12)", color: isDark ? "#2997FF" : "#0071E3", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
+                      <div style={{ background: isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.12)", color: isDark ? "#A78BFA" : "#7C3AED", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
                         ➔ RECONNECT
                       </div>
                     </div>
@@ -5857,7 +5916,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }}>
                     <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Connection Health</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isDark ? "#2997FF" : "#0071E3" }}>{selectedContact.momentum || 88}/100 · High Engagement</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED" }}>{selectedContact.momentum || 88}/100 · High Engagement</span>
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -5944,6 +6003,11 @@ Keep it punchy, sharp, and directly actionable.`;
             onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
             onSignedOut={handleSignedOut}
             onExportContacts={exportCSV}
+            onToggleTheme={toggleTheme}
+            onSignOut={async () => {
+              await supabase.auth.signOut();
+              handleSignedOut();
+            }}
           />
         )}
 
@@ -5988,7 +6052,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 style={{
                   padding: "14px 18px",
                   borderRadius: 14,
-                  background: "linear-gradient(135deg, #0071E3, #2997FF)",
+                  background: "#7C3AED",
                   color: "#FFFFFF",
                   border: "none",
                   fontWeight: 700,
@@ -5998,7 +6062,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 10,
-                  boxShadow: "0 4px 14px rgba(0, 113, 227, 0.3)",
+                  boxShadow: "none",
                 }}
               >
                 <Icons.Camera size={18} color="#FFFFFF" />
@@ -6022,7 +6086,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   gap: 10,
                 }}
               >
-                <Icons.Scan size={18} color={isDark ? "#2997FF" : "#0071E3"} />
+                <Icons.Scan size={18} color={isDark ? "#A78BFA" : "#7C3AED"} />
                 <span>Live Viewfinder Scan</span>
               </button>
             </div>
@@ -6051,14 +6115,14 @@ Keep it punchy, sharp, and directly actionable.`;
                       style={{
                         width: 38,
                         height: 38,
-                        border: `3px solid ${isDark ? "rgba(41, 151, 255, 0.2)" : "rgba(0, 113, 227, 0.2)"}`,
-                        borderTopColor: isDark ? "#2997FF" : "#0071E3",
+                        border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`,
+                        borderTopColor: isDark ? "#A78BFA" : "#7C3AED",
                         borderRadius: "50%",
                         animation: "spin 0.8s linear infinite",
                         margin: "0 auto 14px",
                       }}
                     />
-                    <div style={{ color: isDark ? "#2997FF" : "#0071E3", fontWeight: 600, fontSize: 14 }}>Scanning business card…</div>
+                    <div style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>Scanning business card…</div>
                   </div>
                 ) : scanPreview ? (
                   <img src={scanPreview} alt="preview" style={{ maxHeight: 200, borderRadius: 10, maxWidth: "100%", boxShadow: "0 6px 20px rgba(0,0,0,0.15)" }} />
@@ -6077,7 +6141,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     />
                     <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: themeStyles.text }}>Choose from Gallery or Drop Card</div>
                     <div style={{ color: themeStyles.textMuted, fontSize: 12 }}>
-                      or <span style={{ color: isDark ? "#2997FF" : "#0071E3", fontWeight: 600 }}>browse files</span> · PNG, JPG
+                      or <span style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600 }}>browse files</span> · PNG, JPG
                     </div>
                   </div>
                 )}
@@ -6267,7 +6331,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       style={{
                         background: "none",
                         border: "none",
-                        color: isDark ? "#2997FF" : "#0071E3",
+                        color: isDark ? "#A78BFA" : "#7C3AED",
                         fontSize: 11,
                         fontWeight: 600,
                         cursor: "pointer",
@@ -6518,10 +6582,10 @@ Keep it punchy, sharp, and directly actionable.`;
             )}
 
             {/* Executive Briefing Section */}
-            <div style={{ background: isDark ? "rgba(41, 151, 255, 0.08)" : "rgba(0, 113, 227, 0.05)", border: `1px solid ${isDark ? "rgba(41, 151, 255, 0.2)" : "rgba(0, 113, 227, 0.15)"}`, borderRadius: 14, padding: "12px 16px", marginBottom: 14 }}>
+            <div style={{ background: isDark ? "rgba(167, 139, 250, 0.08)" : "rgba(124, 58, 237, 0.05)", border: `1px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.15)"}`, borderRadius: 14, padding: "12px 16px", marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: prepBrief ? 8 : 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#2997FF" : "#0071E3", display: "flex", alignItems: "center", gap: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-                  <Icons.FileText size={14} color={isDark ? "#2997FF" : "#0071E3"} />
+                <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED", display: "flex", alignItems: "center", gap: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                  <Icons.FileText size={14} color={isDark ? "#A78BFA" : "#7C3AED"} />
                   <span>EXECUTIVE BRIEFING & NOTES</span>
                 </div>
                 <button
@@ -6530,7 +6594,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   style={{
                     background: "none",
                     border: "none",
-                    color: isDark ? "#2997FF" : "#0071E3",
+                    color: isDark ? "#A78BFA" : "#7C3AED",
                     fontSize: 11,
                     fontWeight: 600,
                     cursor: "pointer",
@@ -6725,8 +6789,8 @@ Keep it punchy, sharp, and directly actionable.`;
 
             {generatingEmail ? (
               <div style={{ textAlign: "center", padding: "36px 0" }}>
-                <div style={{ width: 34, height: 34, border: `3px solid ${isDark ? "rgba(41, 151, 255, 0.2)" : "rgba(0, 113, 227, 0.2)"}`, borderTopColor: isDark ? "#2997FF" : "#0071E3", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-                <div style={{ color: isDark ? "#2997FF" : "#0071E3", fontWeight: 600, fontSize: 13 }}>Generating personalized follow-up draft…</div>
+                <div style={{ width: 34, height: 34, border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`, borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+                <div style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 13 }}>Generating personalized follow-up draft…</div>
               </div>
             ) : emailSent ? (
               <div style={{ textAlign: "center", padding: "36px 0" }}>
@@ -6980,8 +7044,8 @@ Keep it punchy, sharp, and directly actionable.`;
                     </h3>
                     <span
                       style={{
-                        background: isDark ? "rgba(41, 151, 255, 0.15)" : "#EBF5FF",
-                        color: isDark ? "#2997FF" : "#0071E3",
+                        background: isDark ? "rgba(167, 139, 250, 0.15)" : "#EBF5FF",
+                        color: isDark ? "#A78BFA" : "#7C3AED",
                         fontSize: 11,
                         fontWeight: 600,
                         padding: "2px 8px",
@@ -7026,7 +7090,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           {[d.contact.title, d.contact.company].filter(Boolean).join(" · ")}
                         </span>
                       </div>
-                      <div style={{ fontSize: 12, color: isDark ? "#2997FF" : "#0071E3", marginTop: 2 }}>
+                      <div style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2 }}>
                         {d.contact.email}
                       </div>
                     </div>
@@ -7037,7 +7101,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           <Icons.Check size={12} /> Sent
                         </span>
                       ) : d.status === "sending" ? (
-                        <span style={{ color: isDark ? "#2997FF" : "#0071E3", fontSize: 11, fontWeight: 600 }}>
+                        <span style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 11, fontWeight: 600 }}>
                           Dispatching…
                         </span>
                       ) : (
@@ -7095,7 +7159,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 style={{
                   ...S.btn,
                   flex: 2,
-                  background: isDark ? "#2997FF" : "#0071E3",
+                  background: isDark ? "#A78BFA" : "#7C3AED",
                   opacity: bulkSending ? 0.7 : 1,
                 }}
                 onClick={sendAllBulkEmails}
@@ -7116,8 +7180,8 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* ── NETWORQ AI & VOICE ASSISTANT (NetworQ Intelligence) ── */}
-      {/* Floating Trigger Dock */}
-      {!aiOpen && (
+      {/* Floating Trigger Dock (desktop; on phones the AI lives in the header) */}
+      {!aiOpen && !isMobile && (
         <div
           style={{
             position: "fixed",
@@ -7159,13 +7223,18 @@ Keep it punchy, sharp, and directly actionable.`;
         <div
           style={{
             position: "fixed",
-            bottom: isMobile ? 70 : 26,
-            right: isMobile ? 12 : 28,
-            width: isMobile ? "calc(100% - 24px)" : 390,
-            height: isMobile ? "calc(100vh - 140px)" : 560,
-            maxHeight: 600,
-            zIndex: 950,
-            borderRadius: 22,
+            // Phones: full-screen sheet above the tab bar; desktop: floating panel
+            top: isMobile ? 0 : undefined,
+            left: isMobile ? 0 : undefined,
+            bottom: isMobile ? 0 : 26,
+            right: isMobile ? 0 : 28,
+            width: isMobile ? "100%" : 390,
+            height: isMobile ? "100%" : 560,
+            maxHeight: isMobile ? "none" : 600,
+            paddingTop: isMobile ? "env(safe-area-inset-top)" : 0,
+            paddingBottom: isMobile ? "env(safe-area-inset-bottom)" : 0,
+            zIndex: 1200,
+            borderRadius: isMobile ? 0 : 22,
             background: isDark ? "rgba(22, 22, 23, 0.96)" : "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(25px)",
             WebkitBackdropFilter: "blur(25px)",
@@ -7211,8 +7280,8 @@ Keep it punchy, sharp, and directly actionable.`;
                     style={{
                       fontSize: 10,
                       fontWeight: 700,
-                      color: isDark ? "#2997FF" : "#0071E3",
-                      background: isDark ? "rgba(41, 151, 255, 0.12)" : "rgba(0, 113, 227, 0.08)",
+                      color: isDark ? "#A78BFA" : "#7C3AED",
+                      background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(124, 58, 237, 0.08)",
                       padding: "1px 6px",
                       borderRadius: 980,
                     }}

@@ -41,8 +41,7 @@ test.describe("Authentication", () => {
     await page.reload();
     await expect(signOutButton(page)).toBeVisible();
 
-    await signOutButton(page).click();
-    await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
+    await logout(page);
 
     await page.reload();
     await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();

@@ -10,6 +10,8 @@ import {
   Platform,
   Linking,
   KeyboardAvoidingView,
+  ToastAndroid,
+  PermissionsAndroid,
 } from "react-native";
 // react-native's SafeAreaView is iOS-only; with Android edge-to-edge the WebView
 // would otherwise draw under the status bar and the gesture/navigation bar.
@@ -36,20 +38,45 @@ function Shell() {
   const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
   const googleAuth = useGoogleAuthBridge(webViewRef, TARGET_URL);
 
-  // Handle hardware Android back button
+  // Hardware back: let the web app close overlays / go to the previous tab first;
+  // on the home screen, a second press within 2 s exits.
+  const lastBackAt = useRef(0);
+  const hasErrorRef = useRef(false);
+  hasErrorRef.current = hasError;
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const onBackPress = () => {
-      if (canGoBack && webViewRef.current) {
-        webViewRef.current.goBack();
-        return true;
-      }
-      return false;
+      if (hasErrorRef.current) return false; // offline screen: let Android close the app
+      webViewRef.current?.injectJavaScript(
+        `(function(){var h=false;try{h=!!(window.__networqHandleBack&&window.__networqHandleBack());}catch(e){}window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:"nav:back",handled:h}));})();true;`
+      );
+      return true;
     };
-
     const subscription = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => subscription.remove();
-  }, [canGoBack]);
+  }, []);
+
+  const handleNavMessage = useCallback(
+    (raw: string) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(raw);
+      } catch {
+        return;
+      }
+      if (msg?.type === "perm:camera") {
+        if (Platform.OS === "android") PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA).catch(() => {});
+        return;
+      }
+      if (msg?.type !== "nav:back" || msg.handled) return;
+      if (canGoBack) return webViewRef.current?.goBack(); // e.g. from /privacy back to the app
+      const now = Date.now();
+      if (now - lastBackAt.current < 2000) return BackHandler.exitApp();
+      lastBackAt.current = now;
+      ToastAndroid.show("Press back again to exit", ToastAndroid.SHORT);
+    },
+    [canGoBack]
+  );
 
   // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
@@ -95,6 +122,7 @@ function Shell() {
           onShouldStartLoadWithRequest={handleShouldStartLoad}
           injectedJavaScriptBeforeContentLoaded={SHELL_CAPABILITIES_JS}
           onMessage={(e) => {
+            if (e.nativeEvent.url.startsWith(TARGET_URL)) handleNavMessage(e.nativeEvent.data);
             radarBridge.onMessage(e);
             googleAuth.onMessage(e);
           }}

@@ -1,7 +1,7 @@
 const { createClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./_lib/cors");
 const { verifyAndCheckLimit } = require("./_lib/verifyAndLimit");
-const { buildGroqRequestBody } = require("./_lib/groq");
+const { buildGroqRequestBody, FALLBACK_MODEL } = require("./_lib/groq");
 
 module.exports = async function handler(req, res) {
   try {
@@ -77,8 +77,9 @@ module.exports = async function handler(req, res) {
     let data = await response.json();
 
     // If initial model not found on current tier, fallback to versatile
-    if (!response.ok && data?.error?.code === "model_not_found") {
-      const fallbackBody = { ...body, model: "llama-3.3-70b-versatile" };
+    // Text-only fallback (the fallback model can't read images, so never for card scans)
+    if (!response.ok && data?.error?.code === "model_not_found" && action !== "card_scan") {
+      const fallbackBody = { ...body, model: FALLBACK_MODEL };
       response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
         method: "POST",
         headers: {

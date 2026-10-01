@@ -27,7 +27,7 @@ test.describe("Settings & account security", () => {
     await expect.poll(() => accountCalls.filter((c) => c.path.endsWith("/auth/session-event")).length).toBe(1);
     expect(accountCalls[0].body).toEqual({ type: "signed_in" });
     await page.reload();
-    await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Profile & Settings" })).toBeVisible();
     await page.waitForTimeout(500);
     expect(accountCalls.filter((c) => c.path.endsWith("/auth/session-event"))).toHaveLength(1);
   });

@@ -1,4 +1,5 @@
-const VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+// Groq retired its Llama vision models; Qwen 3.8 handles images (verified on a business card)
+const VISION_MODEL = "qwen/qwen3.8-27b";
 const TEXT_MODEL = "qwen/qwen3.8-27b";
 
 function buildGroqRequestBody({ system, messages, max_tokens, action }) {
@@ -11,5 +12,8 @@ function extractGroqText(responseJson) {
   return responseJson?.choices?.[0]?.message?.content || "";
 }
 
-module.exports = { buildGroqRequestBody, extractGroqText, VISION_MODEL, TEXT_MODEL };
+// Used when Groq reports model_not_found for the primary model
+const FALLBACK_MODEL = "openai/gpt-oss-120b";
+
+module.exports = { buildGroqRequestBody, extractGroqText, VISION_MODEL, TEXT_MODEL, FALLBACK_MODEL };
 

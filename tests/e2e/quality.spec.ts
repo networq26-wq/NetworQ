@@ -24,7 +24,7 @@ test("every main screen renders without crashing or overflowing", async ({ page,
       // Some screens open a modal (e.g. 1-Click Follow-ups) — close it like a user would
       const close = page.getByRole("button", { name: "Close", exact: true });
       if (await close.count()) await close.last().click();
-      await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Profile & Settings" })).toBeVisible();
       await noHorizontalScroll(page);
     });
   }

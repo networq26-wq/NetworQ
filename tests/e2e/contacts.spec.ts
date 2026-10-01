@@ -103,7 +103,7 @@ test("two users at once never see each other's contacts", async ({ browser, db }
   await expect(pageA.getByText("Contact saved successfully!")).toBeVisible();
 
   await pageB.reload();
-  await expect(pageB.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect(pageB.getByRole("button", { name: "Profile & Settings" })).toBeVisible();
   await expect(pageB.getByText("Secret Investor")).toHaveCount(0);
 
   await logout(pageB);
