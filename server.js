@@ -197,6 +197,13 @@ app.get(["/download/apk", "/download/NetworQ.apk", "/api/download/apk"], (req, r
   return res.status(404).json({ error: "NetworQ APK is currently building or not found." });
 });
 
+// ── Legal pages (Play Store requires public privacy policy + deletion info) ─────
+const legalDir = path.join(__dirname, "public/legal");
+app.use("/legal", express.static(legalDir, { maxAge: "1d" }));
+app.get("/privacy", (req, res) => res.sendFile(path.join(legalDir, "privacy.html")));
+app.get("/terms", (req, res) => res.sendFile(path.join(legalDir, "terms.html")));
+app.get("/delete-account", (req, res) => res.sendFile(path.join(legalDir, "delete-account.html")));
+
 // ── Waitlist ──────────────────────────────────────────────────────────────────
 app.get("/waitlist", (req, res) => waitlistHandler(req, res));
 

@@ -132,3 +132,14 @@ test("/api/enrich is rate limited per IP", async () => {
   }
   assert.ok(statuses.includes(429), `expected a 429, got ${[...new Set(statuses)]}`);
 });
+
+test("legal pages are public and linked to each other", async () => {
+  for (const [p, title] of [["/privacy", "Privacy Policy"], ["/terms", "Terms of Service"], ["/delete-account", "Delete your NetworQ account"]]) {
+    const res = await fetch(base + p);
+    assert.equal(res.status, 200, p);
+    const html = await res.text();
+    assert.ok(html.includes(title), `${p} title`);
+    assert.ok(html.includes('href="/privacy"') || p === "/privacy");
+  }
+  assert.equal((await fetch(base + "/legal/_style.css")).status, 200);
+});

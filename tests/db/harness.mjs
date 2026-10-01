@@ -8,6 +8,7 @@ const BOOTSTRAP = `
   create role anon; create role authenticated; create role service_role;
   create schema auth;
   create table auth.users (id uuid primary key, email text);
+  create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid references auth.users(id) on delete cascade);
   create function auth.uid() returns uuid language sql stable as
     $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
   create table profiles (id uuid primary key references auth.users(id) on delete cascade,
@@ -34,6 +35,7 @@ export async function createDb(...migrations) {
     // Call an RPC as a given user (null = anonymous)
     async as(userId, sql, params = []) {
       await db.query("select set_config('request.jwt.claim.sub', $1, false)", [userId || ""]);
+      await db.query("select set_config('request.jwt.claim.role', $1, false)", [userId ? "authenticated" : ""]);
       const res = await db.query(sql, params);
       return res.rows;
     },
