@@ -33,6 +33,15 @@ export const test = base.extend<Fixtures>({
       sentEmails.push(JSON.parse(route.request().postData() || "{}"));
       return route.fulfill({ json: { ok: true, provider: "mock" } });
     });
+    // Events import (api/events.js extraction is tested separately with real-page fixtures)
+    await context.route("**/api/events/import", async (route) => {
+      const req = route.request();
+      if (!db.userFromRequest(req)) return route.fulfill({ status: 401, json: { error: "Please sign in again." } });
+      const { url } = JSON.parse(req.postData() || "{}");
+      if (!/^https:\/\/lu\.ma\//.test(url)) return route.fulfill({ status: 422, json: { error: "We couldn't find event details on that page." } });
+      const row = db.addPublicEvent({ title: "AI Builders Night Hyderabad", starts_at: new Date(Date.now() + 5 * 86400000).toISOString(), url, venue: "T-Hub, Raidurg", city: "Hyderabad", organizer: "Hyderabad AI Collective" });
+      return route.fulfill({ json: { ok: true, events: [row] } });
+    });
     // Account endpoints (api/account.js is tested separately with fakes)
     await context.route(/\/api\/(auth|account)\//, async (route) => {
       const req = route.request();

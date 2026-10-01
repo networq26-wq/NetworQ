@@ -36,6 +36,12 @@ export class MockSupabase {
   autoConfirm = true;
   failNext: { method?: string; table?: string } | null = null;
   uploads: string[] = [];
+
+  addPublicEvent(e: Partial<Record<string, any>> & { title: string; starts_at: string; url: string }) {
+    const row = { id: randomUUID(), ends_at: null, venue: null, city: null, image: null, description: null, organizer: null, verified: false, source_host: new URL(e.url).hostname, created_at: new Date().toISOString(), ...e };
+    this.table("public_events").push(row);
+    return row;
+  }
   sessionsRevoked = 0;
   private refreshTokens = new Map<string, string>();
 
@@ -375,7 +381,8 @@ export class MockSupabase {
     const returnRows = prefer.includes("return=representation");
 
     // RLS: callers only ever see their own rows
-    const visible = () => this.table(table).filter((r) => r[ownerCol] === user.id);
+    const SHARED_READ = ["public_events"];
+    const visible = () => (SHARED_READ.includes(table) ? this.table(table) : this.table(table).filter((r) => r[ownerCol] === user.id));
     const matches = (row: Row) => {
       for (const [key, raw] of url.searchParams) {
         if (["select", "order", "limit", "offset", "on_conflict", "columns"].includes(key)) continue;
@@ -384,6 +391,8 @@ export class MockSupabase {
         if (op === "eq" && String(row[key]) !== val) return false;
         if (op === "neq" && String(row[key]) === val) return false;
         if (op === "is" && val === "null" && row[key] != null) return false;
+        if (op === "gte" && !(String(row[key]) >= val)) return false;
+        if (op === "lte" && !(String(row[key]) <= val)) return false;
       }
       return true;
     };

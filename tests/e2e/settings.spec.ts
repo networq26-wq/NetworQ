@@ -100,7 +100,9 @@ test.describe("Settings & account security", () => {
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(db.table("profiles")[0].notification_prefs.login_alerts).toBe(false);
+    await expect.poll(() => db.table("profiles")[0].notification_prefs.login_alerts).toBe(false);
+    await page.waitForTimeout(500);
+    await expect(toggle).toHaveAttribute("aria-checked", "false"); // not reverted by a failed save
   });
 
   test("sign out of all devices revokes every session", async ({ page, db }) => {

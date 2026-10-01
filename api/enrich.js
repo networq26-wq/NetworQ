@@ -175,3 +175,4 @@ module.exports = async function enrichHandler(req, res) {
 
 module.exports.isPrivateAddress = isPrivateAddress;
 module.exports.assertPublicUrl = assertPublicUrl;
+module.exports.fetchHtml = fetchHtml;

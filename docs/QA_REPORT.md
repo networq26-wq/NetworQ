@@ -9,10 +9,10 @@ The code is release-ready: every automated check passes. Three configuration ste
 | Area | Result | Evidence |
 |---|---|---|
 | Type check | ✅ 0 errors (was 7) | `npx tsc --noEmit` |
-| Unit + API + security + SQL tests | ✅ 56 / 56 | `npm test` |
+| Unit + API + security + SQL + email tests | ✅ 81 / 81 | `npm test` |
 | Production build | ✅ | `npm run build` |
-| Browser E2E + unit (desktop + Pixel 7), CSP enforced | ✅ 77 / 77, 0 CSP violations | `npm run test:e2e` |
-| Database functions (PGlite, real Postgres) | ✅ 16 / 16 | `npm test` |
+| Browser E2E + unit (desktop + Pixel 7), CSP enforced | ✅ 109 / 109, 0 CSP violations | `npm run test:e2e` |
+| Database functions (PGlite, real Postgres) | ✅ 22 / 22 | `npm test` |
 | Android compile (Gradle, JDK 17) | ✅ BUILD SUCCESSFUL | `cd android && ./gradlew :app:compileDebugKotlin` |
 | Live Supabase RLS | ⚠️ 13 / 14 (passes after migration) | `npm run test:rls` |
 | Secrets in bundle | ✅ none | grep of `dist/_expo/static/js/web/*.js` |
@@ -24,6 +24,8 @@ The code is release-ready: every automated check passes. Three configuration ste
    - `supabase/migrations/20261001_security_hardening.sql`
    - `supabase/migrations/20261001b_restore_waitlist_and_storage.sql` (the live project is missing `join_waitlist()` and the `card-images` bucket)
    - `supabase/migrations/20261002_event_radar.sql` (Event Radar)
+   - `supabase/migrations/20261003_account_email_events.sql` and `20261003b_avatars_storage.sql` (settings, emails, events)
+   - Then follow `docs/SUPABASE_EMAIL_SETUP.md` (custom SMTP + branded templates).
 
    Then re-run `npm run test:rls` (expect 14 / 14).
 2. **Verify a sending domain in Resend** (e.g. `networq.co.in`) and set `RESEND_FROM_EMAIL=NetworQ <noreply@networq.co.in>`. The current `onboarding@resend.dev` sandbox only delivers to the Resend account owner.
@@ -82,6 +84,28 @@ Checklists used: `levnikolaevich/claude-code-skills` (codebase, test-suite and p
 | 35 | — | **Event Radar** (BLE, Android): event join by code/QR/Events Hub, rotating 15-min tokens, Kalman-smoothed distance ranges, consent-based contact exchange, incognito, browser fallback | 16 SQL tests (PGlite), 10 unit, 18 E2E (2 viewports), live suite ready |
 
 Before Radar works in production: run `supabase/migrations/20261002_event_radar.sql` and build a new APK (the Bluetooth module is native code; OTA updates can't deliver it).
+
+### Fourth pass (2026-10-01) — APK layout, events accuracy, account & email
+
+| # | Sev | Finding | Result |
+|---|---|---|---|
+| 36 | P1 | Android shell used RN `SafeAreaView` (iOS-only) with edge-to-edge on → WebView under status/navigation bars; keyboard covered inputs | `react-native-safe-area-context` + keyboard padding; Gradle BUILD SUCCESSFUL. **Verify on a device** |
+| 37 | P0 | "Live event scraper" asked the AI to *generate realistic* events; fallback templates were invented too | Removed (−1,026 lines). Events now come only from real pages (schema.org JSON-LD) or `.ics` feeds, with source links. Verified on live Luma + Eventbrite pages |
+| 38 | P0 (Play Store) | No in-app account deletion; no privacy policy | Settings → Delete account (7-day grace, email, cancel); `/privacy`, `/terms`, `/delete-account` |
+| 39 | P1 | No change password / email, no sign-out-everywhere, no show-password | Built (Settings → Security) |
+| 40 | P1 | No welcome, new-sign-in, password-changed emails | Built with react-email + Resend; signed "secure my account" link revokes sessions |
+| 41 | P1 | Supabase default auth emails are unbranded and, without custom SMTP, reach team members only | Branded templates + `docs/SUPABASE_EMAIL_SETUP.md` (owner action) |
+| 42 | P2 | Sign-out confirmations never displayed (toast outside app shell) | Shown on the sign-in screen |
+
+### Still missing (recommended next)
+
+| Area | Gap |
+|---|---|
+| Auth | Two-factor authentication (TOTP); passkeys; per-device session list (Supabase doesn't expose sessions to clients — needs a server view) |
+| Mobile | Push notifications (FCM) for connection requests & reminders; iOS app; Radar in background (Android foreground service); on-device QA on 2+ phones |
+| Product | Event moderation (report / admin verify), scheduled re-import of `.ics` feeds, onboarding tour, offline mode for contacts |
+| Ops | Error monitoring (e.g. Sentry), uptime alerts, database backups/restore drill, analytics with consent |
+| Compliance | Lawyer review of privacy/terms (DPDP Act 2023 / GDPR), cookie/analytics consent if analytics are added, data-export (JSON) of the full account |
 
 ## Test assets
 

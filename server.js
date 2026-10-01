@@ -11,6 +11,7 @@ const enrichHandler = require("./api/enrich");
 const emailHandler = require("./api/email");
 const { startReminderEngine } = require("./api/reminders");
 const { createAccountRouter, productionDeps, purgeDeletedAccounts } = require("./api/account");
+const { createEventsRouter, productionDeps: eventsDeps } = require("./api/events");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
@@ -65,6 +66,7 @@ app.use("/api/enrich", limiter(60 * 1000, 30));
 app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
 app.use("/api/email", limiter(60 * 1000, 20));
 app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
+app.use("/api/events", limiter(60 * 1000, 20));
 
 function parseEnvContent(content) {
   if (!content) return;
@@ -234,6 +236,11 @@ if (accountDeps) {
     res.status(503).json({ error: "Account service is not configured on this server." })
   );
 }
+
+// ── Events import (real event pages / .ics feeds only) ────────────────────────
+const evDeps = eventsDeps();
+if (evDeps) app.use("/api", createEventsRouter(evDeps));
+else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
 
 // ── Email sending ─────────────────────────────────────────────────────────────
 app.post("/api/email", async (req, res) => emailHandler(req, res));
