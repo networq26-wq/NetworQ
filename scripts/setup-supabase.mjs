@@ -101,6 +101,9 @@ for (const file of MIGRATIONS) {
 
 // 3. Auth email + security config
 const current = await api("GET", "/config/auth");
+// Merge redirect URLs — never drop entries the project already allows
+const existing = String(current.uri_allow_list || "").split(",").map((u) => u.trim()).filter(Boolean);
+authConfig.uri_allow_list = [...new Set([...existing, ...authConfig.uri_allow_list.split(",")])].join(",");
 const changes = Object.keys(authConfig).filter((k) => String(current[k] ?? "") !== String(authConfig[k]));
 const shown = changes.map((k) => (k === "smtp_pass" ? `${k}=<resend key>` : k.includes("templates") ? `${k}=<template>` : `${k}=${authConfig[k]}`));
 if (!APPLY) {

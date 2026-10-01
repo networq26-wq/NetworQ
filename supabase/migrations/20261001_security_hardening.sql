@@ -4,6 +4,19 @@
 --   2. increment_ai_usage trusted the caller-supplied p_user_id (SECURITY DEFINER).
 --   3. Adds an 'email_send' daily cap so /api/email cannot be used for bulk spam.
 
+-- 0. The live project never received this table from schema.sql — create it if missing
+create table if not exists ai_usage (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid references auth.users(id) on delete cascade not null,
+  action      text not null,
+  used_date   date not null default current_date,
+  count       integer not null default 0,
+  unique (user_id, action, used_date)
+);
+alter table ai_usage enable row level security;
+drop policy if exists "Users can read own ai_usage" on ai_usage;
+create policy "Users can read own ai_usage" on ai_usage for select using (auth.uid() = user_id);
+
 -- 1. Usage rows are written only by increment_ai_usage (security definer)
 drop policy if exists "Users can insert own ai_usage" on ai_usage;
 drop policy if exists "Users can update own ai_usage" on ai_usage;

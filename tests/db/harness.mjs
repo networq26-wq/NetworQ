@@ -18,6 +18,8 @@ const BOOTSTRAP = `
     event text, reference text, reminder text, reminder_date date, image text,
     added_at timestamptz default now(), reminder_done boolean default false,
     email_sent boolean default false, meet_link text, meet_date text, tags text[]);
+  create table follow_up_emails (id uuid primary key default gen_random_uuid(), user_id uuid not null, contact_id uuid);
+  create table meetings (id uuid primary key default gen_random_uuid(), user_id uuid not null, contact_id uuid);
 `;
 
 export async function createDb(...migrations) {
