@@ -20,6 +20,8 @@
     "test:all": "npx tsc --noEmit && npm test && npm run build && playwright test"
   },
   "dependencies": {
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.1.0",
     "@supabase/supabase-js": "^2.105.4",
     "compression": "^1.8.2",
     "cors": "^2.8.6",

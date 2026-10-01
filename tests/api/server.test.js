@@ -143,3 +143,9 @@ test("legal pages are public and linked to each other", async () => {
   }
   assert.equal((await fetch(base + "/legal/_style.css")).status, 200);
 });
+
+test("account endpoints report 'not configured' instead of failing open", async () => {
+  const res = await post("/api/auth/session-event", { type: "signed_in" }, { Authorization: "Bearer mock-x" });
+  assert.equal(res.status, 503);
+  assert.equal((await fetch(base + "/api/account/secure?t=x")).status, 503);
+});

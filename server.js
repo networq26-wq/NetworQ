@@ -10,6 +10,7 @@ const waitlistHandler = require("./api/waitlist");
 const enrichHandler = require("./api/enrich");
 const emailHandler = require("./api/email");
 const { startReminderEngine } = require("./api/reminders");
+const { createAccountRouter, productionDeps, purgeDeletedAccounts } = require("./api/account");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
@@ -63,6 +64,7 @@ app.use("/api/", limiter(15 * 60 * 1000, 600));
 app.use("/api/enrich", limiter(60 * 1000, 30));
 app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
 app.use("/api/email", limiter(60 * 1000, 20));
+app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 
 function parseEnvContent(content) {
   if (!content) return;
@@ -223,6 +225,16 @@ app.get("/api/groq", (req, res) => {
   });
 });
 
+// ── Account security: sign-in alerts, secure-my-account, deletion ─────────────
+const accountDeps = productionDeps();
+if (accountDeps) {
+  app.use("/api", createAccountRouter(accountDeps));
+} else {
+  app.all(["/api/auth/*splat", "/api/account/*splat"], (req, res) =>
+    res.status(503).json({ error: "Account service is not configured on this server." })
+  );
+}
+
 // ── Email sending ─────────────────────────────────────────────────────────────
 app.post("/api/email", async (req, res) => emailHandler(req, res));
 app.options("/api/email", (req, res) => res.status(200).end());
@@ -303,8 +315,11 @@ function startServer() {
   // ── Start background reminder engine ────────────────────────────────────────
   // Only run on primary instance (not during Expo web build)
   let reminderTimer = null;
+  let purgeTimer = null;
   if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     reminderTimer = startReminderEngine();
+    purgeDeletedAccounts().catch(console.error);
+    purgeTimer = setInterval(() => purgeDeletedAccounts().catch(console.error), 60 * 60 * 1000);
   }
 
   // ── Graceful shutdown: finish in-flight requests on deploy/restart ──────────
@@ -314,6 +329,7 @@ function startServer() {
     shuttingDown = true;
     console.log(`${signal} received — shutting down gracefully`);
     if (reminderTimer) clearInterval(reminderTimer);
+    if (purgeTimer) clearInterval(purgeTimer);
     let open = servers.length;
     if (!open) process.exit(0);
     servers.forEach((srv) =>

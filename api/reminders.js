@@ -100,6 +100,13 @@ async function checkAndSendReminders() {
 
   for (const contact of contacts) {
     try {
+      // Respect Settings → Notifications → Reminder emails
+      const { data: prefsRow } = await supabase.from("profiles").select("notification_prefs").eq("id", contact.user_id).maybeSingle();
+      if (prefsRow?.notification_prefs?.reminder_emails === false) {
+        await supabase.from("contacts").update({ reminder_done: true }).eq("id", contact.id);
+        continue;
+      }
+
       const { data: authUser } = await supabase.auth.admin.getUserById(contact.user_id);
       const userEmail = authUser?.user?.email;
       if (!userEmail) continue;

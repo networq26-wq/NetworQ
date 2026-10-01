@@ -1,0 +1,111 @@
+// Transactional email templates (react-email components, rendered without a JSX build step).
+const React = require("react");
+const { render: renderEmail } = require("@react-email/render");
+const { Html, Head, Preview, Body, Container, Section, Heading, Text, Button, Hr, Link } = require("@react-email/components");
+
+const h = React.createElement;
+const BRAND = "#7C3AED";
+const font = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial, sans-serif";
+
+function Layout({ preview, heading, lines, cta, footnote, appUrl }) {
+  return h(
+    Html,
+    { lang: "en" },
+    h(Head),
+    h(Preview, null, preview),
+    h(
+      Body,
+      { style: { backgroundColor: "#F2F2F7", fontFamily: font, margin: 0, padding: "24px 0" } },
+      h(
+        Container,
+        { style: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: "32px 28px", maxWidth: 520 } },
+        h(Text, { style: { fontSize: 22, fontWeight: 800, color: "#1C1C1E", margin: "0 0 20px" } }, "Networ", h("span", { style: { color: BRAND } }, "Q")),
+        h(Heading, { as: "h1", style: { fontSize: 22, color: "#1C1C1E", margin: "0 0 12px" } }, heading),
+        ...lines.map((l, i) => h(Text, { key: i, style: { fontSize: 15, lineHeight: "24px", color: "#3C3C43", margin: "0 0 12px" } }, l)),
+        cta &&
+          h(
+            Section,
+            { style: { margin: "24px 0" } },
+            h(Button, { href: cta.url, style: { backgroundColor: BRAND, color: "#FFFFFF", borderRadius: 12, padding: "12px 22px", fontSize: 15, fontWeight: 600, textDecoration: "none" } }, cta.label)
+          ),
+        footnote && h(Text, { style: { fontSize: 13, color: "#6E6E73", margin: "0 0 8px" } }, footnote),
+        h(Hr, { style: { borderColor: "#E5E5EA", margin: "24px 0 16px" } }),
+        h(
+          Text,
+          { style: { fontSize: 12, color: "#8E8E93", margin: 0 } },
+          "NetworQ — Professional Network Intelligence · ",
+          h(Link, { href: `${appUrl}/?settings=notifications`, style: { color: "#8E8E93" } }, "Email settings"),
+          " · ",
+          h(Link, { href: `${appUrl}/privacy`, style: { color: "#8E8E93" } }, "Privacy")
+        )
+      )
+    )
+  );
+}
+
+const first = (name) => (name ? String(name).trim().split(/\s+/)[0] : "there");
+
+function welcome({ name, appUrl }) {
+  return {
+    subject: "Welcome to NetworQ",
+    appUrl,
+    preview: "Scan a card, join an event, never lose a connection.",
+    heading: `Welcome, ${first(name)} 👋`,
+    lines: [
+      "Your NetworQ workspace is ready.",
+      "Scan a business card to save a contact in seconds, set follow-up reminders, and open Event Radar at your next event to see who's nearby.",
+    ],
+    cta: { label: "Open NetworQ", url: appUrl },
+  };
+}
+
+function newSignIn({ name, device, when, city, secureUrl, appUrl = "https://www.networq.co.in" }) {
+  return {
+    subject: "New sign-in to your NetworQ account",
+    appUrl,
+    preview: `${device} · ${when}`,
+    heading: "New sign-in detected",
+    lines: [
+      `Hi ${first(name)}, your account was just signed in from a new device.`,
+      `Device: ${device}`,
+      `Time: ${when}${city ? ` · Near ${city}` : ""}`,
+      "If this was you, there's nothing to do.",
+    ],
+    cta: { label: "This wasn't me — secure my account", url: secureUrl },
+    footnote: "Securing your account signs out every device and emails you a link to set a new password. The link works for 24 hours.",
+  };
+}
+
+function passwordChanged({ name, when, secureUrl, appUrl = "https://www.networq.co.in" }) {
+  return {
+    subject: "Your NetworQ password was changed",
+    appUrl,
+    preview: `Changed ${when}`,
+    heading: "Password changed",
+    lines: [`Hi ${first(name)}, the password for your NetworQ account was changed on ${when}.`, "If you made this change, you can ignore this email."],
+    cta: { label: "I didn't do this — secure my account", url: secureUrl },
+  };
+}
+
+function deletionScheduled({ name, date, cancelUrl, appUrl = "https://www.networq.co.in" }) {
+  return {
+    subject: "Your NetworQ account is scheduled for deletion",
+    appUrl,
+    preview: `Deletion on ${date}`,
+    heading: "Account deletion scheduled",
+    lines: [
+      `Hi ${first(name)}, we received a request to delete your NetworQ account.`,
+      `Your account and all its data will be permanently deleted on ${date}. You've been signed out of all devices.`,
+      "Changed your mind? Cancel any time before then.",
+    ],
+    cta: { label: "Cancel deletion", url: cancelUrl },
+  };
+}
+
+async function render(tpl) {
+  const el = h(Layout, tpl);
+  const [html, text] = await Promise.all([renderEmail(el), renderEmail(el, { plainText: true })]);
+  return { subject: tpl.subject, html, text };
+}
+
+module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, render };
