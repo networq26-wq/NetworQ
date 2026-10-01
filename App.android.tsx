@@ -8,9 +8,12 @@ import {
   StatusBar,
   TouchableOpacity,
   Platform,
-  SafeAreaView,
   Linking,
+  KeyboardAvoidingView,
 } from "react-native";
+// react-native's SafeAreaView is iOS-only; with Android edge-to-edge the WebView
+// would otherwise draw under the status bar and the gesture/navigation bar.
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useRadarBridge } from "./radar/shellBridge";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
@@ -18,6 +21,14 @@ import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest }
 const TARGET_URL = "https://www.networq.co.in";
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Shell />
+    </SafeAreaProvider>
+  );
+}
+
+function Shell() {
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
@@ -51,8 +62,10 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" translucent />
+      {/* Edge-to-edge windows aren't resized for the keyboard — pad instead so inputs stay visible */}
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "android" ? "padding" : undefined}>
 
       {hasError ? (
         <View style={styles.errorContainer}>
@@ -98,6 +111,7 @@ export default function App() {
           }}
         />
       )}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
