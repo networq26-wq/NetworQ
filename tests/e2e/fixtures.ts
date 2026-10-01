@@ -8,6 +8,7 @@ type Fixtures = {
   db: MockSupabase;
   sentEmails: any[];
   pageErrors: string[];
+  accountCalls: { path: string; body: any }[];
 };
 
 export const test = base.extend<Fixtures>({
@@ -20,7 +21,10 @@ export const test = base.extend<Fixtures>({
   pageErrors: async ({}, use) => {
     await use([]);
   },
-  context: async ({ context, db, sentEmails }, use) => {
+  accountCalls: async ({}, use) => {
+    await use([]);
+  },
+  context: async ({ context, db, sentEmails, accountCalls }, use) => {
     await db.attach(context);
     await context.route("**/api/ai", (route) =>
       route.fulfill({ json: { choices: [{ message: { role: "assistant", content: "Mock AI reply" } }] } })
@@ -28,6 +32,26 @@ export const test = base.extend<Fixtures>({
     await context.route("**/api/email", (route) => {
       sentEmails.push(JSON.parse(route.request().postData() || "{}"));
       return route.fulfill({ json: { ok: true, provider: "mock" } });
+    });
+    // Account endpoints (api/account.js is tested separately with fakes)
+    await context.route(/\/api\/(auth|account)\//, async (route) => {
+      const req = route.request();
+      const path = new URL(req.url()).pathname;
+      const body = req.postData() ? JSON.parse(req.postData() as string) : {};
+      accountCalls.push({ path, body });
+      const user = db.userFromRequest(req);
+      if (!user) return route.fulfill({ status: 401, json: { error: "Please sign in again." } });
+      const prof = db.table("profiles").find((r) => r.id === user.id);
+      if (path.endsWith("/account/delete")) {
+        const at = new Date(Date.now() + 7 * 86400000).toISOString();
+        if (prof) prof.deletion_scheduled_at = at;
+        return route.fulfill({ json: { ok: true, scheduled_for: at } });
+      }
+      if (path.endsWith("/account/cancel-deletion")) {
+        if (prof) prof.deletion_scheduled_at = null;
+        return route.fulfill({ json: { ok: true } });
+      }
+      return route.fulfill({ json: { ok: true, first_login: false, new_device: false } });
     });
     await use(context);
   },

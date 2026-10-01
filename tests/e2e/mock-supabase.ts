@@ -35,6 +35,8 @@ export class MockSupabase {
   tables: Record<string, Row[]> = {};
   autoConfirm = true;
   failNext: { method?: string; table?: string } | null = null;
+  uploads: string[] = [];
+  sessionsRevoked = 0;
   private refreshTokens = new Map<string, string>();
 
   addUser(email: string, password: string, opts: { confirmed?: boolean; profile?: Row; metadata?: Row } = {}) {
@@ -132,6 +134,16 @@ export class MockSupabase {
 
   private rpc(fn: string, a: any, uid: string): unknown {
     switch (fn) {
+      case "update_notification_prefs": {
+        const prof = this.table("profiles").find((r) => r.id === uid)!;
+        const cur = prof.notification_prefs || { login_alerts: true, reminder_emails: true, product_updates: false };
+        prof.notification_prefs = {
+          login_alerts: a.p_prefs?.login_alerts ?? cur.login_alerts,
+          reminder_emails: a.p_prefs?.reminder_emails ?? cur.reminder_emails,
+          product_updates: a.p_prefs?.product_updates ?? cur.product_updates,
+        };
+        return prof.notification_prefs;
+      }
       case "my_events":
         return this.attendees
           .filter((x) => x.user_id === uid)
@@ -267,6 +279,14 @@ export class MockSupabase {
     });
     await context.route(/\/auth\/v1\//, (route) => this.handleAuth(route));
     await context.route(/\/rest\/v1\//, (route) => this.handleRest(route));
+    await context.route(/\/storage\/v1\/object\//, (route) => {
+      const req = route.request();
+      if (req.method() === "OPTIONS") return this.json(route, 200, {});
+      if (!this.userFromRequest(req)) return this.json(route, 403, { message: "Unauthorized" });
+      const key = new URL(req.url()).pathname.replace(/^.*\/object\//, "");
+      this.uploads.push(key);
+      return this.json(route, 200, { Key: key, Id: randomUUID() });
+    });
   }
 
   private json(route: Route, status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -319,12 +339,16 @@ export class MockSupabase {
       if (!u) return this.json(route, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
       if (req.method() === "PUT") {
         if (body.password) u.password = body.password;
+        if (body.email) (u as any).pendingEmail = body.email;
         if (body.data) Object.assign(u.user_metadata, body.data);
       }
       return this.json(route, 200, this.publicUser(u));
     }
 
-    if (path === "/logout") return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+    if (path === "/logout") {
+      if (url.searchParams.get("scope") === "global") this.sessionsRevoked++;
+      return route.fulfill({ status: 204, headers: { "access-control-allow-origin": "*" } });
+    }
     if (path === "/recover") return this.json(route, 200, {});
     return this.json(route, 200, {});
   }

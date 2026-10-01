@@ -2,6 +2,9 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { supabase } from "./supabase";
 import QRCode from "qrcode";
 import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
+import { SettingsScreen } from "./settings/SettingsScreen";
+import { apiBase, createAccountApi } from "./settings/accountApi";
+import { PasswordInput } from "./ui/PasswordInput";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -3119,7 +3122,7 @@ function NetworQApp() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
-  const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add">("contacts");
+  const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add" | "settings">("contacts");
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
   // Event invite links: https://www.networq.co.in/?join=NQ-XXXXXX (from the Radar share QR)
@@ -3196,17 +3199,6 @@ function NetworQApp() {
   const [meetSent, setMeetSent] = useState(false);
   const [meetSending, setMeetSending] = useState(false);
   const [remindersOpen, setRemindersOpen] = useState(true);
-  const [profileModal, setProfileModal] = useState(false);
-  const [profileForm, setProfileForm] = useState({
-    name: "",
-    company: "",
-    role: "",
-    sector: "",
-    phone: "",
-    linkedin: "",
-    bio: "",
-  });
-  const [savingProfile, setSavingProfile] = useState(false);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepBrief, setPrepBrief] = useState<string | null>(null);
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
@@ -3536,6 +3528,16 @@ VOICE & ASSISTANT DIRECTIVES:
         setCurrentUser({ ...(profileRes.data || {}), email: userEmail, id: userId });
         setContacts((contactsRes.data || []).map(dbToContact));
         setScreen("app");
+        // Sign-in notification (welcome / new device). Once per browser session.
+        try {
+          const key = `nq_signin_reported_${userId}`;
+          if (!sessionStorage.getItem(key)) {
+            sessionStorage.setItem(key, "1");
+            createAccountApi(supabase, apiBase(AI_PROXY)).sessionEvent("signed_in").catch(() => {});
+          }
+        } catch {
+          /* storage unavailable */
+        }
       } catch (err: any) {
         loadedUserRef.current = null;
         console.error("Failed to load user data:", err);
@@ -4329,45 +4331,22 @@ Keep it punchy, sharp, and directly actionable.`;
     triggerConfetti();
   };
 
-  const openProfileModal = () => {
-    setProfileForm({
-      name: currentUser?.name || "",
-      company: currentUser?.company || "",
-      role: currentUser?.role || "",
-      sector: currentUser?.sector || "",
-      phone: currentUser?.phone || "",
-      linkedin: currentUser?.linkedin || "",
-      bio: currentUser?.bio || "",
-    });
-    setProfileModal(true);
-  };
+  const accountApi = useMemo(() => createAccountApi(supabase, apiBase(AI_PROXY)), []);
 
-  const updateProfile = async () => {
-    setSavingProfile(true);
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          name: profileForm.name,
-          company: profileForm.company,
-          role: profileForm.role,
-          sector: profileForm.sector,
-          phone: profileForm.phone,
-          linkedin: profileForm.linkedin,
-          bio: profileForm.bio,
-        })
-        .eq("id", currentUser.id);
-      if (error) throw error;
-      setCurrentUser((u: any) => ({ ...u, ...profileForm }));
-      setProfileModal(false);
-      triggerConfetti();
-      showToast("Profile updated.", "success");
-    } catch (err: any) {
-      showToast(err.message || "Failed to update profile.", "error");
-    } finally {
-      setSavingProfile(false);
-    }
-  };
+  const openProfileModal = () => setTab("settings");
+
+  const handleSignedOut = useCallback(
+    (message?: string) => {
+      loadedUserRef.current = null;
+      setCurrentUser(null);
+      setContacts([]);
+      setTab("contacts");
+      setScreen("login");
+      // Toasts only render inside the app shell — show it on the sign-in screen instead
+      setAuthMsg(message ? { text: message, type: "success" } : null);
+    },
+    []
+  );
 
   const getContactRoleCategory = useCallback((c: any): string => {
     if (c.roleCategory) return c.roleCategory;
@@ -4971,13 +4950,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={S.card}>
             <div style={{ marginBottom: 18 }}>
               <label style={S.label}>New Password</label>
-              <input
-                style={S.input}
-                type="password"
-                placeholder="Min 8 characters"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
+              <PasswordInput style={S.input} label="New password" autoComplete="new-password" placeholder="Min 8 characters" value={newPassword} onChange={setNewPassword} />
             </div>
             {authMsg && (
               <div
@@ -5125,13 +5098,13 @@ Keep it punchy, sharp, and directly actionable.`;
                   Forgot?
                 </span>
               </div>
-              <input
+              <PasswordInput
                 style={S.input}
-                type="password"
+                label="Password"
                 placeholder="••••••••"
                 value={loginForm.password}
-                onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                onChange={(v) => setLoginForm((f) => ({ ...f, password: v }))}
+                onEnter={handleLogin}
               />
             </div>
 
@@ -5167,6 +5140,11 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 Create Account
               </span>
+            </div>
+            <div style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: themeStyles.textMuted }}>
+              <a href="/privacy" style={{ color: themeStyles.textMuted }}>Privacy</a>
+              {" · "}
+              <a href="/terms" style={{ color: themeStyles.textMuted }}>Terms</a>
             </div>
           </div>
         </div>
@@ -5252,12 +5230,13 @@ Keep it punchy, sharp, and directly actionable.`;
 
                 <div style={{ marginBottom: 12 }}>
                   <label style={S.label}>Password *</label>
-                  <input
+                  <PasswordInput
                     style={S.input}
-                    type="password"
+                    label="Password"
+                    autoComplete="new-password"
                     placeholder="Minimum 8 characters"
                     value={form.password}
-                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+                    onChange={(v) => setForm((f) => ({ ...f, password: v }))}
                   />
                 </div>
 
@@ -5914,6 +5893,31 @@ Keep it punchy, sharp, and directly actionable.`;
             }}
           >
         {/* ── CONTACTS TAB ── */}
+        {currentUser?.deletion_scheduled_at && (
+          <div
+            role="alert"
+            style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 auto 16px", maxWidth: 880, padding: "12px 16px", borderRadius: 16, background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.35)" }}
+          >
+            <div style={{ flex: "1 1 240px", fontSize: 14 }}>
+              <strong>Your account is scheduled for deletion</strong> on {new Date(currentUser.deletion_scheduled_at).toLocaleDateString()}. All data will be permanently removed.
+            </div>
+            <button
+              style={{ ...S.btn, minHeight: 44 }}
+              onClick={async () => {
+                try {
+                  await accountApi.cancelDeletion();
+                  setCurrentUser((u: any) => ({ ...u, deletion_scheduled_at: null }));
+                  showToast("Deletion cancelled. Welcome back!", "success");
+                } catch (err: any) {
+                  showToast(err.message, "error");
+                }
+              }}
+            >
+              Cancel deletion
+            </button>
+          </div>
+        )}
+
         {tab === "contacts" && (
           <div>
             {/* ── BRAND DASHBOARD BANNER (Brand Identity Guideline Page 12) ── */}
@@ -6934,6 +6938,20 @@ Keep it punchy, sharp, and directly actionable.`;
           />
         )}
 
+        {/* ── SETTINGS TAB ── */}
+        {tab === "settings" && currentUser && (
+          <SettingsScreen
+            supabase={supabase}
+            account={accountApi}
+            currentUser={currentUser}
+            isDark={isDark}
+            showToast={showToast}
+            onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
+            onSignedOut={handleSignedOut}
+            onExportContacts={exportCSV}
+          />
+        )}
+
         {/* ── EVENT RADAR TAB ── */}
         {tab === "radar" && (
           <EventRadar
@@ -7817,122 +7835,6 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* ── PROFILE MODAL ── */}
-      {profileModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(18px)",
-            WebkitBackdropFilter: "blur(18px)",
-            zIndex: 400,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            animation: "fadeIn 0.15s ease",
-          }}
-          onClick={() => setProfileModal(false)}
-        >
-          <div
-            style={{ ...S.card, maxWidth: 500, width: "100%", maxHeight: "90vh", overflowY: "auto", animation: "fadeUp 0.2s ease" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Account Profile</div>
-              <button aria-label="Close" onClick={() => setProfileModal(false)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
-                <Icons.Close size={15} />
-              </button>
-            </div>
-            <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: themeStyles.textMuted }}>
-              Signed in as <strong style={{ color: themeStyles.text }}>{currentUser?.email}</strong>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={S.label}>Full Name *</label>
-                <input
-                  style={S.input}
-                  value={profileForm.name}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
-                  placeholder="Your Name"
-                />
-              </div>
-              <div>
-                <label style={S.label}>Phone</label>
-                <input
-                  style={S.input}
-                  value={profileForm.phone}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="+1 555 123 4567"
-                />
-              </div>
-              <div>
-                <label style={S.label}>Company *</label>
-                <input
-                  style={S.input}
-                  value={profileForm.company}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, company: e.target.value }))}
-                  placeholder="Acme Corp"
-                />
-              </div>
-              <div>
-                <label style={S.label}>Role *</label>
-                <input
-                  style={S.input}
-                  value={profileForm.role}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, role: e.target.value }))}
-                  placeholder="Founder, Lead"
-                />
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={S.label}>Sector</label>
-                <select
-                  style={S.input}
-                  value={profileForm.sector}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, sector: e.target.value }))}
-                >
-                  <option value="">Select industry…</option>
-                  {SECTORS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={S.label}>LinkedIn</label>
-                <input
-                  style={S.input}
-                  value={profileForm.linkedin}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, linkedin: e.target.value }))}
-                  placeholder="linkedin.com/in/…"
-                />
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <label style={S.label}>Company Pitch</label>
-              <textarea
-                style={{ ...S.input, height: 65, resize: "none" }}
-                value={profileForm.bio}
-                onChange={(e) => setProfileForm((f) => ({ ...f, bio: e.target.value }))}
-                placeholder="What does your company do?"
-              />
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button style={{ ...S.btnOutline, flex: 1 }} onClick={() => setProfileModal(false)}>
-                Cancel
-              </button>
-              <button
-                style={{ ...S.btn, flex: 2, opacity: !profileForm.name || savingProfile ? 0.6 : 1 }}
-                onClick={updateProfile}
-                disabled={!profileForm.name || savingProfile}
-              >
-                {savingProfile ? "Saving…" : "Save Changes"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── IPHONE FLOATING CURVED GLASS DOCK ── */}
       {isMobile && (
