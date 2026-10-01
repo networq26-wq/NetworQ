@@ -14,7 +14,7 @@
     "ios": "expo start --ios",
     "build:apk": "npx eas-cli@latest build --profile preview --platform android",
     "update": "npx eas-cli@latest update --auto",
-    "test": "node --test api/_lib/*.test.js tests/api/*.test.js",
+    "test": "node --test api/_lib/*.test.js tests/api/*.test.js tests/db/*.test.mjs",
     "test:rls": "QA_LIVE_SUPABASE=1 node --test tests/integration/*.test.js",
     "test:e2e": "playwright test",
     "test:all": "npx tsc --noEmit && npm test && npm run build && playwright test"
@@ -40,6 +40,7 @@
     "react-native-webview": "^14.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.61.0",
     "@types/qrcode": "^1.5.6",
     "@types/react": "~19.2.2",
