@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "./supabase";
 import QRCode from "qrcode";
+import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -1714,581 +1715,6 @@ function LiveCameraModal({
   );
 }
 
-// ── REAL TACTICAL RADAR CANVAS COMPONENT ──────────────────────────────────────
-interface RadarBlip {
-  id: string;
-  name: string;
-  company: string;
-  role: string;
-  email: string;
-  phone?: string;
-  angle: number; // 0 to 2PI
-  distance: number; // 0.15 to 0.85
-  lastSweepHit: number;
-  contact: any;
-  isLiveDevice?: boolean;
-}
-
-function RealRadarCanvas({
-  contacts,
-  currentUser,
-  onSelectContact,
-  onExchangeContact,
-  isDark,
-  showToast,
-  triggerConfetti,
-}: {
-  contacts: any[];
-  currentUser?: any;
-  onSelectContact: (c: any) => void;
-  onExchangeContact?: (peer: any) => void;
-  isDark: boolean;
-  showToast?: (msg: string, type?: "success" | "error" | "info") => void;
-  triggerConfetti?: () => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [selectedBlip, setSelectedBlip] = useState<RadarBlip | null>(null);
-  const [pingActive, setPingActive] = useState(false);
-  const pingTimeRef = useRef<number>(0);
-  const [livePeers, setLivePeers] = useState<any[]>([]);
-
-  const myDeviceId = useMemo(() => {
-    if (currentUser?.id) return currentUser.id;
-    try {
-      let stored = localStorage.getItem("networq_radar_dev_id");
-      if (!stored) {
-        stored = "device_" + Math.random().toString(36).substring(2, 10);
-        localStorage.setItem("networq_radar_dev_id", stored);
-      }
-      return stored;
-    } catch {
-      return "device_" + Math.random().toString(36).substring(2, 10);
-    }
-  }, [currentUser?.id]);
-
-  // AirDrop / ShareIt Realtime Presence & Auto-Discovery
-  useEffect(() => {
-    const channel = supabase.channel("networq-radar-live", {
-      config: {
-        presence: {
-          key: myDeviceId,
-        },
-      },
-    });
-
-    const myProfile = {
-      id: myDeviceId,
-      name: currentUser?.name || "NetworQ Member",
-      company: currentUser?.company || "NetworQ User",
-      role: currentUser?.role || "Professional",
-      email: currentUser?.email || "",
-      phone: currentUser?.phone || "",
-      avatar: currentUser?.avatar || "",
-      onlineAt: Date.now(),
-    };
-
-    channel
-      .on("presence", { event: "sync" }, () => {
-        const state = channel.presenceState();
-        const detected: any[] = [];
-        Object.entries(state).forEach(([key, presences]: [string, any]) => {
-          if (key !== myDeviceId && presences && presences.length > 0) {
-            const latest = presences[presences.length - 1];
-            detected.push({ ...latest, id: key });
-          }
-        });
-        setLivePeers(detected);
-      })
-      .on("broadcast", { event: "card-exchange" }, ({ payload }) => {
-        if (payload && (payload.targetId === myDeviceId || !payload.targetId)) {
-          if (payload.sender && payload.sender.id !== myDeviceId) {
-            if (showToast) {
-              showToast(`🤝 Received contact card from ${payload.sender.name}!`, "success");
-            }
-            if (triggerConfetti) triggerConfetti();
-            if (onExchangeContact) onExchangeContact(payload.sender);
-          }
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track(myProfile);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [myDeviceId, currentUser]);
-
-  const blips = useMemo<RadarBlip[]>(() => {
-    // 1. Live nearby phones detected via Realtime presence (AirDrop / ShareIt)
-    const liveBlips: RadarBlip[] = livePeers.map((peer, i) => {
-      const str = peer.name + peer.id;
-      let hash = 0;
-      for (let j = 0; j < str.length; j++) hash = (hash * 31 + str.charCodeAt(j)) & 0xffffffff;
-      const angle = (Math.abs(hash % 360) * Math.PI) / 180;
-      const distance = 0.22 + ((i % 3) * 0.22) + (Math.abs(hash % 15) / 100);
-      return {
-        id: peer.id,
-        name: peer.name || "Nearby Phone",
-        company: peer.company || "Live NetworQ Device",
-        role: peer.role || "Member",
-        email: peer.email || "",
-        phone: peer.phone || "",
-        angle,
-        distance: Math.min(0.85, distance),
-        lastSweepHit: 0,
-        contact: peer,
-        isLiveDevice: true,
-      };
-    });
-
-    // 2. Saved local contacts
-    const savedBlips: RadarBlip[] = contacts.map((c, i) => {
-      const str = c.name + c.id;
-      let hash = 0;
-      for (let j = 0; j < str.length; j++) hash = (hash * 31 + str.charCodeAt(j)) & 0xffffffff;
-      const angle = (Math.abs(hash % 360) * Math.PI) / 180;
-      const distance = 0.2 + (Math.abs((hash >> 8) % 65) / 100);
-      return {
-        id: c.id,
-        name: c.name,
-        company: c.company || "Attendee",
-        role: c.title || "Networker",
-        email: c.email || "",
-        phone: c.phone || "",
-        angle,
-        distance,
-        lastSweepHit: 0,
-        contact: c,
-        isLiveDevice: false,
-      };
-    });
-
-    return [...liveBlips, ...savedBlips];
-  }, [livePeers, contacts]);
-
-  const triggerSonarPing = () => {
-    setPingActive(true);
-    pingTimeRef.current = Date.now();
-    if (triggerConfetti) triggerConfetti();
-    setTimeout(() => setPingActive(false), 2400);
-  };
-
-  const sendCardToPeer = async (peer: any) => {
-    const channel = supabase.channel("networq-radar-live");
-    await channel.send({
-      type: "broadcast",
-      event: "card-exchange",
-      payload: {
-        sender: {
-          id: myDeviceId,
-          name: currentUser?.name || "NetworQ Member",
-          company: currentUser?.company || "NetworQ User",
-          role: currentUser?.role || "Professional",
-          email: currentUser?.email || "",
-          phone: currentUser?.phone || "",
-        },
-        targetId: peer.id,
-      },
-    });
-    if (onExchangeContact) onExchangeContact(peer);
-    if (showToast) showToast(`Card shared with ${peer.name} via AirDrop!`, "success");
-    if (triggerConfetti) triggerConfetti();
-  };
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId: number;
-
-    const render = () => {
-      const w = canvas.width;
-      const h = canvas.height;
-      const cx = w / 2;
-      const cy = h / 2;
-      const maxRadius = Math.min(cx, cy) - 24;
-
-      // Clean Scope background
-      ctx.fillStyle = isDark ? "#161617" : "#FFFFFF";
-      ctx.fillRect(0, 0, w, h);
-
-      // Current sweep angle
-      const now = Date.now();
-      const sweepAngle = ((now * 0.0012) % (Math.PI * 2));
-
-      // Concentric range rings
-      const rings = [0.25, 0.5, 0.75, 1.0];
-      const ringLabels = ["10m", "25m", "50m", "100m"];
-
-      rings.forEach((r, idx) => {
-        const rad = maxRadius * r;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-        ctx.strokeStyle = isDark
-          ? (idx === 3 ? "rgba(255, 255, 255, 0.16)" : "rgba(255, 255, 255, 0.07)")
-          : (idx === 3 ? "#D2D2D7" : "#E5E5EA");
-        ctx.lineWidth = idx === 3 ? 1.5 : 1;
-        ctx.stroke();
-
-        ctx.fillStyle = isDark ? "#86868B" : "#8E8E93";
-        ctx.font = "500 10px -apple-system, BlinkMacSystemFont, sans-serif";
-        ctx.textAlign = "left";
-        ctx.fillText(ringLabels[idx], cx + 5, cy - rad + 13);
-      });
-
-      // Subtle crosshairs
-      for (let a = 0; a < 4; a++) {
-        const rad = (a * Math.PI) / 2;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + Math.cos(rad) * maxRadius, cy + Math.sin(rad) * maxRadius);
-        ctx.strokeStyle = isDark ? "rgba(255, 255, 255, 0.08)" : "#E5E5EA";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
-
-      // Compass Bearing labels
-      const bearings = [
-        { label: "N", x: cx, y: cy - maxRadius - 7, align: "center" },
-        { label: "E", x: cx + maxRadius + 10, y: cy + 3, align: "left" },
-        { label: "S", x: cx, y: cy + maxRadius + 14, align: "center" },
-        { label: "W", x: cx - maxRadius - 10, y: cy + 3, align: "right" },
-      ];
-      ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillStyle = isDark ? "#86868B" : "#8E8E93";
-      bearings.forEach((b) => {
-        ctx.textAlign = b.align as CanvasTextAlign;
-        ctx.fillText(b.label, b.x, b.y);
-      });
-
-      // Active Sonar Pulse Wave expansion
-      if (pingActive) {
-        const elapsed = (now - pingTimeRef.current) / 2000;
-        if (elapsed <= 1) {
-          const waveRadius = maxRadius * elapsed;
-          ctx.beginPath();
-          ctx.arc(cx, cy, waveRadius, 0, Math.PI * 2);
-          ctx.strokeStyle = isDark
-            ? `rgba(41, 151, 255, ${1 - elapsed})`
-            : `rgba(0, 113, 227, ${1 - elapsed})`;
-          ctx.lineWidth = 2.5;
-          ctx.stroke();
-        }
-      }
-
-      // Rotating Sweep Beam
-      const sweepTailAngle = 0.55;
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxRadius);
-      grad.addColorStop(0, isDark ? "rgba(41, 151, 255, 0.22)" : "rgba(0, 113, 227, 0.15)");
-      grad.addColorStop(1, "rgba(0, 113, 227, 0.0)");
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, maxRadius, sweepAngle - sweepTailAngle, sweepAngle, false);
-      ctx.closePath();
-      ctx.fillStyle = grad;
-      ctx.fill();
-
-      // Clean sweep line
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(cx + Math.cos(sweepAngle) * maxRadius, cy + Math.sin(sweepAngle) * maxRadius);
-      ctx.strokeStyle = isDark ? "#2997FF" : "#0071E3";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.restore();
-
-      // Draw Blips
-      blips.forEach((b) => {
-        const bx = cx + Math.cos(b.angle) * (b.distance * maxRadius);
-        const by = cy + Math.sin(b.angle) * (b.distance * maxRadius);
-
-        const diff = (sweepAngle - b.angle + Math.PI * 2) % (Math.PI * 2);
-        if (diff < 0.15) {
-          b.lastSweepHit = now;
-        }
-
-        const timeSinceHit = now - b.lastSweepHit;
-        const hitGlow = Math.max(0, 1 - timeSinceHit / 2200);
-        const isSelected = selectedBlip?.id === b.id;
-
-        // Live AirDrop device aura
-        if (b.isLiveDevice) {
-          const pulse = (Math.sin(now * 0.006) + 1) * 3;
-          ctx.beginPath();
-          ctx.arc(bx, by, 10 + pulse, 0, Math.PI * 2);
-          ctx.fillStyle = isDark ? "rgba(16, 185, 129, 0.25)" : "rgba(16, 185, 129, 0.2)";
-          ctx.fill();
-          ctx.strokeStyle = "#10B981";
-          ctx.lineWidth = 1;
-          ctx.stroke();
-        } else if (hitGlow > 0 || isSelected) {
-          ctx.beginPath();
-          ctx.arc(bx, by, isSelected ? 12 : 7 + hitGlow * 5, 0, Math.PI * 2);
-          ctx.fillStyle = isSelected
-            ? (isDark ? "rgba(41, 151, 255, 0.3)" : "rgba(0, 113, 227, 0.25)")
-            : (isDark ? `rgba(41, 151, 255, ${hitGlow * 0.3})` : `rgba(0, 113, 227, ${hitGlow * 0.25})`);
-          ctx.fill();
-        }
-
-        // Blip core dot
-        ctx.beginPath();
-        ctx.arc(bx, by, b.isLiveDevice ? 6 : (isSelected ? 5.5 : 4), 0, Math.PI * 2);
-        ctx.fillStyle = b.isLiveDevice
-          ? "#10B981"
-          : isSelected
-          ? (isDark ? "#2997FF" : "#0071E3")
-          : (isDark ? "#FFFFFF" : "#1D1D1F");
-        ctx.fill();
-        ctx.strokeStyle = isDark ? "#161617" : "#FFFFFF";
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Selected Target Reticle & Label
-        if (isSelected || b.isLiveDevice) {
-          if (isSelected) {
-            ctx.strokeStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3");
-            ctx.lineWidth = 1.5;
-            ctx.beginPath();
-            ctx.arc(bx, by, 11, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-
-          // Connecting Leader Line
-          ctx.beginPath();
-          ctx.moveTo(bx + 8, by - 8);
-          ctx.lineTo(bx + 20, by - 18);
-          ctx.lineTo(bx + 75, by - 18);
-          ctx.strokeStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3");
-          ctx.stroke();
-
-          ctx.fillStyle = b.isLiveDevice ? "#10B981" : (isDark ? "#FFFFFF" : "#1D1D1F");
-          ctx.font = "600 11px -apple-system, BlinkMacSystemFont, sans-serif";
-          ctx.textAlign = "left";
-          ctx.fillText(b.name + (b.isLiveDevice ? " (Live)" : ""), bx + 22, by - 22);
-        }
-      });
-
-      // Center transmitter core
-      ctx.beginPath();
-      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
-      ctx.fillStyle = isDark ? "#2997FF" : "#0071E3";
-      ctx.fill();
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-    return () => cancelAnimationFrame(animId);
-  }, [blips, selectedBlip, pingActive, isDark]);
-
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvas.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvas.height;
-
-    const cx = canvas.width / 2;
-    const cy = canvas.height / 2;
-    const maxRadius = Math.min(cx, cy) - 24;
-
-    const clicked = blips.find((b) => {
-      const bx = cx + Math.cos(b.angle) * (b.distance * maxRadius);
-      const by = cy + Math.sin(b.angle) * (b.distance * maxRadius);
-      const dist = Math.sqrt((bx - x) ** 2 + (by - y) ** 2);
-      return dist <= 18;
-    });
-
-    if (clicked) {
-      setSelectedBlip(clicked);
-    } else {
-      setSelectedBlip(null);
-    }
-  };
-
-  return (
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-      {/* Live Peers Status Badge */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "6px 14px",
-          borderRadius: 20,
-          background: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-        }}
-      >
-        {livePeers.length > 0 ? (
-          <span style={{ color: "#10B981", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#10B981", display: "inline-block", boxShadow: "0 0 8px #10B981" }} />
-            {livePeers.length} Active Phone{livePeers.length > 1 ? "s" : ""} Nearby (AirDrop Auto-Detect)
-          </span>
-        ) : (
-          <span style={{ fontSize: 12, color: isDark ? "#86868B" : "#6E6E73", display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#3B82F6", display: "inline-block", animation: "pulse 1.5s infinite" }} />
-            Broadcasting presence & listening for nearby phones…
-          </span>
-        )}
-      </div>
-
-      {/* Proximity Network Map Screen */}
-      <div
-        style={{
-          borderRadius: "50%",
-          padding: 8,
-          background: isDark ? "#1C1C1E" : "#F5F5F7",
-          border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA"}`,
-          boxShadow: isDark
-            ? "0 20px 50px rgba(0, 0, 0, 0.6)"
-            : "0 10px 30px rgba(0, 0, 0, 0.06)",
-          position: "relative",
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          width={440}
-          height={440}
-          onClick={handleCanvasClick}
-          style={{
-            width: "100%",
-            maxWidth: 440,
-            height: "auto",
-            aspectRatio: "1/1",
-            borderRadius: "50%",
-            display: "block",
-            cursor: "pointer",
-          }}
-        />
-      </div>
-
-      {/* Control Actions */}
-      <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-        <button
-          onClick={triggerSonarPing}
-          style={{
-            padding: "9px 20px",
-            borderRadius: 10,
-            background: isDark ? "#2997FF" : "#0071E3",
-            color: "#ffffff",
-            border: "none",
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            boxShadow: "0 2px 8px rgba(0, 113, 227, 0.25)",
-          }}
-        >
-          <Icons.Radar size={15} />
-          <span>Ping Sonar</span>
-        </button>
-
-        <span style={{ fontSize: 13, color: isDark ? "#86868B" : "#6E6E73", fontWeight: 500 }}>
-          Total On Scope: <strong style={{ color: isDark ? "#F5F5F7" : "#1D1D1F" }}>{blips.length}</strong>
-        </span>
-      </div>
-
-      {/* Selected Contact Inspector Card */}
-      {selectedBlip && (
-        <div
-          style={{
-            width: "100%",
-            maxWidth: 440,
-            background: isDark ? "#1C1C1E" : "#FFFFFF",
-            border: `1px solid ${selectedBlip.isLiveDevice ? "#10B981" : (isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA")}`,
-            borderRadius: 14,
-            padding: "16px 20px",
-            boxShadow: isDark ? "0 10px 30px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.06)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            animation: "fadeUp 0.2s ease",
-          }}
-        >
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: selectedBlip.isLiveDevice ? "#10B981" : (isDark ? "#2997FF" : "#0071E3"), letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              {selectedBlip.isLiveDevice ? "✨ Live AirDrop Device" : "Saved Contact"}
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 16, marginTop: 2, color: isDark ? "#F5F5F7" : "#1D1D1F" }}>
-              {selectedBlip.name}
-            </div>
-            <div style={{ fontSize: 12, color: isDark ? "#86868B" : "#6E6E73", marginTop: 2 }}>
-              {[selectedBlip.role, selectedBlip.company].filter(Boolean).join(" · ")}
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            {selectedBlip.isLiveDevice ? (
-              <button
-                onClick={() => sendCardToPeer(selectedBlip.contact)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  background: "linear-gradient(135deg, #10B981, #059669)",
-                  color: "#fff",
-                  border: "none",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  boxShadow: "0 2px 8px rgba(16, 185, 129, 0.3)",
-                }}
-              >
-                <span>🤝 AirDrop Card</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => onSelectContact(selectedBlip.contact)}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: 8,
-                  background: isDark ? "#2997FF" : "#0071E3",
-                  color: "#fff",
-                  border: "none",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                View Profile ↗
-              </button>
-            )}
-            <button
-              onClick={() => setSelectedBlip(null)}
-              style={{
-                padding: "8px 10px",
-                borderRadius: 8,
-                background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
-                border: "none",
-                color: isDark ? "#F5F5F7" : "#1D1D1F",
-                fontSize: 12,
-                cursor: "pointer",
-              }}
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── NAMEDROP / SONIC BEAM TAP-TO-SHARE SIMULATOR ──────────────────────────────
 function NameDropModal({
   user,
@@ -2737,7 +2163,7 @@ function EventsHub({
   showToast,
 }: {
   isDark: boolean;
-  onLaunchRadarForEvent: (eventName: string) => void;
+  onLaunchRadarForEvent: (event: BusinessEvent) => void;
   onAddContactForEvent: (eventName: string) => void;
   themeStyles: any;
   S: any;
@@ -3268,7 +2694,7 @@ Return ONLY a valid JSON array of objects with this schema:
                 {/* Primary Action Row: Radar Room & Add Contact */}
                 <div style={{ display: "flex", gap: 8, borderTop: `1px solid ${themeStyles.tableRowBorder}`, paddingTop: 12 }}>
                   <button
-                    onClick={() => onLaunchRadarForEvent(ev.title)}
+                    onClick={() => onLaunchRadarForEvent(ev)}
                     style={{
                       ...S.btnSm,
                       flex: 1.2,
@@ -3278,10 +2704,10 @@ Return ONLY a valid JSON array of objects with this schema:
                       borderRadius: 10,
                       fontWeight: 700,
                     }}
-                    title="Open live radar for attendees at this event"
+                    title="Join this event and find attendees near you"
                   >
                     <Icons.Radar size={13} />
-                    <span>Radar Room</span>
+                    <span>I'm attending · Radar</span>
                   </button>
 
                   <button
@@ -3694,7 +3120,14 @@ function NetworQApp() {
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add">("contacts");
-  const [radarEventFilter, setRadarEventFilter] = useState<string | null>(null);
+  const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
+  const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
+  // Event invite links: https://www.networq.co.in/?join=NQ-XXXXXX (from the Radar share QR)
+  const [inviteCode] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const code = new URLSearchParams(window.location.search).get("join");
+    return code && /^NQ-[A-Z0-9]{6}$/i.test(code) ? code.toUpperCase() : null;
+  });
   const [viewMode, setViewMode] = useState<"table" | "cards" | "galaxy">("table");
   const [searchQ, setSearchQ] = useState("");
   const [sortCol, setSortCol] = useState("addedAt");
@@ -4178,6 +3611,18 @@ VOICE & ASSISTANT DIRECTIVES:
       authListener.subscription.unsubscribe();
     };
   }, [loadUserData]);
+
+  useEffect(() => {
+    if (screen !== "app" || !inviteCode) return;
+    setRadarJoinCode(inviteCode);
+    setTab("radar");
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      /* non-browser host */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, inviteCode]);
 
   // Global Cmd+K / Ctrl+K listener
   useEffect(() => {
@@ -7476,10 +6921,9 @@ Keep it punchy, sharp, and directly actionable.`;
             themeStyles={themeStyles}
             S={S}
             isMobile={isMobile}
-            onLaunchRadarForEvent={(eventName) => {
-              setRadarEventFilter(eventName);
+            onLaunchRadarForEvent={(ev) => {
+              setRadarListedEvent({ externalId: ev.id, name: ev.title, venue: [ev.venue, ev.city].filter(Boolean).join(", "), startsAt: ev.date || null });
               setTab("radar");
-              triggerConfetti();
             }}
             onAddContactForEvent={(eventName) => {
               setAddForm((f) => ({ ...f, event: eventName }));
@@ -7490,131 +6934,21 @@ Keep it punchy, sharp, and directly actionable.`;
           />
         )}
 
-        {/* ── REAL RADAR HUD TAB ── */}
+        {/* ── EVENT RADAR TAB ── */}
         {tab === "radar" && (
-          <div style={{ maxWidth: 840, margin: "0 auto", animation: "fadeUp 0.3s ease" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <img
-                  src="/illustrations/Beacon/Beacon-1.svg"
-                  alt="Proximity Beacon"
-                  style={{
-                    width: 48,
-                    height: 28,
-                    objectFit: "contain",
-                    filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
-                  }}
-                />
-                <div>
-                  <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 28, margin: 0, letterSpacing: "-0.02em" }}>
-                    {radarEventFilter ? `${radarEventFilter} Map` : "Proximity Network Map"}
-                  </h2>
-                  <p style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4, margin: 0 }}>
-                    {radarEventFilter
-                      ? `Tracking attendees & connections for ${radarEventFilter}`
-                      : "Real-time proximity mapping for event attendees and collaborators"}
-                  </p>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {radarEventFilter && (
-                  <button
-                    onClick={() => setRadarEventFilter(null)}
-                    style={{ ...S.btnSmOut, fontSize: 12, padding: "7px 12px" }}
-                  >
-                    Clear Filter ✕
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setTab("scan");
-                    triggerConfetti();
-                  }}
-                  style={{
-                    borderRadius: 10,
-                    padding: "9px 18px",
-                    background: isDark ? "#2997FF" : "#0071E3",
-                    color: "#ffffff",
-                    border: "none",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    boxShadow: "0 2px 8px rgba(0, 113, 227, 0.25)",
-                  }}
-                >
-                  <Icons.Scan size={16} />
-                  <span>Scan Card</span>
-                </button>
-              </div>
-            </div>
-
-            <div
-              style={{
-                ...themeStyles.glassCard,
-                borderRadius: 20,
-                padding: 28,
-                border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-              }}
-            >
-              <RealRadarCanvas
-                contacts={
-                  radarEventFilter
-                    ? contacts.filter((c) => c.event?.toLowerCase().includes(radarEventFilter.toLowerCase()))
-                    : contacts
-                }
-                currentUser={currentUser}
-                onSelectContact={(c) => setModal(c)}
-                onExchangeContact={(peer) => {
-                  const newContact = {
-                    id: peer.id || `peer-${Date.now()}`,
-                    name: peer.name || "Nearby Member",
-                    company: peer.company || "",
-                    role: peer.role || peer.title || "",
-                    email: peer.email || "",
-                    phone: peer.phone || "",
-                    website: "",
-                    linkedin: "",
-                    event: "Live Radar Auto-Detect",
-                    notes: `Connected via NetworQ Live Radar on ${new Date().toLocaleDateString()}`,
-                    tags: ["Radar", "Nearby"],
-                    reminder: "",
-                    reminderDate: "",
-                    reminderDone: false,
-                    emailSent: false,
-                  };
-                  setContacts((prev) => {
-                    if (prev.some((c) => (c.email && c.email === newContact.email) || c.id === newContact.id)) return prev;
-                    return [newContact, ...prev];
-                  });
-                  if (currentUser?.id) {
-                    supabase
-                      .from("contacts")
-                      .insert({
-                        user_id: currentUser.id,
-                        name: newContact.name,
-                        company: newContact.company,
-                        title: newContact.role,
-                        email: newContact.email,
-                        phone: newContact.phone,
-                        event: "Live Radar Auto-Detect",
-                        notes: newContact.notes,
-                        tags: newContact.tags,
-                      })
-                      .then(({ error }) => {
-                        if (error) console.warn("Could not save peer contact to database:", error);
-                      });
-                  }
-                }}
-                isDark={isDark}
-                showToast={showToast}
-                triggerConfetti={triggerConfetti}
-              />
-            </div>
-          </div>
+          <EventRadar
+            supabase={supabase}
+            isDark={isDark}
+            showToast={showToast}
+            onContactsChanged={() => currentUser?.id && loadUserData(currentUser.id, currentUser.email)}
+            pendingJoinCode={radarJoinCode}
+            pendingListedEvent={radarListedEvent}
+            onPendingHandled={() => {
+              setRadarJoinCode(null);
+              setRadarListedEvent(null);
+            }}
+            onOpenEventsHub={() => setTab("events")}
+          />
         )}
 
         {/* ── SCAN TAB ── */}

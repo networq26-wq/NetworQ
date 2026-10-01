@@ -18,7 +18,19 @@ interface MockUser {
 const OWNER_COLUMN: Record<string, string> = { profiles: "id" };
 const b64url = (obj: object) => Buffer.from(JSON.stringify(obj)).toString("base64url");
 
+interface RadarEventRow { id: string; external_id: string | null; name: string; venue: string | null; starts_at: string | null; join_code: string | null; source: "listed" | "user"; created_by: string }
+interface AttendeeRow { event_id: string; user_id: string; last_seen_at: number; radar_on: boolean; visible: boolean; show_distance: boolean; show_profile: boolean }
+interface TokenRow { token: string; user_id: string; event_id: string; expires_at: number }
+interface RequestRow { id: string; event_id: string; from_user: string; to_user: string; status: "pending" | "accepted" | "declined"; created_at: string }
+
+class RpcError extends Error {}
+
 export class MockSupabase {
+  // Event Radar state (mirrors supabase/migrations/20261002_event_radar.sql; the SQL itself is tested in tests/db)
+  events: RadarEventRow[] = [];
+  attendees: AttendeeRow[] = [];
+  tokens: TokenRow[] = [];
+  requests: RequestRow[] = [];
   users: MockUser[] = [];
   tables: Record<string, Row[]> = {};
   autoConfirm = true;
@@ -86,6 +98,162 @@ export class MockSupabase {
       return this.users.find((u) => u.id === sub);
     } catch {
       return undefined;
+    }
+  }
+
+  // ── Event Radar RPCs ───────────────────────────────────────────────────────
+  tokenFor(email: string): string | undefined {
+    const u = this.users.find((x) => x.email === email);
+    return [...this.tokens].reverse().find((t) => t.user_id === u?.id && t.expires_at > Date.now())?.token;
+  }
+
+  private profileOf(userId: string, showProfile: boolean) {
+    const p = this.table("profiles").find((r) => r.id === userId) || {};
+    return showProfile
+      ? { name: p.name || "NetworQ attendee", title: p.role ?? null, company: p.company ?? null, avatar: null }
+      : { name: (p.name || "Attendee").split(" ")[0], title: p.role ?? null, company: null, avatar: null };
+  }
+
+  private eventJson(e: RadarEventRow, uid: string) {
+    return { id: e.id, name: e.name, venue: e.venue, starts_at: e.starts_at, ends_at: null, join_code: e.join_code, source: e.source, external_id: e.external_id, is_owner: e.created_by === uid };
+  }
+
+  private member(eventId: string, uid: string) {
+    const a = this.attendees.find((x) => x.event_id === eventId && x.user_id === uid);
+    if (!a) throw new RpcError("not_a_member");
+    return a;
+  }
+
+  private join(eventId: string, uid: string) {
+    const a = this.attendees.find((x) => x.event_id === eventId && x.user_id === uid);
+    if (a) a.last_seen_at = Date.now();
+    else this.attendees.push({ event_id: eventId, user_id: uid, last_seen_at: Date.now(), radar_on: true, visible: true, show_distance: true, show_profile: true });
+  }
+
+  private rpc(fn: string, a: any, uid: string): unknown {
+    switch (fn) {
+      case "my_events":
+        return this.attendees
+          .filter((x) => x.user_id === uid)
+          .map((x) => {
+            const e = this.events.find((ev) => ev.id === x.event_id)!;
+            return { ...this.eventJson(e, uid), attendee_count: this.attendees.filter((y) => y.event_id === e.id).length, settings: { radar_on: x.radar_on, visible: x.visible, show_distance: x.show_distance, show_profile: x.show_profile } };
+          });
+      case "create_event": {
+        const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+        const code = "NQ-" + Array.from({ length: 6 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("");
+        const e: RadarEventRow = { id: randomUUID(), external_id: null, name: a.p_name, venue: a.p_venue, starts_at: a.p_starts_at, join_code: code, source: "user", created_by: uid };
+        this.events.push(e);
+        this.join(e.id, uid);
+        return this.eventJson(e, uid);
+      }
+      case "join_event_by_code": {
+        const e = this.events.find((ev) => ev.join_code === String(a.p_code).trim().toUpperCase());
+        if (!e) return { error: "invalid_code" };
+        this.join(e.id, uid);
+        return this.eventJson(e, uid);
+      }
+      case "join_listed_event": {
+        let e = this.events.find((ev) => ev.external_id === a.p_external_id);
+        if (!e) {
+          e = { id: randomUUID(), external_id: a.p_external_id, name: a.p_name, venue: a.p_venue, starts_at: a.p_starts_at, join_code: null, source: "listed", created_by: uid };
+          this.events.push(e);
+        }
+        this.join(e.id, uid);
+        return this.eventJson(e, uid);
+      }
+      case "leave_event":
+        this.attendees = this.attendees.filter((x) => !(x.event_id === a.p_event_id && x.user_id === uid));
+        this.tokens = this.tokens.filter((t) => !(t.event_id === a.p_event_id && t.user_id === uid));
+        return null;
+      case "update_radar_settings": {
+        const m = this.member(a.p_event_id, uid);
+        Object.assign(m, { radar_on: a.p_radar_on, visible: a.p_visible, show_distance: a.p_show_distance, show_profile: a.p_show_profile });
+        if (!(m.radar_on && m.visible)) this.tokens = this.tokens.filter((t) => !(t.event_id === a.p_event_id && t.user_id === uid));
+        return { radar_on: m.radar_on, visible: m.visible, show_distance: m.show_distance, show_profile: m.show_profile };
+      }
+      case "issue_radar_token": {
+        const m = this.member(a.p_event_id, uid);
+        m.last_seen_at = Date.now();
+        if (!m.radar_on) throw new RpcError("radar_off");
+        const expires = Date.now() + 15 * 60_000;
+        if (!m.visible) return { token: null, expires_at: new Date(expires).toISOString() };
+        const token = randomUUID().replace(/-/g, "").slice(0, 16);
+        this.tokens.push({ token, user_id: uid, event_id: a.p_event_id, expires_at: expires });
+        return { token, expires_at: new Date(expires).toISOString() };
+      }
+      case "resolve_radar_tokens": {
+        const me = this.member(a.p_event_id, uid);
+        if (!me.radar_on) throw new RpcError("radar_off");
+        const wanted: string[] = a.p_tokens || [];
+        if (wanted.length > 64) throw new RpcError("too_many_tokens");
+        const people = this.tokens
+          .filter((t) => t.event_id === a.p_event_id && wanted.includes(t.token) && t.expires_at > Date.now() && t.user_id !== uid)
+          .flatMap((t) => {
+            const att = this.attendees.find((x) => x.event_id === t.event_id && x.user_id === t.user_id);
+            if (!att || !att.radar_on || !att.visible) return [];
+            return [{ ...this.profileOf(t.user_id, att.show_profile), token: t.token, user_id: t.user_id, show_distance: att.show_distance, expires_at: new Date(t.expires_at).toISOString() }];
+          });
+        return me.visible ? { people, hidden_count: 0 } : { people: [], hidden_count: people.length };
+      }
+      case "list_event_attendees": {
+        const me = this.member(a.p_event_id, uid);
+        me.last_seen_at = Date.now();
+        const people = this.attendees
+          .filter((x) => x.event_id === a.p_event_id && x.user_id !== uid && x.radar_on && x.visible && Date.now() - x.last_seen_at < 15 * 60_000)
+          .map((x) => ({ ...this.profileOf(x.user_id, x.show_profile), user_id: x.user_id, show_distance: false }));
+        return me.radar_on && me.visible ? { people, hidden_count: 0 } : { people: [], hidden_count: people.length };
+      }
+      case "send_connection_request": {
+        this.member(a.p_event_id, uid);
+        if (a.p_to_user === uid) throw new RpcError("cannot_connect_to_self");
+        this.member(a.p_event_id, a.p_to_user);
+        let r = this.requests.find((x) => x.event_id === a.p_event_id && x.from_user === uid && x.to_user === a.p_to_user);
+        if (!r) {
+          r = { id: randomUUID(), event_id: a.p_event_id, from_user: uid, to_user: a.p_to_user, status: "pending", created_at: new Date().toISOString() };
+          this.requests.push(r);
+        }
+        return r;
+      }
+      case "my_connection_requests":
+        this.member(a.p_event_id, uid);
+        return {
+          incoming: this.requests
+            .filter((r) => r.event_id === a.p_event_id && r.to_user === uid && r.status === "pending")
+            .map((r) => ({ ...this.profileOf(r.from_user, true), id: r.id, from_user: r.from_user, created_at: r.created_at })),
+          outgoing: this.requests.filter((r) => r.event_id === a.p_event_id && r.from_user === uid).map((r) => ({ id: r.id, to_user: r.to_user, status: r.status })),
+        };
+      case "respond_connection_request": {
+        const r = this.requests.find((x) => x.id === a.p_request_id && x.to_user === uid);
+        if (!r) throw new RpcError("request_not_found");
+        if (r.status !== "pending") return r;
+        r.status = a.p_accept ? "accepted" : "declined";
+        if (a.p_accept) {
+          const eventName = this.events.find((e) => e.id === r.event_id)?.name;
+          for (const [owner, person] of [[r.from_user, r.to_user], [r.to_user, r.from_user]]) {
+            const p = this.table("profiles").find((x) => x.id === person) || {};
+            const u = this.users.find((x) => x.id === person);
+            this.table("contacts").push({ id: randomUUID(), user_id: owner, name: p.name, title: p.role, company: p.company, email: u?.email, event: eventName, reference: "NetworQ Radar", tags: ["radar"], added_at: new Date().toISOString() });
+          }
+        }
+        return r;
+      }
+      default:
+        throw new RpcError(`unknown function ${fn}`);
+    }
+  }
+
+  private async handleRpc(route: Route) {
+    const req = route.request();
+    const user = this.userFromRequest(req);
+    if (!user) return this.json(route, 401, { code: "PGRST301", message: "JWT required" });
+    const fn = new URL(req.url()).pathname.split("/rpc/")[1];
+    try {
+      const result = this.rpc(fn, JSON.parse(req.postData() || "{}"), user.id);
+      return this.json(route, 200, result);
+    } catch (err) {
+      if (err instanceof RpcError) return this.json(route, 400, { code: "P0001", message: err.message });
+      throw err;
     }
   }
 
@@ -165,6 +333,7 @@ export class MockSupabase {
     const req = route.request();
     if (req.method() === "OPTIONS") return this.json(route, 200, {});
     const url = new URL(req.url());
+    if (url.pathname.includes("/rest/v1/rpc/")) return this.handleRpc(route);
     const table = url.pathname.replace(/^.*\/rest\/v1\//, "").split("/")[0];
     const user = this.userFromRequest(req);
     if (!user) return this.json(route, 401, { code: "PGRST301", message: "JWT required" });

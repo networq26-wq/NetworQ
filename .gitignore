@@ -65,3 +65,7 @@ $RECYCLE.BIN/
 playwright-report/
 test-results/
 qa-logs/
+
+# Local native module build output
+modules/*/android/build/
+modules/*/android/.cxx/

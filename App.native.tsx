@@ -12,6 +12,7 @@ import {
   Linking,
 } from "react-native";
 import { WebView } from "react-native-webview";
+import { useRadarBridge } from "./radar/shellBridge";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
@@ -20,6 +21,7 @@ export default function App() {
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
 
   // Handle hardware Android back button
   useEffect(() => {
@@ -76,6 +78,7 @@ export default function App() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
+          onMessage={radarBridge.onMessage}
           cacheEnabled={true}
           renderLoading={() => (
             <View style={styles.loadingContainer}>

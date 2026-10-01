@@ -26,6 +26,16 @@ You verify that the mobile app people download actually installs, launches, logs
 - `eas build --profile preview --platform android` succeeds. Install the APK on an emulator (`adb install`) and smoke-test: launch → login → add contact → delete → logout.
 - `/download/NetworQ.apk` on the server returns the APK with the correct MIME type, or a clean 404 JSON.
 
+**Event Radar (two Android phones, same event)**
+- Fresh install → sign in → Radar → create event; second phone joins with the code / QR invite link.
+- First start asks for *Nearby devices* (Android 12+) or *Location* (≤ 11). Deny → "permission needed" banner → Allow access works. "Don't ask again" → Open Settings.
+- Both phones appear within ~5 s. Walk apart: distance moves through Very close → ~3 m → ~5 m → ~10 m without flicker.
+- Turn Bluetooth off → "Bluetooth is off" banner → Turn on Bluetooth opens settings → Radar resumes by itself.
+- Incognito on phone B → B disappears from A within 30 s; B sees "1 person is nearby".
+- App to background for 1 min → no scanning (battery); returning resumes.
+- Connect → Accept → both phones have the new contact with email/phone.
+- `adb logcat | grep -i networq` shows no SecurityException or crash.
+
 ## Output
 
 PASS / FAIL / NOT TESTED per item, with the command output. Store-blocking problems are P0.

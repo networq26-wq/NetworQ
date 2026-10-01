@@ -9,9 +9,11 @@ The code is release-ready: every automated check passes. Three configuration ste
 | Area | Result | Evidence |
 |---|---|---|
 | Type check | ✅ 0 errors (was 7) | `npx tsc --noEmit` |
-| Unit + API + security tests | ✅ 40 / 40 | `npm test` |
+| Unit + API + security + SQL tests | ✅ 56 / 56 | `npm test` |
 | Production build | ✅ | `npm run build` |
-| Browser E2E (desktop + Pixel 7), CSP enforced | ✅ 49 / 49, 0 CSP violations | `npm run test:e2e` |
+| Browser E2E + unit (desktop + Pixel 7), CSP enforced | ✅ 77 / 77, 0 CSP violations | `npm run test:e2e` |
+| Database functions (PGlite, real Postgres) | ✅ 16 / 16 | `npm test` |
+| Android compile (Gradle, JDK 17) | ✅ BUILD SUCCESSFUL | `cd android && ./gradlew :app:compileDebugKotlin` |
 | Live Supabase RLS | ⚠️ 13 / 14 (passes after migration) | `npm run test:rls` |
 | Secrets in bundle | ✅ none | grep of `dist/_expo/static/js/web/*.js` |
 | Dependency audit (prod) | ⚠️ 10 (build-time only, not in server runtime) — was 27 | `npm audit --omit=dev` |
@@ -21,6 +23,7 @@ The code is release-ready: every automated check passes. Three configuration ste
 1. **Run both migrations in the Supabase SQL editor**, in order:
    - `supabase/migrations/20261001_security_hardening.sql`
    - `supabase/migrations/20261001b_restore_waitlist_and_storage.sql` (the live project is missing `join_waitlist()` and the `card-images` bucket)
+   - `supabase/migrations/20261002_event_radar.sql` (Event Radar)
 
    Then re-run `npm run test:rls` (expect 14 / 14).
 2. **Verify a sending domain in Resend** (e.g. `networq.co.in`) and set `RESEND_FROM_EMAIL=NetworQ <noreply@networq.co.in>`. The current `onboarding@resend.dev` sandbox only delivers to the Resend account owner.
@@ -68,6 +71,17 @@ Checklists used: `levnikolaevich/claude-code-skills` (codebase, test-suite and p
 | 29 | P2 | QR import spread untrusted JSON into the form; used `alert()` | Field whitelist, toasts |
 | 30 | P2 | Waitlist table allowed direct anonymous inserts, bypassing validation | Insert policy removed; RPC only |
 | 31 | P3 | Container ran as root; no graceful shutdown; unused `@emailjs/browser` | `USER node`, SIGTERM drain, dependency removed |
+
+### Third pass (2026-10-01) — scanner restart + Event Radar
+
+| # | Sev | Item | Result |
+|---|---|---|---|
+| 32 | P0 | "App restarts when the scanner tab opens" — reproduced on the **live** bundle: React error #130 (`Icons.Camera` undefined) blanks the app | Fixed on branch (not yet deployed); app-wide error boundary added |
+| 33 | P0 | Old radar broadcast every online user's email/phone to all users worldwide; distances were fake | Removed; replaced by Event Radar |
+| 34 | P1 | `expo-dev-client` / `expo-updates` on SDK 57 with Expo SDK 55 — Android debug build failed | Aligned with `expo install`; `./gradlew :app:compileDebugKotlin` BUILD SUCCESSFUL |
+| 35 | — | **Event Radar** (BLE, Android): event join by code/QR/Events Hub, rotating 15-min tokens, Kalman-smoothed distance ranges, consent-based contact exchange, incognito, browser fallback | 16 SQL tests (PGlite), 10 unit, 18 E2E (2 viewports), live suite ready |
+
+Before Radar works in production: run `supabase/migrations/20261002_event_radar.sql` and build a new APK (the Bluetooth module is native code; OTA updates can't deliver it).
 
 ## Test assets
 
