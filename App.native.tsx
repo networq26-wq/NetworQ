@@ -15,7 +15,7 @@ import {
 } from "react-native";
 // react-native's SafeAreaView is iOS-only; with Android edge-to-edge the WebView
 // would otherwise draw under the status bar and the gesture/navigation bar.
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView, initialWindowMetrics, useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useRadarBridge } from "./radar/shellBridge";
 import { SHELL_CAPABILITIES_JS, useGoogleAuthBridge } from "./shell/googleAuth";
@@ -25,7 +25,7 @@ const TARGET_URL = "https://www.networq.co.in";
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <Shell />
     </SafeAreaProvider>
   );
@@ -35,8 +35,28 @@ function Shell() {
   const webViewRef = useRef<React.ElementRef<typeof WebView>>(null);
   const [canGoBack, setCanGoBack] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const insets = useSafeAreaInsets();
   const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
   const googleAuth = useGoogleAuthBridge(webViewRef, TARGET_URL);
+
+  const safeAreaScript = `
+    (function() {
+      try {
+        var s = document.getElementById('networq-native-safe-insets');
+        if (!s) {
+          s = document.createElement('style');
+          s.id = 'networq-native-safe-insets';
+          (document.head || document.documentElement).appendChild(s);
+        }
+        s.textContent = ':root { --safe-top: ${insets.top}px !important; --safe-bottom: ${insets.bottom}px !important; --safe-left: ${insets.left}px !important; --safe-right: ${insets.right}px !important; }';
+      } catch(e) {}
+    })();
+    true;
+  `;
+
+  useEffect(() => {
+    webViewRef.current?.injectJavaScript(safeAreaScript);
+  }, [insets.top, insets.bottom, insets.left, insets.right]);
 
   // Hardware back: let the web app close overlays / go to the previous tab first;
   // on the home screen, a second press within 2 s exits.
@@ -91,7 +111,7 @@ function Shell() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+    <SafeAreaView style={styles.container} edges={hasError ? ["top", "bottom", "left", "right"] : []}>
       <StatusBar barStyle="light-content" backgroundColor="#0B0F19" translucent />
       {/* Edge-to-edge windows aren't resized for the keyboard — pad instead so inputs stay visible */}
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "android" ? "padding" : undefined}>
@@ -120,7 +140,7 @@ function Shell() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
-          injectedJavaScriptBeforeContentLoaded={SHELL_CAPABILITIES_JS}
+          injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}`}
           onMessage={(e) => {
             if (e.nativeEvent.url.startsWith(TARGET_URL)) handleNavMessage(e.nativeEvent.data);
             radarBridge.onMessage(e);

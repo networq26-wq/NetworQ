@@ -64,13 +64,16 @@ export function IntroductionsModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: 16,
+        padding: "max(16px, calc(var(--safe-top, 0px) + 12px)) max(16px, calc(var(--safe-right, 0px) + 12px)) max(16px, calc(var(--safe-bottom, 0px) + 12px)) max(16px, calc(var(--safe-left, 0px) + 12px))",
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
           width: "100%",
           maxWidth: 480,
+          maxHeight: "min(92dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))",
+          overflowY: "auto",
           background: isDark ? "#121826" : "#FFFFFF",
           color: isDark ? "#F8FAFC" : "#0F172A",
           borderRadius: 24,

@@ -1218,9 +1218,11 @@ function CommandPalette({
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "center",
-        paddingTop: "14vh",
-        paddingLeft: 20,
-        paddingRight: 20,
+        paddingTop: "max(12vh, calc(var(--safe-top, 0px) + 24px))",
+        paddingBottom: "max(20px, calc(var(--safe-bottom, 0px) + 20px))",
+        paddingLeft: "max(20px, calc(var(--safe-left, 0px) + 16px))",
+        paddingRight: "max(20px, calc(var(--safe-right, 0px) + 16px))",
+        boxSizing: "border-box",
         animation: "fadeIn 0.15s ease",
       }}
       onClick={onClose}
@@ -2873,14 +2875,24 @@ Keep it punchy, sharp, and directly actionable.`;
   }, [isDark]);
 
   const CSS = `
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
-      height: 100%;
+      min-height: 100%;
+      min-height: 100dvh;
       width: 100%;
+      max-width: 100vw;
+      overflow-x: hidden;
       overflow-y: auto !important;
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       letter-spacing: -0.012em;
       -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
       background-color: ${isDark ? "#000000" : "#F5F5F7"};
     }
     
@@ -2935,8 +2947,10 @@ Keep it punchy, sharp, and directly actionable.`;
   const S = useMemo(
     () => ({
       page: {
-        minHeight: "100vh",
+        minHeight: "100dvh",
         width: "100%",
+        maxWidth: "100vw",
+        boxSizing: "border-box" as const,
         background: themeStyles.bg,
         color: themeStyles.text,
         fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
@@ -3714,7 +3728,7 @@ Keep it punchy, sharp, and directly actionable.`;
       />
 
       {/* ── AUTHENTIC SAAS APP SHELL (Brand Identity Guideline Page 12) ── */}
-      <div style={{ display: isMobile ? "block" : "flex", minHeight: "100vh", width: "100%" }}>
+      <div style={{ display: isMobile ? "block" : "flex", minHeight: "100dvh", width: "100%", maxWidth: "100vw", overflowX: "hidden" }}>
         {/* DESKTOP SIDEBAR */}
         {!isMobile && (
           <aside
@@ -3729,7 +3743,7 @@ Keep it punchy, sharp, and directly actionable.`;
               padding: "20px 14px",
               position: "sticky",
               top: 0,
-              height: "100vh",
+              height: "100dvh",
               boxSizing: "border-box",
               zIndex: 50,
             }}
@@ -4007,10 +4021,14 @@ Keep it punchy, sharp, and directly actionable.`;
           {/* Top Header Bar */}
           <header
             style={{
-              height: 60,
+              minHeight: isMobile ? "calc(56px + var(--safe-top, env(safe-area-inset-top, 0px)))" : 60,
+              height: isMobile ? undefined : 60,
               borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`,
               background: isDark ? "#0D1022" : "#FFFFFF",
-              padding: isMobile ? "0 14px" : "0 28px",
+              paddingTop: isMobile ? "var(--safe-top, env(safe-area-inset-top, 0px))" : 0,
+              paddingBottom: 0,
+              paddingLeft: isMobile ? "max(14px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 14px))" : "28px",
+              paddingRight: isMobile ? "max(14px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 14px))" : "28px",
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
@@ -4018,6 +4036,7 @@ Keep it punchy, sharp, and directly actionable.`;
               position: "sticky",
               top: 0,
               zIndex: 40,
+              boxSizing: "border-box",
             }}
           >
             {isMobile ? (
@@ -4233,7 +4252,10 @@ Keep it punchy, sharp, and directly actionable.`;
           <div
             style={{
               flex: 1,
-              padding: isMobile ? "16px 16px calc(130px + env(safe-area-inset-bottom))" : "28px 36px 60px",
+              paddingTop: isMobile ? 16 : 28,
+              paddingBottom: isMobile ? "calc(110px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 60,
+              paddingLeft: isMobile ? "max(16px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 16px))" : "36px",
+              paddingRight: isMobile ? "max(16px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 16px))" : "36px",
               maxWidth: 1280,
               width: "100%",
               margin: "0 auto",
@@ -5790,7 +5812,8 @@ Keep it punchy, sharp, and directly actionable.`;
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 20,
+            padding: "max(20px, calc(var(--safe-top, 0px) + 16px)) max(20px, calc(var(--safe-right, 0px) + 16px)) max(20px, calc(var(--safe-bottom, 0px) + 16px)) max(20px, calc(var(--safe-left, 0px) + 16px))",
+            boxSizing: "border-box",
             animation: "fadeIn 0.15s ease",
           }}
           onClick={() => {
@@ -5803,7 +5826,7 @@ Keep it punchy, sharp, and directly actionable.`;
               ...S.card,
               maxWidth: 540,
               width: "100%",
-              maxHeight: "88vh",
+              maxHeight: "min(88dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))",
               overflowY: "auto",
               animation: "fadeUp 0.2s ease",
             }}
@@ -6057,12 +6080,13 @@ Keep it punchy, sharp, and directly actionable.`;
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 20,
+            padding: "max(20px, calc(var(--safe-top, 0px) + 16px)) max(20px, calc(var(--safe-right, 0px) + 16px)) max(20px, calc(var(--safe-bottom, 0px) + 16px)) max(20px, calc(var(--safe-left, 0px) + 16px))",
+            boxSizing: "border-box",
             animation: "fadeIn 0.15s ease",
           }}
           onClick={() => setMeetModal(null)}
         >
-          <div style={{ ...S.card, maxWidth: 460, width: "100%", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
+          <div style={{ ...S.card, maxWidth: 460, width: "100%", maxHeight: "min(90dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Schedule Meeting</div>
               <button aria-label="Close" onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
@@ -6124,9 +6148,9 @@ Keep it punchy, sharp, and directly actionable.`;
         <div
           style={{
             position: "fixed",
-            bottom: "max(14px, env(safe-area-inset-bottom, 14px))",
-            left: 14,
-            right: 14,
+            bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)",
+            left: "max(14px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 14px))",
+            right: "max(14px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 14px))",
             maxWidth: 440,
             margin: "0 auto",
             height: 64,
@@ -6143,6 +6167,7 @@ Keep it punchy, sharp, and directly actionable.`;
               ? "0 16px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.12)"
               : "0 16px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255,255,255,0.8)",
             padding: "4px 8px",
+            boxSizing: "border-box",
           }}
         >
           {[
@@ -6230,7 +6255,8 @@ Keep it punchy, sharp, and directly actionable.`;
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 20,
+            padding: "max(20px, calc(var(--safe-top, 0px) + 16px)) max(20px, calc(var(--safe-right, 0px) + 16px)) max(20px, calc(var(--safe-bottom, 0px) + 16px)) max(20px, calc(var(--safe-left, 0px) + 16px))",
+            boxSizing: "border-box",
             animation: "fadeIn 0.15s ease",
           }}
           onClick={() => !bulkSending && setBulkEmailModalOpen(false)}
@@ -6240,7 +6266,7 @@ Keep it punchy, sharp, and directly actionable.`;
               ...S.card,
               maxWidth: 680,
               width: "100%",
-              maxHeight: "85vh",
+              maxHeight: "min(88dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))",
               display: "flex",
               flexDirection: "column",
               padding: 24,
@@ -6450,13 +6476,16 @@ Keep it punchy, sharp, and directly actionable.`;
             // Phones: full-screen sheet above the tab bar; desktop: floating panel
             top: isMobile ? 0 : undefined,
             left: isMobile ? 0 : undefined,
-            bottom: isMobile ? 0 : 26,
-            right: isMobile ? 0 : 28,
+            bottom: isMobile ? 0 : "calc(var(--safe-bottom, 0px) + 26px)",
+            right: isMobile ? 0 : "calc(var(--safe-right, 0px) + 28px)",
             width: isMobile ? "100%" : 390,
-            height: isMobile ? "100%" : 560,
-            maxHeight: isMobile ? "none" : 600,
-            paddingTop: isMobile ? "env(safe-area-inset-top)" : 0,
-            paddingBottom: isMobile ? "env(safe-area-inset-bottom)" : 0,
+            height: isMobile ? "100dvh" : 560,
+            maxHeight: isMobile ? "100dvh" : 600,
+            paddingTop: isMobile ? "var(--safe-top, env(safe-area-inset-top, 0px))" : 0,
+            paddingBottom: isMobile ? "var(--safe-bottom, env(safe-area-inset-bottom, 0px))" : 0,
+            paddingLeft: isMobile ? "var(--safe-left, env(safe-area-inset-left, 0px))" : 0,
+            paddingRight: isMobile ? "var(--safe-right, env(safe-area-inset-right, 0px))" : 0,
+            boxSizing: "border-box",
             zIndex: 1200,
             borderRadius: isMobile ? 0 : 22,
             background: isDark ? "rgba(22, 22, 23, 0.96)" : "rgba(255, 255, 255, 0.98)",
@@ -6993,7 +7022,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div
           style={{
             position: "fixed",
-            bottom: isMobile ? 80 : 30,
+            bottom: isMobile ? "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 84px)" : "calc(var(--safe-bottom, 0px) + 30px)",
             left: "50%",
             transform: "translateX(-50%)",
             background: toast.type === "success" ? "#10B981" : "#EF4444",
@@ -7040,7 +7069,7 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
       <div
         role="alert"
         style={{
-          minHeight: "100vh",
+          minHeight: "100dvh",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

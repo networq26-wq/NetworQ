@@ -159,7 +159,7 @@ test("final two-user E2E (live)", async ({ page }) => {
     await nav(A, "Events");
     await expect(A.getByRole("list", { name: "Upcoming events" })).toBeVisible({ timeout: 30_000 });
     const all = await A.getByRole("group", { name: "Filter by category" }).getByRole("button").first().innerText();
-    await A.getByLabel("City").selectOption("All India");
+    await A.getByRole("combobox", { name: "City" }).selectOption("All India");
     await A.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "This month" }).click();
     const count = await A.getByText(/^\d+ events?$/).innerText();
     await A.getByRole("button", { name: "Clear filters" }).click();
