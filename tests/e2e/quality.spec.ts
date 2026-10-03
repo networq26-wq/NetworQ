@@ -43,26 +43,90 @@ for (const width of [375, 390, 768, 1280, 1440]) {
   });
 }
 
-test("follow-up email is sent through the authenticated backend", async ({ page, db, sentEmails }) => {
+test("AI outreach: research → 3 drafts → review → send, logged on the timeline", async ({ page, db, sentEmails }) => {
   const u = db.addUser("asha@acme.test", PASSWORD, { profile: PROFILE });
-  db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", email: "ravi@kumar.test", added_at: new Date().toISOString() });
+  db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", email: "ravi@kumar.test", company: "Kumar Freight", website: "kumarfreight.test", added_at: new Date().toISOString() });
   let authHeader = "";
+  const draftBodies: any[] = [];
   await page.route("**/api/email", (route) => {
     authHeader = route.request().headers()["authorization"] || "";
     sentEmails.push(JSON.parse(route.request().postData() || "{}"));
-    return route.fulfill({ json: { ok: true, provider: "mock" } });
+    return route.fulfill({ json: { ok: true, provider: "resend", id: "re_123" } });
   });
+  await page.route("**/api/prospect/research", (route) =>
+    route.fulfill({
+      json: {
+        research: {
+          id: "r1", contact_id: "c1", domain: "kumarfreight.test", created_at: new Date().toISOString(),
+          sources: [{ id: "S1", kind: "homepage", url: "https://kumarfreight.test/", title: "Kumar Freight" }, { id: "SOC-linkedin", kind: "social", url: "https://linkedin.com/company/kf", title: "Linkedin (link only)" }, { id: "CRM", kind: "crm", url: null, title: "Card" }],
+          brief: {
+            company: { name: "Kumar Freight", offerings: [{ text: "Cold-chain trucking", source: "S1", evidence: "cold-chain trucking", status: "verified" }], audience: [], initiatives: [{ text: "Raised $20M", source: "S1", evidence: "x", status: "unverified" }], positioning: [], locations: [] },
+            person: { role_context: [] },
+            signals: [{ text: "New Pune depot", source: "S1", evidence: "opened a depot in Pune", status: "verified" }],
+            potential_needs: [{ text: "May want more pharma clients", status: "inferred", based_on: ["S1"] }],
+          },
+          limitations: ["Social profiles (linkedin) were found on the website, but their contents need sign-in and can't be read automatically — only the links are recorded."],
+        },
+        contact: {},
+      },
+    })
+  );
+  const mk = (option: string, body: string) => ({ option, subjects: [`Subject ${option}`, `Other ${option}`], body: `${body}\n\nAsha`, used: [{ claim: "Pune depot", source: "S1" }, { claim: "met", source: "USER" }], checked: true, warnings: [], words: 120 });
+  await page.route("**/api/prospect/draft", (route) => {
+    const body = JSON.parse(route.request().postData() || "{}");
+    draftBodies.push(body);
+    const drafts = body.options ? [mk(body.options[0], `Shorter ${body.options[0]}`)] : [mk("A", "Hi Ravi, great meeting you."), mk("B", "Saw the new Pune depot."), mk("C", "If pharma growth is a priority…")];
+    return route.fulfill({ json: { drafts, tone: body.tone, emailType: body.emailType } });
+  });
+
   await login(page, "asha@acme.test");
   await page.getByText("Ravi Kumar", { exact: true }).first().click();
-  await page.getByRole("button", { name: "Intro Email" }).click();
-  const send = page.getByRole("button", { name: "Send Email" });
-  await expect(send).toBeVisible();
-  await expect(send).toBeEnabled({ timeout: 15_000 });
-  await send.click();
-  await expect(page.getByText("Email sent to ravi@kumar.test")).toBeVisible();
-  expect(sentEmails[0]).toMatchObject({ to: "ravi@kumar.test" });
+  await page.getByRole("button", { name: "Write Email" }).click();
+  const dlg = page.getByRole("dialog", { name: "Write email to Ravi Kumar" });
+  await dlg.getByLabel("Role").fill("COO");
+  await dlg.getByRole("button", { name: "Research Kumar Freight" }).click();
+  const results = dlg.getByLabel("Research results");
+  await expect(results.getByText("New Pune depot")).toBeVisible();
+  await expect(results.getByLabel("Not verified")).toHaveCount(1);
+  await expect(results.getByText("May want more pharma clients")).toBeVisible();
+  await expect(results.getByText(/need sign-in/)).toBeVisible();
+
+  await dlg.getByRole("button", { name: "Continue" }).click();
+  await expect(dlg.getByText("Tell the AI what your company does")).toBeVisible();
+  await dlg.getByLabel("How you met & what they said").fill("Met at FreightTech. Wants pharma clients.");
+  await dlg.getByRole("button", { name: "Lead generation" }).click();
+  await dlg.getByRole("radio", { name: "Executive" }).click();
+  await dlg.getByRole("button", { name: "Generate 3 drafts" }).click();
+  for (const o of ["A", "B", "C"]) await expect(dlg.getByRole("region", { name: `Option ${o}` })).toBeVisible();
+  expect(draftBodies[0]).toMatchObject({ contactId: "c1", researchId: "r1", manualContext: "Met at FreightTech. Wants pharma clients.", valueProps: ["Lead generation"], tone: "Executive", emailType: "Networking follow-up" });
+  await expect(dlg.getByRole("region", { name: "Option B" }).getByText("Company website")).toBeVisible();
+
+  await dlg.getByRole("button", { name: "Refine option C" }).click();
+  await dlg.getByRole("button", { name: "Shorter" }).click();
+  await expect(dlg.getByText("Shorter C")).toBeVisible();
+  expect(draftBodies[1]).toMatchObject({ options: ["C"], refine: { kind: "shorter" } });
+
+  const b = dlg.getByRole("region", { name: "Option B" });
+  await b.getByRole("radio", { name: "Other B" }).click();
+  await dlg.getByRole("button", { name: "Use option B" }).click();
+  await expect(dlg.getByLabel("Subject")).toHaveValue("Other B");
+  await dlg.getByLabel("Message").fill("Hi Ravi, edited by me.\n\nAsha");
+  await dlg.getByRole("button", { name: "Send email" }).click();
+  expect(sentEmails).toHaveLength(0); // first tap only asks for confirmation
+  await dlg.getByRole("button", { name: /Tap again to send/ }).click();
+  await expect(dlg.getByText("Email sent")).toBeVisible();
+  expect(sentEmails[0]).toMatchObject({ to: "ravi@kumar.test", subject: "Other B", body: "Hi Ravi, edited by me.\n\nAsha" });
   expect(authHeader).toMatch(/^Bearer ey/);
+  const log = db.table("follow_up_emails")[0];
+  expect(log).toMatchObject({ contact_id: "c1", subject: "Other B", draft_option: "B", research_id: "r1", provider_id: "re_123", value_props: ["Lead generation"], tone: "Executive", sent: true });
   expect(db.table("contacts")[0].email_sent).toBe(true);
+
+  await dlg.getByRole("button", { name: "Done" }).click();
+  await page.getByText("Ravi Kumar", { exact: true }).first().click();
+  const timeline = page.getByLabel("Email timeline");
+  await expect(timeline.getByText("Other B")).toBeVisible();
+  await timeline.getByRole("radio", { name: "Replied" }).click();
+  await expect.poll(() => db.table("follow_up_emails")[0].reply_status).toBe("replied");
 });
 
 test("API health endpoint is live", async ({ request }) => {

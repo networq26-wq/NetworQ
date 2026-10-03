@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PasswordInput } from "../ui/PasswordInput";
 import type { AccountApi } from "./accountApi";
+import { OrganizationForm } from "../prospect/OrganizationForm";
+import type { ProspectApi } from "../prospect/prospectApi";
 
 const PURPLE = "#7C3AED";
 type Toast = (message: string, type?: "success" | "error" | "info") => void;
@@ -49,6 +51,7 @@ export function SettingsScreen({
   onExportContacts,
   onToggleTheme,
   onSignOut,
+  prospectApi,
 }: {
   supabase: SupabaseClient;
   account: AccountApi;
@@ -60,6 +63,7 @@ export function SettingsScreen({
   onExportContacts: () => void;
   onToggleTheme: () => void;
   onSignOut: () => void;
+  prospectApi?: ProspectApi;
 }) {
   const t = theme(isDark);
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
@@ -285,6 +289,13 @@ export function SettingsScreen({
           {savingProfile ? "Saving…" : "Save profile"}
         </button>
       </section>
+
+      {prospectApi && currentUser?.id && (
+        <section style={card} aria-labelledby="settings-org">
+          <h3 id="settings-org" style={{ margin: "0 0 4px", fontSize: 18 }}>Your organization</h3>
+          <OrganizationForm supabase={supabase} api={prospectApi} userId={currentUser.id} isDark={isDark} showToast={showToast} />
+        </section>
+      )}
 
       <section style={card} aria-labelledby="settings-security">
         <h3 id="settings-security" style={{ margin: "0 0 4px", fontSize: 18 }}>Security</h3>

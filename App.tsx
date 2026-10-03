@@ -10,6 +10,9 @@ import { createVoicePlayer } from "./voice/voicePlayer";
 import { useNotifications, haptic, type AppNotification } from "./notifications/useNotifications";
 import { NotificationCenter } from "./notifications/NotificationCenter";
 import { CameraCapture } from "./scanner/CameraCapture";
+import { ProspectComposer } from "./prospect/ProspectComposer";
+import { OutreachTimeline } from "./prospect/OutreachTimeline";
+import { createProspectApi } from "./prospect/prospectApi";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -1002,24 +1005,6 @@ ${fromUser?.role || ""}${myCompany}`;
   return { subject, body, raw: `Subject: ${subject}\n\n${body}` };
 }
 
-async function genIntroEmail(fromUser: any, toContact: any, customAngle?: string) {
-  try {
-    const prompt = customAngle
-      ? `Write a concise, professional executive follow-up email from ${fromUser.name} (${fromUser.role} at ${fromUser.company}) to ${toContact.name} (${toContact.title || ""} at ${toContact.company || ""}). Focus angle: ${customAngle}. Format: first line Subject: ..., blank line, then 3 concise paragraphs.`
-      : `Write a concise, executive follow-up email from ${fromUser.name} (${fromUser.role} at ${fromUser.company}) to ${toContact.name} (${toContact.title || ""} at ${toContact.company || ""}). They met at ${toContact.event || "a networking event"}. Format: first line = Subject: ..., blank line, then body.`;
-
-    const res = await callAI(
-      [{ role: "user", content: prompt }],
-      "You write polished, concise, executive networking follow-up emails in a direct Apple/Google tone.",
-      { action: "email_generation" }
-    );
-    if (res && res.trim().length > 30) return res;
-  } catch (err) {
-    console.warn("AI generation note, using executive template:", err);
-  }
-  return generateExecutiveFollowUp(fromUser, toContact, customAngle).raw;
-}
-
 async function enrichCompanyDomain(urlOrDomain: string) {
   try {
     const res = await fetch("/api/enrich", {
@@ -1033,16 +1018,6 @@ async function enrichCompanyDomain(urlOrDomain: string) {
     console.warn("Company enrichment note:", e);
   }
   return null;
-}
-
-function parseEmailDraft(draft: string) {
-  const lines = draft.split("\n");
-  const subjectIdx = lines.findIndex((l) => /^subject:/i.test(l.trim()));
-  const subject = subjectIdx >= 0 ? lines[subjectIdx].replace(/^subject:\s*/i, "").trim() : "Following up";
-  const rest = subjectIdx >= 0 ? lines.slice(subjectIdx + 1) : lines;
-  const bodyStart = rest.findIndex((l) => l.trim() !== "");
-  const body = bodyStart >= 0 ? rest.slice(bodyStart).join("\n").trim() : draft.trim();
-  return { subject, body };
 }
 
 function loadGISScript(): Promise<void> {
@@ -1986,12 +1961,9 @@ function NetworQApp() {
   const [editingContact, setEditingContact] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [saveErr, setSaveErr] = useState("");
-  const [emailModal, setEmailModal] = useState<any>(null);
+  const [composer, setComposer] = useState<{ contact: any; type?: string } | null>(null);
+  const [outreachKey, setOutreachKey] = useState(0);
   const [meetModal, setMeetModal] = useState<any>(null);
-  const [generatingEmail, setGeneratingEmail] = useState(false);
-  const [generatedEmail, setGeneratedEmail] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
-  const [emailSending, setEmailSending] = useState(false);
   const [bulkEmailModalOpen, setBulkEmailModalOpen] = useState(false);
   const [bulkDrafts, setBulkDrafts] = useState<any[]>([]);
   const [bulkSending, setBulkSending] = useState(false);
@@ -2477,7 +2449,7 @@ VOICE & ASSISTANT DIRECTIVES:
     }
     if (notifOpen) return setNotifOpen(false), true;
     if (liveCameraOpen) return setLiveCameraOpen(false), true;
-    if (emailModal) return setEmailModal(null), true;
+    if (composer) return setComposer(null), true;
     if (meetModal) return setMeetModal(null), true;
     if (bulkEmailModalOpen) return setBulkEmailModalOpen(false), true;
     if (modal) return setModal(null), setPrepBrief(null), true;
@@ -2938,21 +2910,8 @@ VOICE & ASSISTANT DIRECTIVES:
     }
   };
 
-  const openEmail = async (contact: any, angle?: string) => {
-    setEmailModal(contact);
-    setEmailSent(false);
-    setGeneratedEmail("");
-    setGeneratingEmail(true);
-    try {
-      const text = await genIntroEmail(currentUser, contact, angle);
-      setGeneratedEmail(text);
-    } catch (err: any) {
-      setGeneratedEmail("");
-      showToast(err.message || "Failed to generate email.", "error");
-    } finally {
-      setGeneratingEmail(false);
-    }
-  };
+  // Research the prospect, then draft three fact-checked emails (prospect/ProspectComposer.tsx)
+  const openEmail = (contact: any, type?: string) => setComposer({ contact, type });
 
   const generateAIPrepBrief = async (contact: any) => {
     setPrepLoading(true);
@@ -3009,42 +2968,6 @@ Keep it punchy, sharp, and directly actionable.`;
       }
     };
     recognition.start();
-  };
-
-  const sendEmail = async () => {
-    if (!emailModal?.email) {
-      showToast("This contact has no email address.", "error");
-      return;
-    }
-    setEmailSending(true);
-    try {
-      const { subject, body } = parseEmailDraft(generatedEmail);
-      await sendEmailViaServer({
-        to: emailModal.email,
-        subject,
-        body,
-        fromName: currentUser?.name || "",
-        replyTo: currentUser?.email || "",
-      });
-      await supabase.from("follow_up_emails").insert({
-        user_id: currentUser?.id,
-        contact_id: emailModal.id,
-        draft: generatedEmail,
-        sent: true,
-        sent_at: new Date().toISOString(),
-      });
-      await supabase.from("contacts").update({ email_sent: true }).eq("id", emailModal.id);
-      setContacts((prev) => prev.map((c) => (c.id === emailModal.id ? { ...c, emailSent: true } : c)));
-      setEmailSent(true);
-      triggerConfetti();
-      showToast(`Email sent to ${emailModal.email}`, "success");
-      setTimeout(() => setEmailModal(null), 2000);
-    } catch (err: any) {
-      console.error("Email send error:", err);
-      showToast(err?.text || err?.message || "Failed to send email.", "error");
-    } finally {
-      setEmailSending(false);
-    }
   };
 
   const sendMeeting = async () => {
@@ -3206,6 +3129,7 @@ Keep it punchy, sharp, and directly actionable.`;
   };
 
   const accountApi = useMemo(() => createAccountApi(supabase, apiBase(AI_PROXY)), []);
+  const prospectApi = useMemo(() => createProspectApi(supabase, apiBase(AI_PROXY)), []);
 
   const openProfileModal = () => setTab("settings");
 
@@ -5868,6 +5792,7 @@ Keep it punchy, sharp, and directly actionable.`;
             onSignedOut={handleSignedOut}
             onExportContacts={exportCSV}
             onToggleTheme={toggleTheme}
+            prospectApi={prospectApi}
             onSignOut={async () => {
               await supabase.auth.signOut();
               handleSignedOut();
@@ -6485,13 +6410,21 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             )}
 
+            <OutreachTimeline
+              supabase={supabase}
+              contactId={modal.id}
+              isDark={isDark}
+              refreshKey={outreachKey}
+              onFollowUp={() => { setModal(null); openEmail(modal, "Follow-up"); }}
+            />
+
             <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
               <button
                 style={{ ...S.btn, flex: 1, fontSize: 12, padding: "9px 12px" }}
                 onClick={() => { setModal(null); openEmail(modal); }}
               >
                 <Icons.Mail size={13} />
-                <span>Intro Email</span>
+                <span>Write Email</span>
               </button>
               <button
                 style={{ ...S.btn, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", flex: 1, fontSize: 12, padding: "9px 12px" }}
@@ -6537,66 +6470,23 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* ── EMAIL MODAL ── */}
-      {emailModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            backdropFilter: "blur(18px)",
-            WebkitBackdropFilter: "blur(18px)",
-            zIndex: 350,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 20,
-            animation: "fadeIn 0.15s ease",
+      {composer && currentUser?.id && (
+        <ProspectComposer
+          supabase={supabase}
+          api={prospectApi}
+          contact={composer.contact}
+          initialType={composer.type}
+          currentUser={currentUser}
+          isDark={isDark}
+          showToast={showToast}
+          sendEmail={sendEmailViaServer}
+          onClose={() => setComposer(null)}
+          onSent={(id) => {
+            setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, emailSent: true } : c)));
+            setOutreachKey((k) => k + 1);
+            triggerConfetti();
           }}
-          onClick={() => setEmailModal(null)}
-        >
-          <div style={{ ...S.card, maxWidth: 540, width: "100%", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Intro Email to {emailModal.name}</div>
-              <button aria-label="Close" onClick={() => setEmailModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
-                <Icons.Close size={15} />
-              </button>
-            </div>
-
-            <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "8px 12px", marginBottom: 14, fontSize: 12, color: themeStyles.textMuted }}>
-              Recipient: <strong style={{ color: themeStyles.text }}>{emailModal.email || "(no email on record)"}</strong>
-            </div>
-
-            {generatingEmail ? (
-              <div style={{ textAlign: "center", padding: "36px 0" }}>
-                <div style={{ width: 34, height: 34, border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`, borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
-                <div style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 13 }}>Generating personalized follow-up draft…</div>
-              </div>
-            ) : emailSent ? (
-              <div style={{ textAlign: "center", padding: "36px 0" }}>
-                <Icons.CheckCircle size={44} style={{ margin: "0 auto 10px" }} />
-                <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Email Sent</div>
-                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Delivered to {emailModal.email}</div>
-              </div>
-            ) : (
-              <>
-                <textarea
-                  value={generatedEmail}
-                  onChange={(e) => setGeneratedEmail(e.target.value)}
-                  style={{ ...S.input, height: 210, resize: "none", fontSize: 13, lineHeight: 1.6, marginBottom: 14, fontFamily: "inherit" }}
-                />
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button style={{ ...S.btnOutline, flex: 1 }} onClick={() => openEmail(emailModal)} disabled={emailSending}>
-                    Regenerate
-                  </button>
-                  <button style={{ ...S.btn, flex: 2, opacity: emailSending ? 0.6 : 1 }} onClick={sendEmail} disabled={emailSending}>
-                    <Icons.Send size={14} />
-                    <span>{emailSending ? "Sending…" : "Send Email"}</span>
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        />
       )}
 
       {/* ── MEETING MODAL ── */}

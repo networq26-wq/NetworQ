@@ -46,7 +46,7 @@ async function assertPublicUrl(parsed) {
   }
 }
 
-async function fetchHtml(targetUrl, timeoutMs = 5000, redirectsLeft = 3) {
+async function fetchHtml(targetUrl, timeoutMs = 5000, redirectsLeft = 3, userAgent) {
   const parsed = new URL(targetUrl);
   await assertPublicUrl(parsed);
   return new Promise((resolve, reject) => {
@@ -56,7 +56,7 @@ async function fetchHtml(targetUrl, timeoutMs = 5000, redirectsLeft = 3) {
         parsed,
         {
           headers: {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "User-Agent": userAgent || "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
             Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           },
           timeout: timeoutMs,
@@ -66,7 +66,7 @@ async function fetchHtml(targetUrl, timeoutMs = 5000, redirectsLeft = 3) {
             res.resume();
             if (redirectsLeft <= 0) return reject(new Error("Too many redirects"));
             const redirectUrl = new URL(res.headers.location, targetUrl).href;
-            return fetchHtml(redirectUrl, timeoutMs, redirectsLeft - 1).then(resolve).catch(reject);
+            return fetchHtml(redirectUrl, timeoutMs, redirectsLeft - 1, userAgent).then(resolve).catch(reject);
           }
           if (res.statusCode !== 200) {
             return reject(new Error(`HTTP ${res.statusCode}`));
