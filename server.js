@@ -14,6 +14,7 @@ const { createAccountRouter, productionDeps, purgeDeletedAccounts } = require(".
 const { createEventsRouter, productionDeps: eventsDeps } = require("./api/events");
 const { startEventsCrawler } = require("./api/eventsCrawler");
 const { createTtsRouter, productionDeps: ttsDeps } = require("./api/tts");
+const { createNotifyHookRouter, productionDeps: notifyDeps } = require("./api/notifyHook");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -263,6 +264,10 @@ if (process.env.NODE_ENV !== "production") {
     res.json({ heard });
   });
 }
+
+// ── Database → server hook: connection emails ────────────────────────────────
+const notifyD = notifyDeps();
+if (notifyD) app.use("/api", createNotifyHookRouter(notifyD));
 
 // ── Natural voice for the AI assistant ───────────────────────────────────────
 const ttsD = ttsDeps();

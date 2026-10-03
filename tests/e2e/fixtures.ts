@@ -33,7 +33,9 @@ export const test = base.extend<Fixtures>({
       sentEmails.push(JSON.parse(route.request().postData() || "{}"));
       return route.fulfill({ json: { ok: true, provider: "mock" } });
     });
-    // Events import (api/events.js extraction is tested separately with real-page fixtures)
+    // Realtime websockets are not mocked: close them so tests never reach a real project (polling fallback is used)
+    await context.routeWebSocket(/supabase\.co/, (ws) => ws.close());
+        // Events import (api/events.js extraction is tested separately with real-page fixtures)
     await context.route("**/api/events/import", async (route) => {
       const req = route.request();
       if (!db.userFromRequest(req)) return route.fulfill({ status: 401, json: { error: "Please sign in again." } });

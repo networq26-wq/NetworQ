@@ -46,7 +46,7 @@ export interface IncomingRequest {
   created_at: string;
 }
 
-export type RequestStatus = "pending" | "accepted" | "declined";
+export type RequestStatus = "pending" | "accepted" | "declined" | "cancelled";
 
 const FRIENDLY: Record<string, string> = {
   invalid_code: "That event code doesn't exist. Check it and try again.",
@@ -56,6 +56,8 @@ const FRIENDLY: Record<string, string> = {
   not_authenticated: "Please sign in again.",
   cannot_connect_to_self: "That's you!",
   request_not_found: "This request is no longer available.",
+  unavailable: "This person isn't available to connect.",
+  cannot_block_self: "You can't block yourself.",
 };
 
 export class RadarError extends Error {
@@ -103,8 +105,12 @@ export function createRadarApi(supabase: SupabaseClient) {
       call<{ people: PublicProfile[]; hidden_count: number }>(supabase, "list_event_attendees", { p_event_id: eventId }),
     sendRequest: (eventId: string, toUser: string) => call<{ id: string; status: RequestStatus }>(supabase, "send_connection_request", { p_event_id: eventId, p_to_user: toUser }),
     myRequests: (eventId: string) =>
-      call<{ incoming: IncomingRequest[]; outgoing: { id: string; to_user: string; status: RequestStatus }[] }>(supabase, "my_connection_requests", { p_event_id: eventId }),
+      call<{ incoming: IncomingRequest[]; outgoing: { id: string | null; to_user: string; status: RequestStatus }[] }>(supabase, "my_connection_requests", { p_event_id: eventId }),
     respond: (requestId: string, accept: boolean) => call<{ status: RequestStatus }>(supabase, "respond_connection_request", { p_request_id: requestId, p_accept: accept }),
+    cancel: (requestId: string) => call<{ status: RequestStatus }>(supabase, "cancel_connection_request", { p_request_id: requestId }),
+    block: (userId: string) => call<void>(supabase, "block_user", { p_user: userId }),
+    unblock: (userId: string) => call<void>(supabase, "unblock_user", { p_user: userId }),
+    blockedUsers: () => call<{ user_id: string; name: string; blocked_at: string }[]>(supabase, "my_blocked_users"),
   };
 }
 

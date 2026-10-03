@@ -21,7 +21,7 @@ const b64url = (obj: object) => Buffer.from(JSON.stringify(obj)).toString("base6
 interface RadarEventRow { id: string; external_id: string | null; name: string; venue: string | null; starts_at: string | null; join_code: string | null; source: "listed" | "user"; created_by: string }
 interface AttendeeRow { event_id: string; user_id: string; last_seen_at: number; radar_on: boolean; visible: boolean; show_distance: boolean; show_profile: boolean }
 interface TokenRow { token: string; user_id: string; event_id: string; expires_at: number }
-interface RequestRow { id: string; event_id: string; from_user: string; to_user: string; status: "pending" | "accepted" | "declined"; created_at: string }
+interface RequestRow { id: string; event_id: string; from_user: string; to_user: string; status: "pending" | "accepted" | "declined" | "cancelled"; created_at: string }
 
 class RpcError extends Error {}
 
@@ -31,6 +31,14 @@ export class MockSupabase {
   attendees: AttendeeRow[] = [];
   tokens: TokenRow[] = [];
   requests: RequestRow[] = [];
+  blocks: { blocker: string; blocked: string }[] = [];
+
+  private notify(user: string, type: string, title: string, body: string, data: Record<string, unknown>) {
+    this.table("notifications").unshift({ id: randomUUID(), user_id: user, type, title, body, data, read_at: null, created_at: new Date().toISOString() });
+  }
+  private isBlocked(a: string, b: string) {
+    return this.blocks.some((x) => (x.blocker === a && x.blocked === b) || (x.blocker === b && x.blocked === a));
+  }
   users: MockUser[] = [];
   tables: Record<string, Row[]> = {};
   autoConfirm = true;
@@ -206,7 +214,7 @@ export class MockSupabase {
         const wanted: string[] = a.p_tokens || [];
         if (wanted.length > 64) throw new RpcError("too_many_tokens");
         const people = this.tokens
-          .filter((t) => t.event_id === a.p_event_id && wanted.includes(t.token) && t.expires_at > Date.now() && t.user_id !== uid)
+          .filter((t) => t.event_id === a.p_event_id && wanted.includes(t.token) && t.expires_at > Date.now() && t.user_id !== uid && !this.isBlocked(uid, t.user_id))
           .flatMap((t) => {
             const att = this.attendees.find((x) => x.event_id === t.event_id && x.user_id === t.user_id);
             if (!att || !att.radar_on || !att.visible) return [];
@@ -227,9 +235,15 @@ export class MockSupabase {
         if (a.p_to_user === uid) throw new RpcError("cannot_connect_to_self");
         this.member(a.p_event_id, a.p_to_user);
         let r = this.requests.find((x) => x.event_id === a.p_event_id && x.from_user === uid && x.to_user === a.p_to_user);
-        if (!r) {
-          r = { id: randomUUID(), event_id: a.p_event_id, from_user: uid, to_user: a.p_to_user, status: "pending", created_at: new Date().toISOString() };
-          this.requests.push(r);
+        if (this.isBlocked(uid, a.p_to_user)) throw new RpcError("unavailable");
+        if (!r || r.status === "cancelled") {
+          if (r) r.status = "pending";
+          else {
+            r = { id: randomUUID(), event_id: a.p_event_id, from_user: uid, to_user: a.p_to_user, status: "pending", created_at: new Date().toISOString() };
+            this.requests.push(r);
+          }
+          const from = this.table("profiles").find((x) => x.id === uid);
+          this.notify(a.p_to_user, "connection_request", `${from?.name || "Someone"} wants to connect`, "Accept to swap contact details.", { request_id: r.id, from_user: uid, event_id: a.p_event_id, screen: "radar" });
         }
         return r;
       }
@@ -246,6 +260,8 @@ export class MockSupabase {
         if (!r) throw new RpcError("request_not_found");
         if (r.status !== "pending") return r;
         r.status = a.p_accept ? "accepted" : "declined";
+        const me = this.table("profiles").find((x) => x.id === uid);
+        this.notify(r.from_user, a.p_accept ? "connection_accepted" : "connection_declined", a.p_accept ? `${me?.name} accepted your request` : "Connection request not accepted", a.p_accept ? "You're connected." : "", { request_id: r.id, from_user: uid, screen: a.p_accept ? "contacts" : "radar" });
         if (a.p_accept) {
           const eventName = this.events.find((e) => e.id === r.event_id)?.name;
           for (const [owner, person] of [[r.from_user, r.to_user], [r.to_user, r.from_user]]) {
@@ -255,6 +271,27 @@ export class MockSupabase {
           }
         }
         return r;
+      }
+      case "cancel_connection_request": {
+        const r = this.requests.find((x) => x.id === a.p_request_id && x.from_user === uid && x.status === "pending");
+        if (!r) throw new RpcError("request_not_found");
+        r.status = "cancelled";
+        this.tables["notifications"] = this.table("notifications").filter((n) => n.data?.request_id !== r.id);
+        return r;
+      }
+      case "block_user":
+        if (!this.blocks.some((x) => x.blocker === uid && x.blocked === a.p_user)) this.blocks.push({ blocker: uid, blocked: a.p_user });
+        this.requests.filter((r) => r.status === "pending" && ((r.from_user === uid && r.to_user === a.p_user) || (r.from_user === a.p_user && r.to_user === uid))).forEach((r) => (r.status = "cancelled"));
+        return null;
+      case "unblock_user":
+        this.blocks = this.blocks.filter((x) => !(x.blocker === uid && x.blocked === a.p_user));
+        return null;
+      case "my_blocked_users":
+        return this.blocks.filter((x) => x.blocker === uid).map((x) => ({ user_id: x.blocked, name: this.table("profiles").find((p) => p.id === x.blocked)?.name, blocked_at: new Date().toISOString() }));
+      case "mark_notifications_read": {
+        let n = 0;
+        for (const row of this.table("notifications")) if (row.user_id === uid && !row.read_at && (!a.p_ids || a.p_ids.includes(row.id))) { row.read_at = new Date().toISOString(); n++; }
+        return n;
       }
       default:
         throw new RpcError(`unknown function ${fn}`);

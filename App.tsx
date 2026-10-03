@@ -7,6 +7,8 @@ import { apiBase, createAccountApi } from "./settings/accountApi";
 import { PasswordInput } from "./ui/PasswordInput";
 import { EventsHub } from "./events/EventsHub";
 import { createVoicePlayer } from "./voice/voicePlayer";
+import { useNotifications, haptic, type AppNotification } from "./notifications/useNotifications";
+import { NotificationCenter } from "./notifications/NotificationCenter";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -2088,8 +2090,15 @@ function NetworQApp() {
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add" | "settings">("contacts");
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
   // Event invite links: https://www.networq.co.in/?join=NQ-XXXXXX (from the Radar share QR)
+  // Email links: /?open=radar | contacts | events | settings
+  const [openTarget] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const t = new URLSearchParams(window.location.search).get("open");
+    return t && ["radar", "contacts", "events", "settings"].includes(t) ? t : null;
+  });
   const [inviteCode] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const code = new URLSearchParams(window.location.search).get("join");
@@ -2560,6 +2569,17 @@ VOICE & ASSISTANT DIRECTIVES:
   }, [loadUserData]);
 
   useEffect(() => {
+    if (screen !== "app" || !openTarget) return;
+    setTab(openTarget as typeof tab);
+    try {
+      window.history.replaceState(null, "", window.location.pathname);
+    } catch {
+      /* non-browser host */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen, openTarget]);
+
+  useEffect(() => {
     if (screen !== "app" || !inviteCode) return;
     setRadarJoinCode(inviteCode);
     setTab("radar");
@@ -2570,6 +2590,42 @@ VOICE & ASSISTANT DIRECTIVES:
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, inviteCode]);
+
+  // ── Notifications (realtime) ──
+  const notif = useNotifications(supabase, currentUser?.id ?? null, (n: AppNotification) => {
+    if (n.type === "connection_request" || n.type === "connection_accepted") haptic([20, 40, 20]);
+    showToast(n.title, n.type === "connection_declined" ? "info" : "success");
+  });
+
+  const openNotification = (n: AppNotification) => {
+    notif.markRead([n.id]);
+    setNotifOpen(false);
+    const screen = n.data?.screen;
+    if (screen === "radar" || screen === "contacts" || screen === "events" || screen === "settings") setTab(screen);
+  };
+
+  // Contacts stay in sync in real time (e.g. a Radar connection accepted on another phone)
+  useEffect(() => {
+    const uid = currentUser?.id;
+    if (!uid) return;
+    const channel = supabase
+      .channel(`contacts:${uid}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "contacts", filter: `user_id=eq.${uid}` }, (payload: any) => {
+        if (payload.eventType === "INSERT") {
+          const c = dbToContact(payload.new);
+          setContacts((cur) => (cur.some((x) => x.id === c.id) ? cur : [c, ...cur]));
+        } else if (payload.eventType === "UPDATE") {
+          const c = dbToContact(payload.new);
+          setContacts((cur) => cur.map((x) => (x.id === c.id ? { ...x, ...c } : x)));
+        } else if (payload.eventType === "DELETE") {
+          setContacts((cur) => cur.filter((x) => x.id !== payload.old.id));
+        }
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
 
   // ── Android back button (handled by the app shell via window.__networqHandleBack) ──
   // Closes the top-most overlay first, then walks back through visited tabs.
@@ -2592,6 +2648,7 @@ VOICE & ASSISTANT DIRECTIVES:
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       return true;
     }
+    if (notifOpen) return setNotifOpen(false), true;
     if (liveCameraOpen) return setLiveCameraOpen(false), true;
     if (emailModal) return setEmailModal(null), true;
     if (meetModal) return setMeetModal(null), true;
@@ -4815,11 +4872,12 @@ Keep it punchy, sharp, and directly actionable.`;
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button
-                onClick={() => setRemindersOpen((o) => !o)}
+                onClick={() => setNotifOpen(true)}
                 title="Notifications & Reminders"
+                aria-label={notif.unread ? `Notifications, ${notif.unread} unread` : "Notifications & Reminders"}
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: isMobile ? 44 : 36,
+                  height: isMobile ? 44 : 36,
                   borderRadius: 9,
                   border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
                   background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
@@ -4831,9 +4889,13 @@ Keep it punchy, sharp, and directly actionable.`;
                   position: "relative",
                 }}
               >
-                <Icons.Bell size={16} />
-                {dueReminders.length > 0 && (
-                  <span style={{ position: "absolute", top: 7, right: 7, width: 7, height: 7, borderRadius: "50%", background: "#FF3B30" }} />
+                <Icons.Bell size={isMobile ? 18 : 16} />
+                {notif.unread > 0 ? (
+                  <span aria-hidden="true" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                    {notif.unread > 9 ? "9+" : notif.unread}
+                  </span>
+                ) : (
+                  dueReminders.length > 0 && <span style={{ position: "absolute", top: 7, right: 7, width: 7, height: 7, borderRadius: "50%", background: "#FF3B30" }} />
                 )}
               </button>
 
@@ -5981,6 +6043,22 @@ Keep it punchy, sharp, and directly actionable.`;
               setAddForm((f) => ({ ...f, event: eventName }));
               setTab("add");
               setAddStep("form");
+            }}
+          />
+        )}
+
+        {notifOpen && (
+          <NotificationCenter
+            isDark={isDark}
+            items={notif.items}
+            onOpen={openNotification}
+            onMarkAllRead={() => notif.markRead()}
+            onClose={() => setNotifOpen(false)}
+            dueReminders={dueReminders.length}
+            onOpenReminders={() => {
+              setNotifOpen(false);
+              setTab("contacts");
+              setRemindersOpen(true);
             }}
           />
         )}

@@ -30,7 +30,7 @@ export type RadarStatus =
 
 const RESOLVE_EVERY_MS = 2000;
 const RENDER_EVERY_MS = 1000;
-const REQUESTS_EVERY_MS = 10_000;
+const REQUESTS_EVERY_MS = 10_000; // safety net; realtime is the instant path
 const WEB_LIST_EVERY_MS = 15_000;
 const TOKEN_REFRESH_LEAD_MS = 120_000;
 const UNRESOLVABLE_RETRY_MS = 60_000;
@@ -52,6 +52,7 @@ const postNative = (msg: WebToNative) => {
 
 export function useEventRadar(opts: {
   api: RadarApi;
+  supabase?: import("@supabase/supabase-js").SupabaseClient;
   event: RadarEvent | null;
   onContactsChanged: () => void;
   onError?: (message: string) => void;
@@ -69,6 +70,7 @@ export function useEventRadar(opts: {
   const [hiddenCount, setHiddenCount] = useState(0);
   const [incoming, setIncoming] = useState<IncomingRequest[]>([]);
   const [outgoing, setOutgoing] = useState<Map<string, RequestStatus>>(new Map());
+  const [outgoingIds, setOutgoingIds] = useState<Map<string, string>>(new Map());
 
   const tracker = useRef(new ProximityTracker());
   const profiles = useRef(new Map<string, PublicProfile>());
@@ -250,7 +252,9 @@ export function useEventRadar(opts: {
     try {
       const res = await api.myRequests(eventId);
       setIncoming(res.incoming);
-      setOutgoing(new Map(res.outgoing.map((o) => [o.to_user, o.status])));
+      // cancelled requests read as "no request" so Connect is offered again
+      setOutgoing(new Map(res.outgoing.filter((o) => o.status !== "cancelled").map((o) => [o.to_user, o.status])));
+      setOutgoingIds(new Map(res.outgoing.filter((o) => o.id).map((o) => [o.to_user, o.id as string])));
     } catch {
       /* polled again shortly */
     }
@@ -259,8 +263,17 @@ export function useEventRadar(opts: {
   useEffect(() => {
     if (!eventId) return;
     loadRequests();
+    // Realtime: any change to a request involving me refreshes instantly; polling is the fallback
+    const channel = opts.supabase
+      ?.channel(`requests:${eventId}:${Math.random().toString(36).slice(2)}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "connection_requests", filter: `event_id=eq.${eventId}` }, () => loadRequests())
+      .subscribe();
     const timer = setInterval(loadRequests, REQUESTS_EVERY_MS);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (channel) opts.supabase?.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, loadRequests]);
 
   // ── Actions ────────────────────────────────────────────────────────────────
@@ -312,6 +325,40 @@ export function useEventRadar(opts: {
     [api, onContactsChanged, loadRequests]
   );
 
+  const cancelRequest = useCallback(
+    async (userId: string) => {
+      const id = outgoingIds.get(userId);
+      if (!id) return;
+      setOutgoing((m) => {
+        const n = new Map(m);
+        n.delete(userId);
+        return n;
+      });
+      try {
+        await api.cancel(id);
+      } catch (err: any) {
+        onErrorRef.current?.(err.message);
+      }
+      loadRequests();
+    },
+    [api, outgoingIds, loadRequests]
+  );
+
+  const block = useCallback(
+    async (userId: string) => {
+      try {
+        await api.block(userId);
+        setPeople((list) => list.filter((p) => p.userId !== userId));
+        setIncoming((list) => list.filter((r) => r.from_user !== userId));
+        profiles.current.delete(userId);
+      } catch (err: any) {
+        onErrorRef.current?.(err.message);
+      }
+      loadRequests();
+    },
+    [api, loadRequests]
+  );
+
   const openBluetoothSettings = useCallback(() => postNative({ type: "radar:openSettings" }), []);
   const retryPermissions = useCallback(() => setStartNonce((n) => n + 1), []);
 
@@ -339,6 +386,8 @@ export function useEventRadar(opts: {
     outgoing,
     connect,
     respond,
+    cancelRequest,
+    block,
     openBluetoothSettings,
     retryPermissions,
   };

@@ -7,6 +7,7 @@ import { RadarCanvas } from "./RadarCanvas";
 import { BUCKET_LABEL } from "./proximity";
 import { createRadarApi, type RadarEvent, type RadarSettings } from "./radarApi";
 import { useEventRadar, type RadarPerson, type RadarStatus } from "./useEventRadar";
+import { haptic } from "../notifications/useNotifications";
 
 const PURPLE = "#7C3AED";
 const STORAGE_KEY = "networq_radar_event";
@@ -149,6 +150,7 @@ export function EventRadar({
 
   const radar = useEventRadar({
     api,
+    supabase,
     event: activeEvent,
     onContactsChanged,
     onError: (m) => showToast(m, "error"),
@@ -234,12 +236,14 @@ export function EventRadar({
                     <button
                       style={btn(t, "primary")}
                       onClick={async () => {
+                        haptic([20, 40, 20]);
                         await radar.respond(r.id, true);
                         showToast(`${r.name} added to your contacts`, "success");
                       }}
                     >
                       Accept
                     </button>
+                    <ConfirmLink t={t} label="Block" confirmLabel="Block?" ariaLabel={`Block ${r.name}`} onConfirm={() => radar.block(r.from_user).then(() => showToast(`${r.name} blocked`, "info"))} />
                   </div>
                 ))}
               </div>
@@ -275,7 +279,19 @@ export function EventRadar({
           </section>
 
           {radar.settings?.radar_on && (
-            <NearbyList t={t} card={card} people={radar.people} outgoing={radar.outgoing} onSelect={setSelected} onConnect={radar.connect} mode={radar.mode} />
+            <NearbyList
+              t={t}
+              card={card}
+              people={radar.people}
+              outgoing={radar.outgoing}
+              onSelect={setSelected}
+              onConnect={(id) => {
+                haptic(25);
+                radar.connect(id);
+              }}
+              onCancel={radar.cancelRequest}
+              mode={radar.mode}
+            />
           )}
 
           {radar.settings && <PrivacyPanel t={t} card={card} settings={radar.settings} onChange={radar.updateSettings} />}
@@ -316,7 +332,18 @@ export function EventRadar({
             <p style={{ color: t.muted, fontSize: 13, maxWidth: 320 }}>
               Contact details are shared only if {selectedPerson.name.split(" ")[0]} accepts your request.
             </p>
-            <ConnectButton t={t} status={radar.outgoing.get(selectedPerson.userId)} onConnect={() => radar.connect(selectedPerson.userId)} wide />
+            <ConnectButton t={t} status={radar.outgoing.get(selectedPerson.userId)} onConnect={() => radar.connect(selectedPerson.userId)} onCancel={() => radar.cancelRequest(selectedPerson.userId)} wide />
+            <ConfirmLink
+              t={t}
+              label="Block"
+              confirmLabel="Tap again to block"
+              ariaLabel={`Block ${selectedPerson.name}`}
+              onConfirm={async () => {
+                await radar.block(selectedPerson.userId);
+                setSelected(null);
+                showToast(`${selectedPerson.name} blocked. You won't see each other on Radar.`, "info");
+              }}
+            />
           </div>
         </Sheet>
       )}
@@ -367,14 +394,39 @@ function DistanceChip({ t, person }: { t: Theme; person: RadarPerson }) {
   );
 }
 
-function ConnectButton({ t, status, onConnect, wide }: { t: Theme; status?: string; onConnect: () => void; wide?: boolean }) {
+function ConnectButton({ t, status, onConnect, onCancel, wide }: { t: Theme; status?: string; onConnect: () => void; onCancel?: () => void; wide?: boolean }) {
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const style = { ...btn(t, status ? "ghost" : "primary"), ...(wide ? { width: "100%", maxWidth: 320 } : {}) };
   if (status === "accepted") return <button style={style} disabled>Connected ✓</button>;
-  if (status === "pending") return <button style={style} disabled>Requested</button>;
   if (status === "declined") return <button style={style} disabled>Not available</button>;
+  if (status === "pending")
+    return (
+      <button
+        style={style}
+        onClick={() => (confirmCancel ? (setConfirmCancel(false), onCancel?.()) : setConfirmCancel(true))}
+        onBlur={() => setConfirmCancel(false)}
+        aria-label={confirmCancel ? "Confirm cancel request" : "Requested — tap to cancel"}
+      >
+        {confirmCancel ? "Cancel request?" : "Requested"}
+      </button>
+    );
   return (
     <button style={style} onClick={onConnect}>
       Connect
+    </button>
+  );
+}
+
+function ConfirmLink({ t, label, confirmLabel, ariaLabel, onConfirm }: { t: Theme; label: string; confirmLabel: string; ariaLabel: string; onConfirm: () => void }) {
+  const [armed, setArmed] = useState(false);
+  return (
+    <button
+      onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
+      onBlur={() => setArmed(false)}
+      aria-label={armed ? `Confirm: ${ariaLabel}` : ariaLabel}
+      style={{ minHeight: 44, padding: "8px 10px", border: "none", background: "none", color: "#FF453A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+    >
+      {armed ? confirmLabel : label}
     </button>
   );
 }
@@ -599,6 +651,7 @@ function NearbyList({
   outgoing,
   onSelect,
   onConnect,
+  onCancel,
   mode,
 }: {
   t: Theme;
@@ -607,6 +660,7 @@ function NearbyList({
   outgoing: Map<string, string>;
   onSelect: (id: string) => void;
   onConnect: (id: string) => void;
+  onCancel: (id: string) => void;
   mode: "native" | "web";
 }) {
   return (
@@ -636,7 +690,7 @@ function NearbyList({
                 </div>
               </button>
               {mode === "native" && <DistanceChip t={t} person={p} />}
-              <ConnectButton t={t} status={outgoing.get(p.userId)} onConnect={() => onConnect(p.userId)} />
+              <ConnectButton t={t} status={outgoing.get(p.userId)} onConnect={() => onConnect(p.userId)} onCancel={() => onCancel(p.userId)} />
             </li>
           ))}
         </ul>

@@ -110,10 +110,38 @@ function deletionScheduled({ name, date, cancelUrl, appUrl = "https://www.networ
   };
 }
 
+function connectionRequest({ name, fromName, fromTitle, eventName, appUrl }) {
+  return {
+    subject: `${fromName} wants to connect on NetworQ`,
+    appUrl,
+    preview: eventName ? `You were both at ${eventName}` : "New connection request",
+    heading: `${fromName} wants to connect`,
+    lines: [
+      `Hi ${first(name)}, ${fromName}${fromTitle ? ` (${fromTitle})` : ""} sent you a connection request${eventName ? ` at ${eventName}` : ""}.`,
+      "Accept to swap contact details — nothing is shared until you do.",
+    ],
+    cta: { label: "Review request", url: `${appUrl}/?open=radar` },
+  };
+}
+
+function connectionAccepted({ name, otherName, otherTitle, eventName, appUrl }) {
+  return {
+    subject: `${otherName} accepted your connection request`,
+    appUrl,
+    preview: "You're connected",
+    heading: "You're connected 🎉",
+    lines: [
+      `Hi ${first(name)}, ${otherName}${otherTitle ? ` (${otherTitle})` : ""} accepted your request${eventName ? ` from ${eventName}` : ""}.`,
+      "Their contact details are now in your NetworQ contacts.",
+    ],
+    cta: { label: "Open contacts", url: `${appUrl}/?open=contacts` },
+  };
+}
+
 async function render(tpl) {
   const el = h(Layout, tpl);
   const [html, text] = await Promise.all([renderEmail(el), renderEmail(el, { plainText: true })]);
   return { subject: tpl.subject, html, text };
 }
 
-module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, render };
+module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, render };
