@@ -152,7 +152,7 @@ test.describe("Settings & account security", () => {
     const conn = page.getByRole("switch", { name: "Connection emails" });
     await expect(conn).toHaveAttribute("aria-checked", "true");
     await conn.click();
-    await expect.poll(() => db.table("profiles").find((p) => p.id === me.id).notification_prefs.connection_emails).toBe(false);
+    await expect.poll(() => db.table("profiles").find((p) => p.id === me.id)!.notification_prefs.connection_emails).toBe(false);
 
     const vib = page.getByRole("switch", { name: "Vibration" });
     await expect(vib).toHaveAttribute("aria-checked", "true");

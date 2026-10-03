@@ -165,6 +165,43 @@ test.describe("Event Radar", () => {
     await bob.ctx.close();
   });
 
+  test("after a block, the blocked person stops seeing the blocker even though the phone still hears them", async ({ browser, db }) => {
+    test.setTimeout(120_000);
+    seed(db);
+    const asha = await newPage(browser, db);
+    const bob = await newPage(browser, db);
+    for (const [p, email] of [[asha.page, "asha@acme.test"], [bob.page, "bob@acme.test"]] as const) {
+      await login(p, email);
+      await openRadar(p);
+      await p.getByRole("tab", { name: "Nearby" }).click();
+      await p.getByRole("button", { name: "Turn on Nearby" }).click();
+    }
+    await expect.poll(() => db.tokenFor("bob@acme.test")).toMatch(/^[0-9a-f]{16}$/);
+    await expect.poll(() => db.tokenFor("asha@acme.test")).toMatch(/^[0-9a-f]{16}$/);
+    const bobToken = db.tokenFor("bob@acme.test")!;
+    const ashaToken = db.tokenFor("asha@acme.test")!;
+    await sendSightings(asha.page, bobToken, -70, 4);
+    await sendSightings(bob.page, ashaToken, -70, 4);
+    await expect(asha.page.getByRole("list", { name: "Nearby attendees" }).getByText("Bob Iyer")).toBeVisible();
+    await expect(bob.page.getByRole("list", { name: "Nearby attendees" }).getByText("Asha Rao")).toBeVisible();
+
+    await bob.page.getByRole("button", { name: "View Asha Rao" }).click();
+    await bob.page.getByRole("button", { name: "Block Asha Rao" }).click();
+    await bob.page.getByRole("button", { name: "Confirm: Block Asha Rao" }).click();
+    await expect(bob.page.getByRole("list", { name: "Nearby attendees" })).toHaveCount(0);
+
+    // Asha's phone keeps hearing Bob's (unchanged) token; the periodic re-check removes him anyway
+    const keepHearing = setInterval(() => sendSightings(asha.page, bobToken, -70, 1).catch(() => {}), 1000);
+    try {
+      await expect(asha.page.getByRole("list", { name: "Nearby attendees" })).toHaveCount(0, { timeout: 30_000 });
+    } finally {
+      clearInterval(keepHearing);
+    }
+    expect([...asha.errors, ...bob.errors]).toEqual([]);
+    await asha.ctx.close();
+    await bob.ctx.close();
+  });
+
   test("signals from people at other events are ignored", async ({ browser, db }) => {
     seed(db);
     const asha = await newPage(browser, db);

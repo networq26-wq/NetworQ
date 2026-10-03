@@ -156,6 +156,10 @@ export class ProximityTracker {
     return best;
   }
 
+  boundTokens(now: number): string[] {
+    return this.snapshot(now).filter((t) => t.userId).map((t) => t.token);
+  }
+
   unknownTokens(now: number): string[] {
     return this.snapshot(now).filter((t) => !t.userId).map((t) => t.token);
   }

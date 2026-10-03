@@ -6,7 +6,7 @@ test("pass vCard is standard 3.0, escapes separators and round-trips", () => {
   expect(v.startsWith("BEGIN:VCARD\r\nVERSION:3.0\r\n")).toBe(true);
   expect(v).toContain("N:Rao;Asha;;;");
   expect(v).toContain("TITLE:Founder\\, CEO");
-  expect(v).toContain(String.raw`ORG:Acme; Labs`);
+  expect(v).toContain("ORG:Acme\\; Labs");
   expect(parseContactQr(v)).toEqual({ name: "Asha Rao", title: "Founder, CEO", company: "Acme; Labs", email: "asha@acme.in", phone: "+91 90000 11111", linkedin: "https://linkedin.com/in/asha" });
 });
 

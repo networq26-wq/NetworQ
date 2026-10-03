@@ -33,7 +33,8 @@ const RENDER_EVERY_MS = 1000;
 const REQUESTS_EVERY_MS = 10_000; // safety net; realtime is the instant path
 const WEB_LIST_EVERY_MS = 15_000;
 const TOKEN_REFRESH_LEAD_MS = 120_000;
-const UNRESOLVABLE_RETRY_MS = 60_000;
+const REVALIDATE_EVERY_MS = 15_000; // re-check people on screen: blocks, hidden or left drop off quickly
+const UNRESOLVABLE_RETRY_MS = 20_000; // a person who just turned Radar on appears within ~20 s
 
 declare global {
   interface Window {
@@ -172,13 +173,18 @@ export function useEventRadar(opts: {
   useEffect(() => {
     if (mode !== "native" || !active || !eventId) return;
     let busy = false;
+    let lastRevalidate = Date.now();
     const timer = setInterval(async () => {
       if (busy) return;
       const now = Date.now();
-      const pending = tracker.current
+      const unknown = tracker.current
         .unknownTokens(now)
         .filter((t) => now - (unresolvable.current.get(t) ?? 0) > UNRESOLVABLE_RETRY_MS);
+      // Periodically re-ask about people already on screen: the server is the source of truth
+      const recheck = now - lastRevalidate > REVALIDATE_EVERY_MS ? tracker.current.boundTokens(now) : [];
+      const pending = [...unknown, ...recheck].slice(0, 64);
       if (!pending.length) return;
+      if (recheck.length) lastRevalidate = now;
       busy = true;
       try {
         const res = await api.resolveTokens(eventId, pending);
@@ -188,7 +194,11 @@ export function useEventRadar(opts: {
           tracker.current.bindUser(p.token, p.user_id);
           profiles.current.set(p.user_id, p);
         }
-        for (const t of pending) if (!found.has(t)) unresolvable.current.set(t, now);
+        for (const t of pending) {
+          if (found.has(t)) continue;
+          unresolvable.current.set(t, now);
+          if (recheck.includes(t)) tracker.current.forget(t); // blocked, hidden or left → off the radar now
+        }
         setHiddenCount(res.hidden_count);
       } catch {
         // keep last known people; next tick retries

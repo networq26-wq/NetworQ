@@ -43,11 +43,14 @@ export function parseContactQr(text: string): Record<string, string> | null {
       const i = line.indexOf(":");
       if (i < 0) continue;
       const key = line.slice(0, i).split(";")[0].toUpperCase();
-      const val = unesc(line.slice(i + 1)).trim().slice(0, 300);
+      const rawVal = line.slice(i + 1);
+      // Structured fields (N, ORG) split on unescaped ";" before unescaping
+      const parts = rawVal.split(/(?<!\\);/).map((x) => unesc(x).trim());
+      const val = unesc(rawVal).trim().slice(0, 300);
       if (!val) continue;
       if (key === "FN") out.name = val;
-      else if (key === "N" && !out.name) out.name = val.split(";").slice(0, 2).reverse().join(" ").trim();
-      else if (key === "ORG") out.company = val.split(";")[0];
+      else if (key === "N" && !out.name) out.name = parts.slice(0, 2).reverse().join(" ").trim();
+      else if (key === "ORG") out.company = parts[0].slice(0, 300);
       else if (key === "TITLE") out.title = val;
       else if (key === "EMAIL" && !out.email) out.email = val;
       else if (key === "TEL" && !out.phone) out.phone = val;
