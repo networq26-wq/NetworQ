@@ -47,7 +47,7 @@ export function usePushBridge(webViewRef: React.RefObject<React.ElementRef<typeo
     // Cold start from a notification tap
     const last = Notifications.getLastNotificationResponse();
     if (last) open(last.notification.request.content.data?.url);
-    const sub = Notifications.addNotificationResponseReceivedListener((r) => open(r.notification.request.content.data?.url));
+    const sub = Notifications.addNotificationResponseReceivedListener((r: any) => open(r.notification.request.content.data?.url));
     return () => sub.remove();
   }, [open]);
 
