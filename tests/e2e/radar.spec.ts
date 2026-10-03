@@ -100,6 +100,8 @@ test.describe("Event Radar", () => {
     const bobToken = db.tokenFor("bob@acme.test")!;
     expect(await bob.page.evaluate(() => (window as any).__shell.token)).toBe(bobToken);
     await sendSightings(asha.page, bobToken, -79, 6);
+    // A real phone keeps hearing Bob; without this he'd drop off after 30 s on a slow machine
+    const hearing = setInterval(() => sendSightings(asha.page, bobToken, -79, 1).catch(() => {}), 2000);
 
     const nearby = asha.page.getByRole("list", { name: "Nearby attendees" });
     await expect(nearby.getByText("Bob Iyer")).toBeVisible();
@@ -118,6 +120,7 @@ test.describe("Event Radar", () => {
     expect(contacts.find((c) => c.user_id === db.users[0].id)).toMatchObject({ name: "Bob Iyer", email: "bob@acme.test", reference: "NetworQ Radar", event: "Founders Night" });
     expect(contacts.find((c) => c.user_id === db.users[1].id)).toMatchObject({ name: "Asha Rao", email: "asha@acme.test" });
 
+    clearInterval(hearing);
     expect([...asha.errors, ...bob.errors]).toEqual([]);
     await asha.ctx.close();
     await bob.ctx.close();

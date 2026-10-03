@@ -29,6 +29,7 @@ export function NotificationCenter({
   onClose,
   dueReminders,
   onOpenReminders,
+  topSlot,
 }: {
   isDark: boolean;
   items: AppNotification[];
@@ -37,6 +38,7 @@ export function NotificationCenter({
   onClose: () => void;
   dueReminders: number;
   onOpenReminders: () => void;
+  topSlot?: React.ReactNode;
 }) {
   const t = isDark
     ? { surface: "#1C1C1E", raised: "#2C2C2E", text: "#FFFFFF", muted: "#AEAEB2", border: "rgba(255,255,255,0.08)" }
@@ -69,6 +71,7 @@ export function NotificationCenter({
           </button>
         </div>
 
+        {topSlot}
         {dueReminders > 0 && (
           <button
             onClick={onOpenReminders}

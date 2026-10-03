@@ -5,7 +5,7 @@ import { PasswordInput } from "../ui/PasswordInput";
 import type { AccountApi } from "./accountApi";
 import { OrganizationForm } from "../prospect/OrganizationForm";
 import type { ProspectApi } from "../prospect/prospectApi";
-import { BlockedUsers, HelpAbout, RecentDevices } from "./MoreSettings";
+import { BlockedUsers, HelpAbout, PushSwitch, RecentDevices } from "./MoreSettings";
 import { hapticsEnabled, setHapticsEnabled, haptic } from "../ui/haptics";
 
 const PURPLE = "#7C3AED";
@@ -329,7 +329,8 @@ export function SettingsScreen({
       </section>
 
       <section style={card} aria-labelledby="settings-notifications">
-        <h3 id="settings-notifications" style={{ margin: "0 0 4px", fontSize: 18 }}>Email notifications</h3>
+        <h3 id="settings-notifications" style={{ margin: "0 0 4px", fontSize: 18 }}>Notifications</h3>
+        <PushSwitch supabase={supabase} t={t} apiBaseUrl={apiBaseUrl} showToast={showToast} />
         <Switch id="login_alerts" title="New sign-in alerts" hint="Email me when my account is used on a new device." />
         <Switch id="reminder_emails" title="Follow-up reminders" hint="Email me when a contact reminder is due." />
         <Switch id="connection_emails" title="Connection emails" hint="Email me when someone wants to connect or accepts my request." />

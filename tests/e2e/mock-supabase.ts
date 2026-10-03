@@ -32,6 +32,7 @@ export class MockSupabase {
   tokens: TokenRow[] = [];
   requests: RequestRow[] = [];
   blocks: { blocker: string; blocked: string }[] = [];
+  pushTokens: { token: string; user_id: string; platform: string }[] = [];
 
   private notify(user: string, type: string, title: string, body: string, data: Record<string, unknown>) {
     this.table("notifications").unshift({ id: randomUUID(), user_id: user, type, title, body, data, read_at: null, created_at: new Date().toISOString() });
@@ -159,6 +160,13 @@ export class MockSupabase {
         };
         return prof.notification_prefs;
       }
+      case "register_push_token":
+        this.pushTokens = this.pushTokens.filter((t) => t.token !== a.p_token);
+        this.pushTokens.push({ token: a.p_token, user_id: uid, platform: a.p_platform });
+        return null;
+      case "unregister_push_token":
+        this.pushTokens = this.pushTokens.filter((t) => !(t.token === a.p_token && t.user_id === uid));
+        return null;
       case "nearby_status": {
         const e = this.events.find((ev) => ev.external_id === "networq:nearby");
         const m = e && this.attendees.find((x) => x.event_id === e.id && x.user_id === uid);

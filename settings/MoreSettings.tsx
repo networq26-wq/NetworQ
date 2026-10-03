@@ -1,6 +1,7 @@
 // Settings sections: blocked people, recent devices, help & support, about.
 import React, { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { disablePush, enablePush, pushStatus, type PushStatus } from "../notifications/pushClient";
 
 type Theme = { surface: string; raised: string; text: string; muted: string; border: string };
 export const SUPPORT_EMAIL = "support@networq.co.in";
@@ -130,5 +131,52 @@ export function HelpAbout({ t, card, btn, userEmail, apiBaseUrl = "" }: { t: The
         <div style={{ fontSize: 14, fontWeight: 600, color: server ? (server.ok ? "#34C759" : "#FF3B30") : t.muted }}>{server ? (server.ok ? `Online · ${server.version}` : "Unreachable") : "Checking…"}</div>
       </div>
     </section>
+  );
+}
+
+// ── Push on this device ──────────────────────────────────────────────────────
+export function PushSwitch({ supabase, t, apiBaseUrl = "", showToast }: { supabase: SupabaseClient; t: Theme; apiBaseUrl?: string; showToast: (m: string, k?: "success" | "error" | "info") => void }) {
+  const [status, setStatus] = useState<PushStatus>(pushStatus());
+  const [busy, setBusy] = useState(false);
+  const on = status === "on";
+  const hint =
+    status === "unsupported"
+      ? "This browser can't receive notifications. Use the NetworQ Android app or Chrome."
+      : status === "denied"
+        ? "Blocked in your phone or browser settings — allow notifications for NetworQ there."
+        : "Requests, accepts and follow-up reminders on this device, even when NetworQ is closed.";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600 }}>Push notifications</div>
+        <div style={{ color: t.muted, fontSize: 13 }}>{hint}</div>
+      </div>
+      <button
+        role="switch"
+        aria-checked={on}
+        aria-label="Push notifications"
+        disabled={busy || status === "unsupported"}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            if (on) {
+              await disablePush(supabase);
+              setStatus("off");
+            } else {
+              const s = await enablePush(supabase, apiBaseUrl, true);
+              setStatus(s);
+              if (s === "denied") showToast("Notifications are blocked. Allow them in your phone or browser settings.", "info");
+            }
+          } catch (e: any) {
+            showToast(e.message, "error");
+          } finally {
+            setBusy(false);
+          }
+        }}
+        style={{ width: 52, minWidth: 52, height: 32, borderRadius: 16, border: "none", padding: 2, cursor: "pointer", opacity: status === "unsupported" ? 0.45 : 1, background: on ? "#7C3AED" : t.raised, boxShadow: `inset 0 0 0 1px ${t.border}` }}
+      >
+        <span style={{ display: "block", width: 28, height: 28, borderRadius: 14, background: "#FFFFFF", transform: `translateX(${on ? 20 : 0}px)`, transition: "transform 0.2s" }} />
+      </button>
+    </div>
   );
 }

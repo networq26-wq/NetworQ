@@ -70,7 +70,74 @@ test("respects the recipient's connection-email preference", async () => {
   const h = harness();
   try {
     const r = await (await h.post({ notification_id: "n3" })).json();
-    assert.equal(r.skipped, "opted out");
+    assert.equal(r.email, "opted out");
     assert.equal(h.sent.length, 0);
   } finally { h.close(); }
+});
+
+// ── Push ──────────────────────────────────────────────────────────────────────
+function pushHarness({ prefs = {}, tokens = [{ token: "ExponentPushToken[abc]", platform: "android" }], deadTokens = [], type = "connection_request" } = {}) {
+  const pushed = [], removed = [], markedPush = [];
+  const n = { id: "p1", type, user_id: "bob", title: "Asha Rao wants to connect", body: "Tap to respond", data: { from_user: "asha", screen: "radar" }, emailed_at: null, pushed_at: null };
+  const h = harness({
+    loadNotification: async () => n,
+    loadPerson: async (id) => (id === "bob" ? { name: "Bob", email: "bob@acme.test", notification_prefs: prefs } : { name: "Asha Rao" }),
+    loadTokens: async () => tokens,
+    removeTokens: async (t) => removed.push(...t),
+    markPushed: async (id) => { markedPush.push(id); n.pushed_at = "now"; },
+    markEmailed: async () => { n.emailed_at = "now"; },
+    push: { send: async (t, m) => { pushed.push({ t, m }); return { delivered: t.length - deadTokens.length, dead: deadTokens }; } },
+  });
+  return { ...h, pushed, removed, markedPush, n };
+}
+
+test("every notification is pushed once to the recipient's devices with a deep link", async () => {
+  const h = pushHarness();
+  try {
+    const r = await (await h.post({ notification_id: "p1" })).json();
+    assert.deepEqual(r.push, { delivered: 1, removed: 0 });
+    assert.equal(h.pushed[0].m.title, "Asha Rao wants to connect");
+    assert.equal(h.pushed[0].m.url, "https://app.test/?open=radar");
+    assert.equal(h.pushed[0].m.data.screen, "radar");
+    const again = await (await h.post({ notification_id: "p1" })).json();
+    assert.equal(again.push, "already pushed");
+    assert.equal(h.pushed.length, 1);
+  } finally {
+    h.close();
+  }
+});
+
+test("reminders are pushed but not emailed by the hook; opted-out and device-less users get no push", async () => {
+  const rem = pushHarness({ type: "reminder" });
+  try {
+    const r = await (await rem.post({ notification_id: "p1" })).json();
+    assert.equal(r.email, "type");
+    assert.equal(rem.pushed.length, 1);
+  } finally {
+    rem.close();
+  }
+  const off = pushHarness({ prefs: { push: false } });
+  try {
+    assert.equal((await (await off.post({ notification_id: "p1" })).json()).push, "opted out");
+    assert.equal(off.pushed.length, 0);
+  } finally {
+    off.close();
+  }
+  const none = pushHarness({ tokens: [] });
+  try {
+    assert.equal((await (await none.post({ notification_id: "p1" })).json()).push, "no devices");
+  } finally {
+    none.close();
+  }
+});
+
+test("dead tokens reported by the push service are removed", async () => {
+  const h = pushHarness({ tokens: [{ token: "ExponentPushToken[a]", platform: "android" }, { token: "ExponentPushToken[gone]", platform: "android" }], deadTokens: ["ExponentPushToken[gone]"] });
+  try {
+    const r = await (await h.post({ notification_id: "p1" })).json();
+    assert.deepEqual(r.push, { delivered: 1, removed: 1 });
+    assert.deepEqual(h.removed, ["ExponentPushToken[gone]"]);
+  } finally {
+    h.close();
+  }
 });
