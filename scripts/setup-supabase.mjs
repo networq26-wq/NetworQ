@@ -60,6 +60,7 @@ const MIGRATIONS = [
   "20261007_prospect_research.sql",
   "20261008_nearby_radar.sql",
   "20261009_events_categories.sql",
+  "20261010_push_notifications.sql",
 ];
 
 const authConfig = {

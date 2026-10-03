@@ -100,6 +100,16 @@ async function checkAndSendReminders() {
 
   for (const contact of contacts) {
     try {
+      // In-app + push notification (the dedupe key makes hourly re-runs harmless)
+      await supabase.from("notifications").insert({
+        user_id: contact.user_id,
+        type: "reminder",
+        title: `Follow up with ${contact.name}`,
+        body: contact.reminder || null,
+        data: { screen: "contacts", contact_id: contact.id },
+        dedupe_key: `reminder:${contact.id}:${contact.reminder_date}`,
+      }).then(({ error: nErr }) => nErr && !/duplicate|unique/i.test(nErr.message) && console.warn("[Reminders] notification:", nErr.message));
+
       // Respect Settings → Notifications → Reminder emails
       const { data: prefsRow } = await supabase.from("profiles").select("notification_prefs").eq("id", contact.user_id).maybeSingle();
       if (prefsRow?.notification_prefs?.reminder_emails === false) {

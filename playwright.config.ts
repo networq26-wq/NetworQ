@@ -9,6 +9,8 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   fullyParallel: true,
   retries: process.env.CI ? 1 : 0,
+  // Radar tests drive two browsers each; more parallel workers starve an 8 GB laptop
+  workers: process.env.CI ? 1 : 2,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   use: {
     baseURL: `http://localhost:${PORT}`,

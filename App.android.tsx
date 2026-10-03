@@ -19,6 +19,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import { useRadarBridge } from "./radar/shellBridge";
 import { SHELL_CAPABILITIES_JS, useGoogleAuthBridge } from "./shell/googleAuth";
+import { PUSH_CAPABILITY_JS, usePushBridge } from "./shell/pushBridge";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
@@ -37,6 +38,7 @@ function Shell() {
   const [hasError, setHasError] = useState(false);
   const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
   const googleAuth = useGoogleAuthBridge(webViewRef, TARGET_URL);
+  const push = usePushBridge(webViewRef, TARGET_URL);
 
   // Hardware back: let the web app close overlays / go to the previous tab first;
   // on the home screen, a second press within 2 s exits.
@@ -109,7 +111,7 @@ function Shell() {
       ) : (
         <WebView
           ref={webViewRef}
-          source={{ uri: TARGET_URL }}
+          source={{ uri: push.startUrl || TARGET_URL }}
           style={styles.webView}
           javaScriptEnabled={true}
           domStorageEnabled={true}
@@ -120,11 +122,13 @@ function Shell() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
-          injectedJavaScriptBeforeContentLoaded={SHELL_CAPABILITIES_JS}
+          injectedJavaScriptBeforeContentLoaded={SHELL_CAPABILITIES_JS + PUSH_CAPABILITY_JS}
+          onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {
             if (e.nativeEvent.url.startsWith(TARGET_URL)) handleNavMessage(e.nativeEvent.data);
             radarBridge.onMessage(e);
             googleAuth.onMessage(e);
+            push.onMessage(e);
           }}
           cacheEnabled={true}
           renderLoading={() => (

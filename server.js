@@ -281,6 +281,12 @@ const prospectD = prospectDeps();
 if (prospectD) app.use("/api", createProspectRouter(prospectD));
 else app.post(["/api/prospect/*splat", "/api/organization/*splat"], (req, res) => res.status(503).json({ error: "AI research is unavailable on this server." }));
 
+// ── Push: public VAPID key for browsers (the private key never leaves the server) ──
+app.get("/api/push/config", (req, res) => {
+  res.set("Cache-Control", "public, max-age=3600");
+  res.json({ vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null });
+});
+
 // ── Email sending ─────────────────────────────────────────────────────────────
 app.post("/api/email", async (req, res) => emailHandler(req, res));
 app.options("/api/email", (req, res) => res.status(200).end());

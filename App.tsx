@@ -8,6 +8,8 @@ import { EventsHub } from "./events/EventsHub";
 import { createVoicePlayer } from "./voice/voicePlayer";
 import { useNotifications, haptic, type AppNotification } from "./notifications/useNotifications";
 import { NotificationCenter } from "./notifications/NotificationCenter";
+import { PushPrompt } from "./notifications/PushPrompt";
+import { installSignOutHook, reattachPush } from "./notifications/pushClient";
 import { CameraCapture } from "./scanner/CameraCapture";
 import { ProspectComposer } from "./prospect/ProspectComposer";
 import { OutreachTimeline } from "./prospect/OutreachTimeline";
@@ -32,6 +34,7 @@ const NATIVE_GOOGLE_AUTH = IS_NATIVE_WEBVIEW && !!(window as any).__NETWORQ_SHEL
 const GOOGLE_SIGNIN_AVAILABLE = !IS_NATIVE_WEBVIEW || NATIVE_GOOGLE_AUTH;
 
 const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
+installSignOutHook(supabase);
 
 // ── CONFETTI PARTICLE SYSTEM ──────────────────────────────────────────────────
 interface ConfettiParticle {
@@ -1711,6 +1714,7 @@ VOICE & ASSISTANT DIRECTIVES:
   const loadUserData = useCallback(
     async (userId: string, userEmail?: string) => {
       loadedUserRef.current = userId;
+      reattachPush(supabase, apiBase(AI_PROXY)); // this device had push on → attach it to this account
       setContactsLoading(true);
       try {
         const [profileRes, contactsRes] = await Promise.all([
@@ -5235,6 +5239,7 @@ Keep it punchy, sharp, and directly actionable.`;
             onMarkAllRead={() => notif.markRead()}
             onClose={() => setNotifOpen(false)}
             dueReminders={dueReminders.length}
+            topSlot={<PushPrompt supabase={supabase} apiBase={apiBase(AI_PROXY)} isDark={isDark} showToast={showToast} />}
             onOpenReminders={() => {
               setNotifOpen(false);
               setTab("contacts");
