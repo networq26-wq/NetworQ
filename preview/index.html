@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NetworQ · Device Preview</title>
+<style>
+  :root { --bg: #0b0b0f; --panel: #16161c; --text: #f2f2f7; --muted: #8e8e93; --brand: #7c3aed; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Text", Arial, sans-serif; min-height: 100vh; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px 18px; background: rgba(11,11,15,.9); backdrop-filter: blur(12px); border-bottom: 1px solid #222; }
+  header h1 { font-size: 15px; margin: 0 12px 0 0; } header h1 span { color: var(--brand); }
+  label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+  select, button, input { background: var(--panel); color: var(--text); border: 1px solid #2a2a33; border-radius: 9px; padding: 7px 10px; font: inherit; }
+  button { cursor: pointer; } button.primary { background: var(--brand); border-color: var(--brand); }
+  .status { margin-left: auto; color: var(--muted); font-size: 12px; } .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34c759; margin-right: 6px; }
+  main { display: flex; flex-wrap: wrap; gap: 40px; justify-content: center; align-items: flex-start; padding: 28px 18px 60px; }
+  figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  figcaption { color: var(--muted); font-size: 12px; }
+  .device { position: relative; border-radius: var(--r); padding: 12px; background: #1c1c1e; box-shadow: 0 0 0 2px #3a3a3c, 0 30px 70px rgba(0,0,0,.6); transform-origin: top center; }
+  .screen { position: relative; width: var(--w); height: var(--h); border-radius: calc(var(--r) - 12px); overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+  .statusbar { height: var(--sb); flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font-weight: 600; font-size: 14px; color: #000; background: #fff; position: relative; }
+  .dark .statusbar, .dark .navbar { background: #000; color: #fff; }
+  .island { position: absolute; left: 50%; top: 11px; transform: translateX(-50%); width: 122px; height: 34px; border-radius: 20px; background: #000; }
+  .punch { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); width: 14px; height: 14px; border-radius: 50%; background: #000; }
+  iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+  .navbar { height: var(--nb); flex: none; display: flex; align-items: center; justify-content: center; background: #fff; }
+  .navbar i { width: 120px; height: 5px; border-radius: 3px; background: currentColor; opacity: .85; }
+  .help { max-width: 860px; margin: 0 auto 40px; padding: 0 18px; color: var(--muted); font-size: 13px; }
+  .help code { color: var(--text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Networ<span>Q</span> · Device Preview</h1>
+  <label>Screen <input id="path" value="/" size="12" /></label>
+  <label>Mode
+    <select id="mode"><option value="android">Android app (APK)</option><option value="web">Mobile website</option></select>
+  </label>
+  <label>Zoom <select id="zoom"><option>0.6</option><option>0.75</option><option selected>0.85</option><option>1</option></select></label>
+  <label><input type="checkbox" id="dark" /> Dark status bars</label>
+  <button class="primary" id="reload">Reload all</button>
+  <span class="status"><span class="dot"></span>Fast Refresh — edits appear automatically</span>
+</header>
+<main id="devices"></main>
+<p class="help">
+  All three devices run the live dev app from <code>http://localhost:8081</code>. Fast Refresh updates them a few seconds after any code change, keeping your state.
+  Each frame reserves the status bar and gesture area the way the Android shell does (safe areas), so layouts match the APK.
+  The frames share one session — sign in once. To test two users (Radar, connection requests), open a second preview in a private window.
+  Use <b>Screen</b> to open a path such as <code>/?join=NQ-ABC123</code>. <b>Mode</b> switches between the Android app layout and the mobile website.
+  The dev app uses your real Supabase project.
+</p>
+<script>
+  const DEVICES = [
+    { id: "iphone", name: "iPhone 15 Pro", w: 393, h: 852, sb: 54, nb: 34, r: 56, notch: "island" },
+    { id: "pixel", name: "Pixel 8 (Android)", w: 412, h: 915, sb: 32, nb: 24, r: 44, notch: "punch" },
+    { id: "small", name: "Small Android (360 × 740)", w: 360, h: 740, sb: 28, nb: 20, r: 36, notch: "punch" },
+  ];
+  const APP = "http://localhost:8081";
+  const $ = (id) => document.getElementById(id);
+  const saved = JSON.parse(localStorage.getItem("nq-preview") || "{}");
+  for (const k of ["path", "mode", "zoom"]) if (saved[k]) $(k).value = saved[k];
+  $("dark").checked = !!saved.dark;
+
+  function src() {
+    const p = $("path").value || "/";
+    const url = new URL(p, APP);
+    if ($("mode").value === "android") url.searchParams.set("shell", "android");
+    return url.toString();
+  }
+  function render() {
+    localStorage.setItem("nq-preview", JSON.stringify({ path: $("path").value, mode: $("mode").value, zoom: $("zoom").value, dark: $("dark").checked }));
+    const z = +$("zoom").value;
+    $("devices").innerHTML = DEVICES.map((d) => `
+      <figure>
+        <div style="width:${(d.w + 24) * z}px;height:${(d.h + 24) * z}px;position:relative">
+        <div class="device ${$("dark").checked ? "dark" : ""}" style="--w:${d.w}px;--h:${d.h}px;--sb:${d.sb}px;--nb:${d.nb}px;--r:${d.r}px;transform:scale(${z});transform-origin:top left;position:absolute;left:0;top:0">
+          <div class="screen">
+            <div class="statusbar"><span>9:41</span><div class="${d.notch}"></div><span>●●● 100%</span></div>
+            <iframe title="${d.name}" src="${src()}" allow="camera; microphone; clipboard-write"></iframe>
+            <div class="navbar"><i></i></div>
+          </div>
+        </div>
+        </div>
+        <figcaption>${d.name} · ${d.w}×${d.h - d.sb - d.nb} usable</figcaption>
+      </figure>`).join("");
+  }
+  for (const id of ["mode", "zoom", "dark"]) $(id).addEventListener("change", render);
+  $("path").addEventListener("keydown", (e) => e.key === "Enter" && render());
+  $("reload").addEventListener("click", render);
+  render();
+</script>
+</body>
+</html>

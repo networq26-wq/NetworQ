@@ -297,7 +297,7 @@ app.use("/api", (err, req, res, next) => {
 function startServer() {
   const primaryPort = parseInt(process.env.PORT || "3001", 10);
   const targetPorts =
-    process.env.NODE_ENV === "production"
+    process.env.NODE_ENV === "production" || process.env.NETWORQ_SINGLE_PORT
       ? [primaryPort]
       : [primaryPort, 3000, 8081].filter((p, idx, arr) => arr.indexOf(p) === idx);
 

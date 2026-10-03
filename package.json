@@ -18,7 +18,8 @@
     "test:rls": "QA_LIVE_SUPABASE=1 node --test tests/integration/*.test.js",
     "test:e2e": "playwright test",
     "test:all": "npx tsc --noEmit && npm test && npm run build && playwright test",
-    "setup:supabase": "node scripts/setup-supabase.mjs"
+    "setup:supabase": "node scripts/setup-supabase.mjs",
+    "preview": "./scripts/dev-preview.sh"
   },
   "dependencies": {
     "@react-email/components": "^1.0.12",

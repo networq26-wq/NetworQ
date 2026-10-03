@@ -69,3 +69,5 @@ qa-logs/
 # Local native module build output
 modules/*/android/build/
 modules/*/android/.cxx/
+.preview-metro.log
+.preview-api.log

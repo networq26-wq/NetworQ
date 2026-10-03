@@ -7,8 +7,8 @@ echo "🚀 Starting NetworQ Backend Proxy & Expo Server..."
 lsof -ti:3001 | xargs kill -9 2>/dev/null || true
 lsof -ti:8081 | xargs kill -9 2>/dev/null || true
 
-# Start backend proxy in background
-node server.js &
+# Start backend proxy in background (only :3001 — Expo needs :8081)
+PORT=3001 NODE_ENV=development NETWORQ_SINGLE_PORT=1 node server.js &
 BACKEND_PID=$!
 echo "✅ Backend AI Proxy running on port 3001"
 
