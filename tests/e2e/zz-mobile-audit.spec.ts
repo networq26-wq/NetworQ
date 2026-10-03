@@ -41,7 +41,7 @@ for (const vp of [{ name: "pixel7", width: 412, height: 915 }, { name: "small", 
     await nav("Events"); await shot("04-events");
     await nav("Radar"); await shot("05-radar");
     await nav("Scan"); await shot("06-scan");
-    await nav("3D Pass"); await shot("07-pass");
+    await nav("Pass"); await shot("07-pass");
     await nav("Add"); await shot("08-add");
     await page.getByRole("button", { name: "Profile & Settings" }).click().catch(() => console.log(`NO SETTINGS ENTRY ${vp.name}`));
     await shot("09-settings");

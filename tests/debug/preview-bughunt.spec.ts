@@ -39,7 +39,7 @@ test("two-user bug hunt in the preview", async ({ browser }) => {
   const ctxA = await browser.newContext(), ctxB = await browser.newContext();
   const a = await open(ctxA, "a", -79), b = await open(ctxB, "b", -71);
 
-  for (const tab of ["Events", "Scan", "3D Pass", "Add", "Contacts"]) { await nav(a, tab); await a.waitForTimeout(1200); }
+  for (const tab of ["Events", "Scan", "Pass", "Add", "Contacts"]) { await nav(a, tab); await a.waitForTimeout(1200); }
   await a.getByRole("button", { name: "Profile & Settings" }).click(); await a.waitForTimeout(1200);
   await a.getByRole("button", { name: "AI Assistant" }).click(); await a.waitForTimeout(800);
   await a.getByRole("button", { name: "Close" }).last().click().catch(() => issues.push("AI sheet: no Close button"));

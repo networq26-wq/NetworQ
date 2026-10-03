@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "./supabase";
-import QRCode from "qrcode";
 import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
 import { SettingsScreen } from "./settings/SettingsScreen";
 import { apiBase, createAccountApi } from "./settings/accountApi";
@@ -13,6 +12,8 @@ import { CameraCapture } from "./scanner/CameraCapture";
 import { ProspectComposer } from "./prospect/ProspectComposer";
 import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
+import { DigitalPass } from "./pass/DigitalPass";
+import { parseContactQr } from "./pass/vcard";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -169,43 +170,6 @@ function downloadVCard(contact: {
   a.click();
   URL.revokeObjectURL(url);
   triggerConfetti();
-}
-
-// ── APPLE SOUND SYNTHESIZER (WEB AUDIO API) ──────────────────────────────────
-function playAppleChime() {
-  if (typeof window === "undefined") return;
-  try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-
-    // Harmonic 1: 523.25 Hz (C5)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(523.25, now);
-    gain1.gain.setValueAtTime(0.18, now);
-    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(now);
-    osc1.stop(now + 0.45);
-
-    // Harmonic 2: 659.25 Hz (E5)
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(659.25, now + 0.1);
-    gain2.gain.setValueAtTime(0.22, now + 0.1);
-    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(now + 0.1);
-    osc2.stop(now + 0.65);
-  } catch (e) {
-    console.warn("Audio feedback not available:", e);
-  }
 }
 
 // ── APPLE CALENDAR (.ICS) GENERATOR ───────────────────────────────────────────
@@ -853,21 +817,6 @@ function downscaleImage(dataUrl: string, maxSide = 1280, quality = 0.8): Promise
   });
 }
 
-// QR codes are generated on-device — the profile data never leaves the browser
-function useQrDataUrl(data: string) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    QRCode.toDataURL(data, { width: 260, margin: 1, errorCorrectionLevel: "M" })
-      .then((u) => !cancelled && setUrl(u))
-      .catch((err) => console.warn("QR generation failed:", err));
-    return () => {
-      cancelled = true;
-    };
-  }, [data]);
-  return url;
-}
-
 // Jitsi Meet rooms are created on first join, so a random room name is a real, working link
 function genMeetLink() {
   const chars = "abcdefghijkmnpqrstuvwxyz23456789";
@@ -1151,336 +1100,8 @@ function tagColor(tag: string, isDark: boolean) {
     : { bg: "rgba(0, 0, 0, 0.04)", color: "#6E6E73", border: "rgba(0, 0, 0, 0.08)" };
 }
 
-// ── FIXED & ROBUST 3D HOLOGRAPHIC PASS COMPONENT ──────────────────────────────
-const CARD_THEMES = [
-  { id: "aurora", name: "Aurora Hologram", grad: "linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #0e7490 100%)", border: "#818cf8", foil: "rgba(129, 140, 248, 0.4)" },
-  { id: "obsidian", name: "Obsidian Titanium", grad: "linear-gradient(135deg, #09090b 0%, #18181b 50%, #27272a 100%)", border: "#71717a", foil: "rgba(255, 255, 255, 0.3)" },
-  { id: "cyber", name: "Cyberpunk Amber", grad: "linear-gradient(135deg, #451a03 0%, #78350f 50%, #d97706 100%)", border: "#f59e0b", foil: "rgba(245, 158, 11, 0.4)" },
-  { id: "emerald", name: "Emerald Luxe", grad: "linear-gradient(135deg, #022c22 0%, #064e3b 50%, #047857 100%)", border: "#34d399", foil: "rgba(52, 211, 153, 0.4)" },
-];
-
-function HoloCard3D({
-  user,
-  qrData,
-  isDark,
-  onOpenNameDrop,
-}: {
-  user: any;
-  qrData: string;
-  isDark: boolean;
-  onOpenNameDrop: () => void;
-}) {
-  const [themeIdx, setThemeIdx] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, gx: 50, gy: 50 });
-  const cardRef = useRef<HTMLDivElement>(null);
-  const qrImage = useQrDataUrl(qrData);
-
-  const theme = CARD_THEMES[themeIdx];
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const rect = cardRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const px = (x / rect.width - 0.5) * 2;
-    const py = (y / rect.height - 0.5) * 2;
-    setTilt({
-      rx: -py * 14,
-      ry: px * 14,
-      gx: Math.round((x / rect.width) * 100),
-      gy: Math.round((y / rect.height) * 100),
-    });
-  };
-
-  const handleMouseLeave = () => {
-    setTilt({ rx: 0, ry: 0, gx: 50, gy: 50 });
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
-      {/* Theme Switcher */}
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        {CARD_THEMES.map((t, idx) => (
-          <button
-            key={t.id}
-            onClick={() => setThemeIdx(idx)}
-            style={{
-              padding: "6px 13px",
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              border: themeIdx === idx ? `1.5px solid ${t.border}` : "1px solid rgba(255,255,255,0.1)",
-              background: themeIdx === idx ? (isDark ? "rgba(255,255,255,0.14)" : "rgba(0,0,0,0.06)") : "transparent",
-              color: isDark ? "#fff" : "#1e293b",
-              transition: "all 0.2s ease",
-            }}
-          >
-            {t.name}
-          </button>
-        ))}
-      </div>
-
-      {/* 3D Perspective Card Container */}
-      <div
-        ref={cardRef}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        style={{
-          perspective: 1200,
-          width: "100%",
-          maxWidth: 380,
-          height: 230,
-          userSelect: "none",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            borderRadius: 20,
-            position: "relative",
-            transformStyle: "preserve-3d",
-            transform: `rotateX(${flipped ? -tilt.rx * 0.5 : tilt.rx}deg) rotateY(${flipped ? 180 + tilt.ry * 0.5 : tilt.ry}deg)`,
-            transition: "transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1)",
-            boxShadow: isDark
-              ? `0 25px 50px -12px rgba(0,0,0,0.7), 0 0 25px ${theme.foil}`
-              : `0 20px 40px -10px rgba(99,102,241,0.25), 0 0 20px ${theme.foil}`,
-          }}
-        >
-          {/* Card Front */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 20,
-              background: theme.grad,
-              border: `1.5px solid ${theme.border}77`,
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              padding: "24px 26px",
-              color: "#ffffff",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              overflow: "hidden",
-              zIndex: flipped ? 0 : 2,
-            }}
-          >
-            {/* Holographic Glare Overlay */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: `radial-gradient(circle at ${tilt.gx}% ${tilt.gy}%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.06) 35%, transparent 70%)`,
-                pointerEvents: "none",
-                mixBlendMode: "overlay",
-              }}
-            />
-
-            {/* Header row */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", zIndex: 1 }}>
-              <div>
-                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase", color: "rgba(255,255,255,0.7)" }}>
-                  {user?.sector || "FOUNDER & OPERATOR"}
-                </span>
-                <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 24, fontWeight: 700, marginTop: 4, letterSpacing: "0.01em" }}>
-                  {user?.name || "Your Name"}
-                </div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 2 }}>
-                  {[user?.role, user?.company].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-              <Icons.Logo size={30} />
-            </div>
-
-            {/* Footer row */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", zIndex: 1 }}>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", display: "flex", flexDirection: "column", gap: 3 }}>
-                <div>{user?.email}</div>
-                {user?.phone && <div>{user?.phone}</div>}
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setFlipped(true);
-                }}
-                style={{
-                  background: "rgba(255,255,255,0.18)",
-                  backdropFilter: "blur(8px)",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  padding: "5px 10px",
-                  borderRadius: 8,
-                  fontSize: 10,
-                  fontWeight: 800,
-                  color: "#fff",
-                  cursor: "pointer",
-                  letterSpacing: "0.06em",
-                }}
-              >
-                SHOW QR ↻
-              </button>
-            </div>
-          </div>
-
-          {/* Card Back (QR Side) */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: 20,
-              background: theme.grad,
-              border: `1.5px solid ${theme.border}77`,
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              transform: "rotateY(180deg)",
-              padding: "18px 22px",
-              color: "#ffffff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              overflow: "hidden",
-              zIndex: flipped ? 2 : 0,
-            }}
-          >
-            <div style={{ background: "#ffffff", padding: 8, borderRadius: 14, boxShadow: "0 6px 20px rgba(0,0,0,0.3)" }}>
-              {qrImage ? (
-                <img src={qrImage} alt="QR Code" style={{ width: 115, height: 115, display: "block" }} />
-              ) : (
-                <div style={{ width: 115, height: 115 }} />
-              )}
-            </div>
-
-            <div style={{ flex: 1, textAlign: "left" }}>
-              <div style={{ fontSize: 10, fontWeight: 800, color: "rgba(255,255,255,0.7)", letterSpacing: "0.12em" }}>NETWORQ PASS</div>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 18, marginTop: 3 }}>Scan to Exchange</div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 4, lineHeight: 1.35 }}>
-                Camera auto-saves to mobile address book
-              </div>
-
-              <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(window.location.href);
-                    triggerConfetti();
-                  }}
-                  style={{
-                    background: "rgba(255,255,255,0.22)",
-                    border: "none",
-                    borderRadius: 6,
-                    padding: "4px 8px",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Copy Link
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setFlipped(false);
-                  }}
-                  style={{
-                    background: "rgba(255,255,255,0.15)",
-                    border: "none",
-                    borderRadius: 6,
-                    padding: "4px 8px",
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  Flip Front
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Action Bar Beneath Card */}
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-        <button
-          onClick={() => setFlipped((f) => !f)}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 12,
-            background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.05)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            color: isDark ? "#fff" : "#0f172a",
-            fontWeight: 700,
-            fontSize: 12,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <span>Flip Card ↻</span>
-        </button>
-
-        <button
-          onClick={() => downloadVCard({
-            name: user?.name || "My Contact",
-            company: user?.company,
-            title: user?.role,
-            email: user?.email,
-            phone: user?.phone,
-            linkedin: user?.linkedin,
-          })}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 12,
-            background: "linear-gradient(135deg, #6366F1, #4F46E5)",
-            color: "#ffffff",
-            border: "none",
-            fontWeight: 700,
-            fontSize: 12,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            boxShadow: "0 4px 14px rgba(99, 102, 241, 0.35)",
-          }}
-        >
-          <Icons.Download size={14} />
-          <span>Save vCard (.vcf)</span>
-        </button>
-
-        <button
-          onClick={onOpenNameDrop}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 12,
-            background: "linear-gradient(135deg, #06B6D4, #3B82F6)",
-            color: "#ffffff",
-            border: "none",
-            fontWeight: 700,
-            fontSize: 12,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            boxShadow: "0 4px 14px rgba(6, 182, 212, 0.35)",
-          }}
-        >
-          <Icons.Tap size={14} />
-          <span>NameDrop Beam</span>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// Reads a NetworQ profile QR from an image (data URL). Returns the picked profile
-// fields, or null when the image has no QR (so the caller falls back to card OCR).
+// Reads a contact QR (a Digital Pass vCard, or the older NetworQ JSON) from an image.
+// Returns the picked profile fields, or null when there's no contact QR (caller falls back to OCR).
 function readProfileQr(dataUrl: string): Promise<Record<string, string> | null> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -1495,15 +1116,7 @@ function readProfileQr(dataUrl: string): Promise<Record<string, string> | null> 
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = require("jsqr")(data, width, height);
-        if (!code) return resolve(null);
-        const parsed = JSON.parse(code.data);
-        if (!parsed || typeof parsed !== "object") return resolve(null);
-        // Only accept known string fields from an untrusted QR payload
-        const picked: Record<string, string> = {};
-        for (const k of ["name", "title", "company", "email", "phone", "website", "linkedin"]) {
-          if (typeof parsed[k] === "string") picked[k] = parsed[k].slice(0, 300);
-        }
-        resolve(picked.name ? picked : null);
+        resolve(code ? parseContactQr(code.data) : null);
       } catch {
         resolve(null);
       }
@@ -1511,142 +1124,6 @@ function readProfileQr(dataUrl: string): Promise<Record<string, string> | null> 
     img.onerror = () => resolve(null);
     img.src = dataUrl;
   });
-}
-
-// ── NAMEDROP / SONIC BEAM TAP-TO-SHARE SIMULATOR ──────────────────────────────
-function NameDropModal({
-  user,
-  onClose,
-  isDark,
-}: {
-  user: any;
-  onClose: () => void;
-  isDark: boolean;
-}) {
-  const [beaming, setBeaming] = useState(false);
-
-  const startBeam = () => {
-    setBeaming(true);
-    triggerConfetti();
-    setTimeout(() => setBeaming(false), 2600);
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.75)",
-        backdropFilter: "blur(22px)",
-        WebkitBackdropFilter: "blur(22px)",
-        zIndex: 500,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 20,
-        animation: "fadeIn 0.2s ease",
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: isDark ? "rgba(15, 23, 42, 0.95)" : "rgba(255, 255, 255, 0.95)",
-          borderRadius: 24,
-          border: "1px solid rgba(6, 182, 212, 0.3)",
-          padding: 28,
-          textAlign: "center",
-          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-          animation: "fadeUp 0.2s ease",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ width: 60, height: 60, borderRadius: 20, background: "rgba(6, 182, 212, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-          <Icons.Tap size={32} color="#06B6D4" />
-        </div>
-
-        <h3 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 24, margin: 0 }}>NameDrop Beam</h3>
-        <p style={{ color: isDark ? "#94a3b8" : "#64748b", fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
-          Bring the top of your phone close to another phone to beam your contact card.
-        </p>
-
-        {/* Pulsing Magnetic Aura Animation */}
-        <div style={{ position: "relative", width: 180, height: 180, margin: "20px auto" }}>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              border: "2px solid rgba(6, 182, 212, 0.4)",
-              animation: beaming ? "pulse 0.8s ease infinite" : "none",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 25,
-              borderRadius: "50%",
-              border: "2px dashed rgba(99, 102, 241, 0.5)",
-              animation: "spin 8s linear infinite",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: 50,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366F1, #06B6D4)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#fff",
-              fontWeight: 800,
-              fontSize: 14,
-              boxShadow: "0 0 25px #06B6D4",
-            }}
-          >
-            {beaming ? "BEAMING…" : "HOLD NEAR"}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={startBeam}
-            style={{
-              flex: 2,
-              padding: "11px 20px",
-              borderRadius: 12,
-              background: "linear-gradient(135deg, #06B6D4, #3B82F6)",
-              color: "#fff",
-              border: "none",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            {beaming ? "Sending Card…" : "Simulate Beam Transfer"}
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1,
-              padding: "11px 16px",
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.1)",
-              border: "none",
-              color: isDark ? "#fff" : "#0f172a",
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── CMD + K COMMAND PALETTE ───────────────────────────────────────────────────
@@ -1912,7 +1389,6 @@ function NetworQApp() {
   const [sortCol, setSortCol] = useState("addedAt");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [modal, setModal] = useState<any>(null);
-  const [nameDropOpen, setNameDropOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [signupStep, setSignupStep] = useState(1);
   const [authMsg, setAuthMsg] = useState<{ text: string; type: "error" | "success" | "info" } | null>(null);
@@ -2453,7 +1929,6 @@ VOICE & ASSISTANT DIRECTIVES:
     if (meetModal) return setMeetModal(null), true;
     if (bulkEmailModalOpen) return setBulkEmailModalOpen(false), true;
     if (modal) return setModal(null), setPrepBrief(null), true;
-    if (nameDropOpen) return setNameDropOpen(false), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
     if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
@@ -4190,14 +3665,7 @@ Keep it punchy, sharp, and directly actionable.`;
     );
   }
 
-  const qrData = JSON.stringify({
-    name: currentUser?.name,
-    title: currentUser?.role,
-    company: currentUser?.company,
-    email: currentUser?.email,
-    phone: currentUser?.phone,
-    linkedin: currentUser?.linkedin,
-  });
+
 
   return (
     <div style={S.page}>
@@ -4209,11 +3677,6 @@ Keep it punchy, sharp, and directly actionable.`;
         id="networq-confetti-canvas"
         style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}
       />
-
-      {/* NameDrop Beam Modal */}
-      {nameDropOpen && (
-        <NameDropModal user={currentUser} onClose={() => setNameDropOpen(false)} isDark={isDark} />
-      )}
 
       {/* Cmd + K Command Palette */}
       <CommandPalette
@@ -5910,21 +5373,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {/* ── 3D MY QR PASS TAB ── */}
         {tab === "qr" && (
-          <div style={{ maxWidth: 520, margin: "0 auto", textAlign: "center" }}>
-            <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28, marginBottom: 4 }}>
-              My NetworQ 3D Pass
-            </h2>
-            <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 24 }}>
-              Interactive 3D holographic digital business card. Real-time tilt and vCard export.
-            </p>
-
-            <HoloCard3D
-              user={currentUser}
-              qrData={qrData}
-              isDark={isDark}
-              onOpenNameDrop={() => setNameDropOpen(true)}
-            />
-          </div>
+          <DigitalPass user={currentUser} isDark={isDark} showToast={showToast} onEditProfile={() => setTab("settings")} />
         )}
 
         {/* ── ADD CONTACT TAB ── */}
@@ -6595,7 +6044,7 @@ Keep it punchy, sharp, and directly actionable.`;
             { t: "events", icon: Icons.Calendar, label: "Events" },
             { t: "radar", icon: Icons.Radar, label: "Radar" },
             { t: "scan", icon: Icons.Scan, label: "Scan" },
-            { t: "qr", icon: Icons.QrCode, label: "3D Pass" },
+            { t: "qr", icon: Icons.QrCode, label: "Pass" },
             { t: "add", icon: Icons.Plus, label: "Add" },
           ].map(({ t, icon: MobileIcon, label }) => {
             const active = tab === t;
