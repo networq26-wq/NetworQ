@@ -9,6 +9,7 @@ import { EventsHub } from "./events/EventsHub";
 import { createVoicePlayer } from "./voice/voicePlayer";
 import { useNotifications, haptic, type AppNotification } from "./notifications/useNotifications";
 import { NotificationCenter } from "./notifications/NotificationCenter";
+import { CameraCapture } from "./scanner/CameraCapture";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -1503,211 +1504,38 @@ function HoloCard3D({
   );
 }
 
-// ── LIVE CAMERA SCANNER MODAL ─────────────────────────────────────────────────
-function LiveCameraModal({
-  isOpen,
-  onClose,
-  onCapture,
-  isDark,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onCapture: (file: any) => void;
-  isDark: boolean;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const [cameraError, setCameraError] = useState("");
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    if (!isOpen) {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-      setReady(false);
-      return;
-    }
-
-    setCameraError("");
-    setReady(false);
-
-    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraError("Live camera stream not supported directly by this browser. Tap Open Native Camera.");
-      return;
-    }
-
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
-        audio: false,
-      })
-      .then((stream) => {
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play().then(() => setReady(true)).catch(console.warn);
-          };
+// Reads a NetworQ profile QR from an image (data URL). Returns the picked profile
+// fields, or null when the image has no QR (so the caller falls back to card OCR).
+function readProfileQr(dataUrl: string): Promise<Record<string, string> | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = require("jsqr")(data, width, height);
+        if (!code) return resolve(null);
+        const parsed = JSON.parse(code.data);
+        if (!parsed || typeof parsed !== "object") return resolve(null);
+        // Only accept known string fields from an untrusted QR payload
+        const picked: Record<string, string> = {};
+        for (const k of ["name", "title", "company", "email", "phone", "website", "linkedin"]) {
+          if (typeof parsed[k] === "string") picked[k] = parsed[k].slice(0, 300);
         }
-      })
-      .catch((err) => {
-        console.warn("Camera stream error:", err);
-        setCameraError(
-          err.name === "NotAllowedError"
-            ? "Camera permission denied. Please allow camera access in app settings."
-            : "Unable to start live camera feed. Please use native camera capture."
-        );
-      });
-
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
+        resolve(picked.name ? picked : null);
+      } catch {
+        resolve(null);
       }
     };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const handleSnap = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], `card_scan_${Date.now()}.jpg`, { type: "image/jpeg" });
-        onCapture(file);
-        onClose();
-      }
-    }, "image/jpeg", 0.92);
-  };
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
-        background: "rgba(0,0,0,0.85)",
-        backdropFilter: "blur(12px)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          background: isDark ? "#1C1C1E" : "#FFFFFF",
-          borderRadius: 22,
-          overflow: "hidden",
-          boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px" }}>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: isDark ? "#FFF" : "#000" }}>Live Card Scanner</div>
-            <div style={{ fontSize: 12, color: isDark ? "#8E8E93" : "#6E6E73" }}>Fit business card inside frame</div>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)",
-              border: "none",
-              borderRadius: "50%",
-              width: 32,
-              height: 32,
-              cursor: "pointer",
-              color: isDark ? "#FFF" : "#000",
-              fontSize: 16,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
-        <div style={{ position: "relative", width: "100%", height: 320, background: "#000", overflow: "hidden" }}>
-          {cameraError ? (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", color: "#EF4444" }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📷</div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{cameraError}</div>
-            </div>
-          ) : (
-            <>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: "25px 20px",
-                  border: "2px dashed rgba(255,255,255,0.85)",
-                  borderRadius: 14,
-                  boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
-                  pointerEvents: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <div style={{ color: "#FFF", fontSize: 12, fontWeight: 600, background: "rgba(0,0,0,0.6)", padding: "5px 12px", borderRadius: 20 }}>
-                  Align Business Card
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ padding: "18px 24px", display: "flex", alignItems: "center", justifyContent: "center", gap: 16, background: isDark ? "#161617" : "#F5F5F7" }}>
-          {!cameraError && (
-            <button
-              onClick={handleSnap}
-              disabled={!ready}
-              style={{
-                width: 62,
-                height: 62,
-                borderRadius: "50%",
-                background: ready ? "linear-gradient(135deg, #7C3AED, #A78BFA)" : "#8E8E93",
-                border: "4px solid rgba(255,255,255,0.8)",
-                boxShadow: "0 4px 14px rgba(124, 58, 237,0.4)",
-                cursor: ready ? "pointer" : "default",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#FFF",
-                fontSize: 22,
-              }}
-            >
-              📸
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
 }
 
 // ── NAMEDROP / SONIC BEAM TAP-TO-SHARE SIMULATOR ──────────────────────────────
@@ -2177,7 +2005,6 @@ function NetworQApp() {
   const [isRecordingVoice, setIsRecordingVoice] = useState(false);
   const fileRef = useRef<any>(null);
   const cameraFileRef = useRef<any>(null);
-  const qrFileRef = useRef<any>(null);
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
 
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
@@ -2897,6 +2724,16 @@ VOICE & ASSISTANT DIRECTIVES:
         setScanErr("");
         setScanning(true);
         try {
+          // A NetworQ profile QR fills the form instantly, with no AI call
+          const qr = await readProfileQr(e.target.result);
+          if (qr) {
+            triggerConfetti();
+            setAddForm((f) => ({ ...f, ...qr }));
+            setAddStep("preview");
+            setTab("add");
+            setScanPreview(null);
+            return;
+          }
           const dataUrl = await downscaleImage(e.target.result);
           const mimeType = dataUrl.slice(5, dataUrl.indexOf(";")) || file.type;
           const base64 = dataUrl.split(",")[1];
@@ -2957,50 +2794,6 @@ VOICE & ASSISTANT DIRECTIVES:
     },
     [currentUser]
   );
-
-  const handleQrFile = useCallback(async (file: any) => {
-    if (!file?.type?.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = async (e: any) => {
-      setScanning(true);
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const jsQR = require("jsqr");
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        setScanning(false);
-        if (code) {
-          try {
-            const data = JSON.parse(code.data);
-            if (!data || typeof data !== "object") throw new Error("not a profile");
-            // Only accept known string fields from an untrusted QR payload
-            const fields = ["name", "title", "company", "email", "phone", "website", "linkedin"] as const;
-            const picked: Record<string, string> = {};
-            for (const k of fields) {
-              if (typeof data[k] === "string") picked[k] = data[k].slice(0, 300);
-            }
-            if (!picked.name) throw new Error("missing name");
-            triggerConfetti();
-            setAddForm((f) => ({ ...f, ...picked }));
-            setAddStep("preview");
-            setTab("add");
-          } catch {
-            showToast("QR code found but could not read a NetworQ profile.", "error");
-          }
-        } else {
-          showToast("No QR code detected. Try a clearer image.", "error");
-        }
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }, [showToast]);
 
   const saveContact = async () => {
     setSaving(true);
@@ -6102,176 +5895,91 @@ Keep it punchy, sharp, and directly actionable.`;
         {/* ── SCAN TAB ── */}
         {tab === "scan" && (
           <div style={{ maxWidth: 580, margin: "0 auto" }}>
-            <LiveCameraModal
-              isOpen={liveCameraOpen}
+            <CameraCapture
+              open={liveCameraOpen}
               onClose={() => setLiveCameraOpen(false)}
               onCapture={(f) => handleFile(f)}
-              isDark={isDark}
+              onFallback={() => cameraFileRef.current?.click()}
             />
 
             <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 28, marginBottom: 4, letterSpacing: "-0.02em" }}>
-              Scan Business Card
+              Scan a card
             </h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
-              Use your device camera or upload a business card photo to automatically extract contact details.
+              Point your camera at a business card or NetworQ QR, or upload a photo. We fill in the details for you.
             </p>
 
-            {/* Quick Action Camera Buttons */}
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 16 }}>
-              <button
-                onClick={() => cameraFileRef.current?.click()}
-                style={{
-                  padding: "14px 18px",
-                  borderRadius: 14,
-                  background: "#7C3AED",
-                  color: "#FFFFFF",
-                  border: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                  boxShadow: "none",
-                }}
-              >
-                <Icons.Camera size={18} color="#FFFFFF" />
-                <span>Open Device Camera</span>
-              </button>
-
-              <button
-                onClick={() => setLiveCameraOpen(true)}
-                style={{
-                  padding: "14px 18px",
-                  borderRadius: 14,
-                  background: isDark ? "rgba(255, 255, 255, 0.08)" : "#F5F5F7",
-                  color: isDark ? "#FFFFFF" : "#1D1D1F",
-                  border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.15)" : "#E5E5EA"}`,
-                  fontWeight: 700,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 10,
-                }}
-              >
-                <Icons.Scan size={18} color={isDark ? "#A78BFA" : "#7C3AED"} />
-                <span>Live Viewfinder Scan</span>
-              </button>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              {([
+                { key: "scan", label: "Scan", sub: "Use camera", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
+                { key: "upload", label: "Upload", sub: "From photos", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
+              ] as const).map((b) => (
+                <button
+                  key={b.key}
+                  onClick={b.act}
+                  disabled={scanning}
+                  aria-label={b.key === "scan" ? "Scan with camera" : "Upload a photo"}
+                  onDragOver={b.key === "upload" ? (e) => e.preventDefault() : undefined}
+                  onDrop={b.key === "upload" ? (e: any) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); } : undefined}
+                  style={{
+                    padding: "26px 12px 22px",
+                    borderRadius: 20,
+                    border: b.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
+                    background: b.primary ? "#7C3AED" : isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+                    color: b.primary ? "#FFFFFF" : themeStyles.text,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 10,
+                    cursor: scanning ? "default" : "pointer",
+                    opacity: scanning ? 0.6 : 1,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: b.primary ? "rgba(255,255,255,0.18)" : isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)",
+                    }}
+                  >
+                    <b.icon size={24} color={b.primary ? "#FFFFFF" : isDark ? "#A78BFA" : "#7C3AED"} />
+                  </span>
+                  <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em" }}>{b.label}</span>
+                  <span style={{ fontSize: 12, opacity: 0.75 }}>{b.sub}</span>
+                </button>
+              ))}
             </div>
 
-            <div style={S.card}>
-              <div
-                style={{
-                  border: `2px dashed ${isDark ? "rgba(255,255,255,0.15)" : "#D2D2D7"}`,
-                  borderRadius: 14,
-                  padding: "36px 20px",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  background: isDark ? "rgba(255,255,255,0.02)" : "#FAFAFC",
-                  transition: "all 0.2s ease",
-                }}
-                onClick={() => fileRef.current?.click()}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleFile(e.dataTransfer.files[0]);
-                }}
-              >
-                {scanning ? (
-                  <div>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`,
-                        borderTopColor: isDark ? "#A78BFA" : "#7C3AED",
-                        borderRadius: "50%",
-                        animation: "spin 0.8s linear infinite",
-                        margin: "0 auto 14px",
-                      }}
-                    />
-                    <div style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>Scanning business card…</div>
+            {(scanning || scanPreview || scanErr) && (
+              <div style={{ ...S.card, marginTop: 16, textAlign: "center" }}>
+                {scanPreview && (
+                  <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, borderRadius: 12, maxWidth: "100%", marginBottom: scanning || scanErr ? 14 : 0 }} />
+                )}
+                {scanning && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
+                    <span style={{ width: 18, height: 18, border: "2px solid rgba(124,58,237,0.25)", borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                    Reading card…
                   </div>
-                ) : scanPreview ? (
-                  <img src={scanPreview} alt="preview" style={{ maxHeight: 200, borderRadius: 10, maxWidth: "100%", boxShadow: "0 6px 20px rgba(0,0,0,0.15)" }} />
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                    <img
-                      src="/illustrations/File-Upload/File-Upload-1.svg"
-                      alt="Upload Illustration"
-                      style={{
-                        width: 170,
-                        height: 85,
-                        objectFit: "contain",
-                        marginBottom: 10,
-                        filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
-                      }}
-                    />
-                    <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4, color: themeStyles.text }}>Choose from Gallery or Drop Card</div>
-                    <div style={{ color: themeStyles.textMuted, fontSize: 12 }}>
-                      or <span style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600 }}>browse files</span> · PNG, JPG
-                    </div>
+                )}
+                {scanErr && (
+                  <div role="alert" style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 10, color: "#ef4444", fontSize: 13, display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}>
+                    <Icons.AlertCircle size={15} />
+                    <span>{scanErr}</span>
+                    <button aria-label="Dismiss" onClick={() => { setScanErr(""); setScanPreview(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#ef4444", cursor: "pointer", display: "flex" }}>
+                      <Icons.Close size={14} />
+                    </button>
                   </div>
                 )}
               </div>
+            )}
 
-              {/* Native device camera input with capture attribute */}
-              <input
-                ref={cameraFileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: "none" }}
-                onChange={(e: any) => handleFile(e.target.files[0])}
-              />
-
-              {/* Standard photo library input */}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                style={{ display: "none" }}
-                onChange={(e: any) => handleFile(e.target.files[0])}
-              />
-
-              {scanErr && (
-                <div
-                  style={{
-                    marginTop: 14,
-                    padding: "10px 14px",
-                    background: "rgba(239, 68, 68, 0.1)",
-                    border: "1px solid rgba(239, 68, 68, 0.2)",
-                    borderRadius: 10,
-                    color: "#ef4444",
-                    fontSize: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <Icons.AlertCircle size={15} />
-                  <span>{scanErr}</span>
-                  <button aria-label="Close"
-                    onClick={() => { setScanErr(""); setScanPreview(null); }}
-                    style={{ marginLeft: "auto", background: "none", border: "none", color: "#ef4444", cursor: "pointer", display: "flex" }}
-                  >
-                    <Icons.Close size={14} />
-                  </button>
-                </div>
-              )}
-
-              <div style={{ marginTop: 20, padding: 14, background: themeStyles.subtleBg, borderRadius: 12, textAlign: "center" }}>
-                <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 13 }}>Or Scan a NetworQ QR Code</div>
-                <button style={S.btnSm} onClick={() => qrFileRef.current?.click()}>
-                  <Icons.QrCode size={14} />
-                  <span>Upload QR Code</span>
-                </button>
-                <input ref={qrFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e: any) => handleQrFile(e.target.files[0])} />
-              </div>
-            </div>
+            {/* Fallback: the phone's own camera app (used when the live camera can't start) */}
+            <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept="image/*" aria-label="Card photo" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
           </div>
         )}
 
