@@ -37,6 +37,9 @@
   <label>Mode
     <select id="mode"><option value="android">Android app (APK)</option><option value="web">Mobile website</option></select>
   </label>
+  <label title="Dev-only Bluetooth simulator: how far this preview appears to other preview windows">Simulated distance
+    <select id="ble"><option value="-55">Very close</option><option value="-71">~3 m</option><option value="-79" selected>~5 m</option><option value="-86">~10 m</option><option value="-95">~20 m</option></select>
+  </label>
   <label>Zoom <select id="zoom"><option>0.6</option><option>0.75</option><option selected>0.85</option><option>1</option></select></label>
   <label><input type="checkbox" id="dark" /> Dark status bars</label>
   <button class="primary" id="reload">Reload all</button>
@@ -59,17 +62,20 @@
   const APP = "http://localhost:8081";
   const $ = (id) => document.getElementById(id);
   const saved = JSON.parse(localStorage.getItem("nq-preview") || "{}");
-  for (const k of ["path", "mode", "zoom"]) if (saved[k]) $(k).value = saved[k];
+  for (const k of ["path", "mode", "zoom", "ble"]) if (saved[k]) $(k).value = saved[k];
   $("dark").checked = !!saved.dark;
 
   function src() {
     const p = $("path").value || "/";
     const url = new URL(p, APP);
-    if ($("mode").value === "android") url.searchParams.set("shell", "android");
+    if ($("mode").value === "android") {
+      url.searchParams.set("shell", "android");
+      url.searchParams.set("bleRssi", $("ble").value);
+    }
     return url.toString();
   }
   function render() {
-    localStorage.setItem("nq-preview", JSON.stringify({ path: $("path").value, mode: $("mode").value, zoom: $("zoom").value, dark: $("dark").checked }));
+    localStorage.setItem("nq-preview", JSON.stringify({ path: $("path").value, mode: $("mode").value, zoom: $("zoom").value, ble: $("ble").value, dark: $("dark").checked }));
     const z = +$("zoom").value;
     $("devices").innerHTML = DEVICES.map((d) => `
       <figure>
@@ -85,7 +91,7 @@
         <figcaption>${d.name} · ${d.w}×${d.h - d.sb - d.nb} usable</figcaption>
       </figure>`).join("");
   }
-  for (const id of ["mode", "zoom", "dark"]) $(id).addEventListener("change", render);
+  for (const id of ["mode", "zoom", "dark", "ble"]) $(id).addEventListener("change", render);
   $("path").addEventListener("keydown", (e) => e.key === "Enter" && render());
   $("reload").addEventListener("click", render);
   render();

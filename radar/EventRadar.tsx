@@ -89,7 +89,12 @@ export function EventRadar({
 
   useEffect(() => {
     loadEvents();
-  }, [loadEvents]);
+    // Keep "N joined" current as people join or leave
+    const timer = setInterval(() => {
+      api.myEvents().then(setEvents).catch(() => {});
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [loadEvents, api]);
 
   const activeEvent = useMemo(() => {
     if (!events?.length) return null;
@@ -520,20 +525,20 @@ function EventHeader({
           {[event.venue, event.attendee_count ? `${event.attendee_count} joined` : null].filter(Boolean).join(" · ")}
         </div>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "nowrap", width: "100%", overflowX: "auto" }}>
         {event.join_code && (
-          <button style={btn(t, "ghost")} onClick={onShare} aria-label={`Share event code ${event.join_code}`}>
+          <button style={{ ...btn(t, "ghost"), flex: "1 1 auto", whiteSpace: "nowrap" }} onClick={onShare} aria-label={`Share event code ${event.join_code}`}>
             <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.04em" }}>{event.join_code}</span>
             <span aria-hidden="true">· Share</span>
           </button>
         )}
         {events.length === 1 && (
-          <button style={btn(t, "ghost")} onClick={onAddEvent}>
+          <button style={{ ...btn(t, "ghost"), whiteSpace: "nowrap" }} onClick={onAddEvent}>
             + Event
           </button>
         )}
         <button
-          style={btn(t, "danger")}
+          style={{ ...btn(t, "danger"), whiteSpace: "nowrap" }}
           onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
           onBlur={() => setConfirmLeave(false)}
           aria-label={confirmLeave ? "Confirm leave event" : "Leave event"}

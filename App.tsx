@@ -7330,7 +7330,8 @@ Keep it punchy, sharp, and directly actionable.`;
                     setAiListening(false);
                   }
                 }}
-                title="Minimize Assistant"
+                title="Close"
+                aria-label="Close"
                 style={{
                   width: 30,
                   height: 30,

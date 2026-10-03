@@ -213,7 +213,9 @@ export function RadarCanvas({
         ctx.textAlign = "center";
         ctx.fillStyle = isDark ? "#FFFFFF" : "#1C1C1E";
         ctx.font = "600 11px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
-        ctx.fillText(p.name.split(" ")[0], x, y + 30);
+        // First name + last initial — disambiguates people who share a first name
+        const parts = p.name.trim().split(/\s+/);
+        ctx.fillText(parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0], x, y + 30);
         ctx.fillStyle = isDark ? "#AEAEB2" : "#6E6E73";
         ctx.font = "500 10px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
         ctx.fillText(p.bucket ? BUCKET_LABEL[p.bucket] : "Nearby", x, y + 42);

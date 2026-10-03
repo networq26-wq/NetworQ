@@ -55,6 +55,7 @@ const MIGRATIONS = [
   "20261003_account_email_events.sql",
   "20261003b_avatars_storage.sql",
   "20261004_events_crawler.sql",
+  "20261005_connections_dedupe.sql",
 ];
 
 const authConfig = {

@@ -245,6 +245,23 @@ const evDeps = eventsDeps();
 if (evDeps) app.use("/api", createEventsRouter(evDeps));
 else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
 
+// ── Dev-only Bluetooth simulator for the device preview (never in production) ──
+// Preview windows publish their current Radar token here and "hear" each other,
+// so the full token → resolve → connect flow can be tested without radios.
+if (process.env.NODE_ENV !== "production") {
+  const air = new Map(); // deviceId → { token, rssi, at }
+  app.post("/api/dev/ble", (req, res) => {
+    const { deviceId, token, rssi } = req.body || {};
+    if (typeof deviceId !== "string" || deviceId.length > 64) return res.status(400).json({ error: "deviceId required" });
+    if (token && /^[0-9a-f]{16}$/.test(token)) air.set(deviceId, { token, rssi: Number(rssi) || -75, at: Date.now() });
+    else air.delete(deviceId);
+    const heard = [...air.entries()]
+      .filter(([id, v]) => id !== deviceId && Date.now() - v.at < 10_000)
+      .map(([, v]) => ({ token: v.token, rssi: v.rssi + Math.round((Math.random() - 0.5) * 6), ts: Date.now() }));
+    res.json({ heard });
+  });
+}
+
 // ── Email sending ─────────────────────────────────────────────────────────────
 app.post("/api/email", async (req, res) => emailHandler(req, res));
 app.options("/api/email", (req, res) => res.status(200).end());
@@ -327,7 +344,10 @@ function startServer() {
   let reminderTimer = null;
   let purgeTimer = null;
   let stopCrawler = null;
-  if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // Background jobs touch real users (reminder emails, deletions, crawling) — production only,
+  // unless explicitly enabled for local debugging with NETWORQ_JOBS=1.
+  const runJobs = process.env.NODE_ENV === "production" || process.env.NETWORQ_JOBS === "1";
+  if (runJobs && process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     reminderTimer = startReminderEngine();
     purgeDeletedAccounts().catch(console.error);
     purgeTimer = setInterval(() => purgeDeletedAccounts().catch(console.error), 60 * 60 * 1000);

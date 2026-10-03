@@ -1,0 +1,20 @@
+import { test, expect } from "@playwright/test";
+test("probe leave", async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 764 });
+  await page.goto("http://localhost:8081/?shell=android");
+  await page.getByPlaceholder("name@company.com").fill("preview.a@networq.co.in");
+  await page.getByLabel("Password", { exact: true }).fill("Preview#2026");
+  await page.getByRole("button", { name: "Sign In", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Profile & Settings" })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: "Radar", exact: true }).last().click();
+  const leave = page.getByRole("button", { name: "Leave event", exact: true });
+  await expect(leave).toBeVisible({ timeout: 15000 });
+  await leave.click();
+  await page.waitForTimeout(400);
+  console.log("after 1st tap, button names:", await page.locator("section button").evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") || e.textContent).filter((t) => /leave|confirm/i.test(t || ""))));
+  page.on("response", async (r) => { if (r.url().includes("/rpc/")) console.log("RPC", r.status(), r.url().split("/rpc/")[1], (await r.text().catch(() => "")).slice(0, 160)); });
+  await page.getByRole("button", { name: "Confirm leave event", exact: true }).click();
+  await page.waitForTimeout(3000);
+  console.log("body:", (await page.locator("body").innerText()).replace(/\s+/g, " ").slice(0, 300));
+  await page.screenshot({ path: "qa-logs/probe.png" });
+});
