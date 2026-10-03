@@ -14,6 +14,11 @@ import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
 import { DigitalPass } from "./pass/DigitalPass";
 import { parseContactQr } from "./pass/vcard";
+import { BatchScannerModal } from "./scanner/BatchScannerModal";
+import { NetworkMapModal } from "./network/NetworkMapModal";
+import { IntroductionsModal } from "./network/IntroductionsModal";
+import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
+import { GlobalSearchModal } from "./search/GlobalSearchModal";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -1454,6 +1459,13 @@ function NetworQApp() {
   const fileRef = useRef<any>(null);
   const cameraFileRef = useRef<any>(null);
   const [liveCameraOpen, setLiveCameraOpen] = useState(false);
+  const [batchScannerOpen, setBatchScannerOpen] = useState(false);
+  const [batchInitialFiles, setBatchInitialFiles] = useState<File[]>([]);
+  const [networkMapOpen, setNetworkMapOpen] = useState(false);
+  const [introductionsOpen, setIntroductionsOpen] = useState(false);
+  const [introTargetContact, setIntroTargetContact] = useState<any | null>(null);
+  const [daySummaryOpen, setDaySummaryOpen] = useState(false);
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -1925,6 +1937,11 @@ VOICE & ASSISTANT DIRECTIVES:
     }
     if (notifOpen) return setNotifOpen(false), true;
     if (liveCameraOpen) return setLiveCameraOpen(false), true;
+    if (batchScannerOpen) return setBatchScannerOpen(false), true;
+    if (networkMapOpen) return setNetworkMapOpen(false), true;
+    if (introductionsOpen) return setIntroductionsOpen(false), true;
+    if (daySummaryOpen) return setDaySummaryOpen(false), true;
+    if (globalSearchOpen) return setGlobalSearchOpen(false), true;
     if (composer) return setComposer(null), true;
     if (meetModal) return setMeetModal(null), true;
     if (bulkEmailModalOpen) return setBulkEmailModalOpen(false), true;
@@ -4052,6 +4069,48 @@ Keep it punchy, sharp, and directly actionable.`;
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button
+                onClick={() => setGlobalSearchOpen(true)}
+                title="Global Professional Search"
+                aria-label="Global Professional Search"
+                style={{
+                  width: isMobile ? 44 : 36,
+                  height: isMobile ? 44 : 36,
+                  borderRadius: 9,
+                  border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
+                  background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+                  color: themeStyles.textMuted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <Icons.Search size={isMobile ? 18 : 16} />
+              </button>
+
+              {!isMobile && (
+                <button
+                  onClick={() => setNetworkMapOpen(true)}
+                  title="Professional Network Map"
+                  aria-label="Professional Network Map"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 9,
+                    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
+                    background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+                    color: themeStyles.textMuted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>🕸️</span>
+                </button>
+              )}
+
+              <button
                 onClick={() => setNotifOpen(true)}
                 title="Notifications & Reminders"
                 aria-label={notif.unread ? `Notifications, ${notif.unread} unread` : "Notifications & Reminders"}
@@ -5300,16 +5359,25 @@ Keep it punchy, sharp, and directly actionable.`;
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {([
-                { key: "scan", label: "Scan", sub: "Use camera", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
-                { key: "upload", label: "Upload", sub: "From photos", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
+                { key: "scan", label: "SCAN NOW", sub: "Use camera directly", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
+                { key: "upload", label: "UPLOAD", sub: "Single or multi-card", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
               ] as const).map((b) => (
                 <button
                   key={b.key}
                   onClick={b.act}
                   disabled={scanning}
-                  aria-label={b.key === "scan" ? "Scan with camera" : "Upload a photo"}
+                  aria-label={b.key === "scan" ? "Scan with camera" : "Upload photos"}
                   onDragOver={b.key === "upload" ? (e) => e.preventDefault() : undefined}
-                  onDrop={b.key === "upload" ? (e: any) => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); } : undefined}
+                  onDrop={b.key === "upload" ? (e: any) => {
+                    e.preventDefault();
+                    const files = Array.from(e.dataTransfer.files || []) as File[];
+                    if (files.length > 1) {
+                      setBatchInitialFiles(files);
+                      setBatchScannerOpen(true);
+                    } else if (files.length === 1) {
+                      handleFile(files[0]);
+                    }
+                  } : undefined}
                   style={{
                     padding: "26px 12px 22px",
                     borderRadius: 20,
@@ -5337,10 +5405,30 @@ Keep it punchy, sharp, and directly actionable.`;
                   >
                     <b.icon size={24} color={b.primary ? "#FFFFFF" : isDark ? "#A78BFA" : "#7C3AED"} />
                   </span>
-                  <span style={{ fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em" }}>{b.label}</span>
+                  <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>{b.label}</span>
                   <span style={{ fontSize: 12, opacity: 0.75 }}>{b.sub}</span>
                 </button>
               ))}
+            </div>
+
+            <div style={{ textAlign: "center", marginTop: 14 }}>
+              <button
+                onClick={() => {
+                  setBatchInitialFiles([]);
+                  setBatchScannerOpen(true);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: isDark ? "#A78BFA" : "#7C3AED",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: "6px 12px",
+                }}
+              >
+                ⚡ Open Batch Multi-Card Queue (Process up to 25 cards) →
+              </button>
             </div>
 
             {(scanning || scanPreview || scanErr) && (
@@ -5368,7 +5456,24 @@ Keep it punchy, sharp, and directly actionable.`;
 
             {/* Fallback: the phone's own camera app (used when the live camera can't start) */}
             <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
-            <input ref={fileRef} type="file" accept="image/*" aria-label="Card photo" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept="image/*"
+              aria-label="Card photo"
+              style={{ display: "none" }}
+              onChange={(e: any) => {
+                const files = Array.from(e.target.files || []) as File[];
+                if (files.length > 1) {
+                  setBatchInitialFiles(files);
+                  setBatchScannerOpen(true);
+                } else if (files.length === 1) {
+                  handleFile(files[0]);
+                }
+                e.target.value = "";
+              }}
+            />
           </div>
         )}
 
@@ -6767,6 +6872,120 @@ Keep it punchy, sharp, and directly actionable.`;
             </button>
           </div>
         </div>
+      )}
+
+      {/* ── BATCH CARD SCANNER (Part 20-26) ── */}
+      {batchScannerOpen && (
+        <BatchScannerModal
+          open={batchScannerOpen}
+          onClose={() => {
+            setBatchScannerOpen(false);
+            setBatchInitialFiles([]);
+          }}
+          initialFiles={batchInitialFiles}
+          isDark={isDark}
+          existingContacts={contacts}
+          callAI={callAI}
+          onSaveContact={async (data, isUpdate, existingId) => {
+            if (isUpdate && existingId) {
+              await supabase.from("contacts").update(data).eq("id", existingId);
+              setContacts((prev) => prev.map((c) => (c.id === existingId ? { ...c, ...data } : c)));
+            } else {
+              const { data: ins } = await supabase
+                .from("contacts")
+                .insert({ user_id: currentUser?.id, ...data })
+                .select()
+                .single();
+              if (ins) setContacts((prev) => [dbToContact(ins), ...prev]);
+            }
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── PROFESSIONAL NETWORK MAP (Part 11) ── */}
+      {networkMapOpen && (
+        <NetworkMapModal
+          open={networkMapOpen}
+          onClose={() => setNetworkMapOpen(false)}
+          currentUser={currentUser}
+          contacts={contacts}
+          isDark={isDark}
+          onRequestIntro={(c) => {
+            setIntroTargetContact(c);
+            setNetworkMapOpen(false);
+            setIntroductionsOpen(true);
+          }}
+          onOpenContact={(c) => {
+            setNetworkMapOpen(false);
+            setModal(c);
+          }}
+        />
+      )}
+
+      {/* ── MUTUAL INTRODUCTIONS WORKFLOW (Part 12) ── */}
+      {introductionsOpen && (
+        <IntroductionsModal
+          open={introductionsOpen}
+          onClose={() => {
+            setIntroductionsOpen(false);
+            setIntroTargetContact(null);
+          }}
+          targetContact={introTargetContact}
+          contacts={contacts}
+          isDark={isDark}
+          onSendIntroRequest={async (connectorId, targetName, targetCompany, note) => {
+            await supabase.from("connection_requests").insert({
+              from_user: currentUser?.id,
+              to_user: connectorId,
+              status: "pending",
+            });
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── NETWORKING DAY SUMMARY (Part 40) ── */}
+      {daySummaryOpen && (
+        <NetworkingDaySummaryModal
+          open={daySummaryOpen}
+          onClose={() => setDaySummaryOpen(false)}
+          contacts={contacts}
+          isDark={isDark}
+          callAI={callAI}
+          onScheduleReminder={async (cId, d, n) => {
+            await supabase.from("reminders").insert({
+              user_id: currentUser?.id,
+              contact_id: cId,
+              due_date: d,
+              note: n,
+            });
+          }}
+          onDraftEmail={(c) => {
+            setDaySummaryOpen(false);
+            setComposer({ contact: c, type: "Networking follow-up" });
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── GLOBAL PROFESSIONAL SEARCH (Part 60) ── */}
+      {globalSearchOpen && (
+        <GlobalSearchModal
+          open={globalSearchOpen}
+          onClose={() => setGlobalSearchOpen(false)}
+          contacts={contacts}
+          isDark={isDark}
+          onSelectContact={(c) => setModal(c)}
+          onRequestConnect={async (p) => {
+            await supabase.from("connection_requests").insert({
+              from_user: currentUser?.id,
+              to_user: p.id,
+            });
+            showToast("Connection request sent!", "success");
+          }}
+          supabase={supabase}
+        />
       )}
 
       {/* ── TOAST NOTIFICATION ── */}

@@ -12,7 +12,19 @@ const STYLES = [
 ] as const;
 
 const PREFS_KEY = "networq.pass";
-function readPrefs(): { style?: string; showEmail?: boolean; showPhone?: boolean } {
+export type PassMode = "normal" | "event" | "sales" | "speaker";
+
+function readPrefs(): {
+  style?: string;
+  showEmail?: boolean;
+  showPhone?: boolean;
+  mode?: PassMode;
+  eventGoal?: string;
+  eventName?: string;
+  salesPitch?: string;
+  meetingUrl?: string;
+  speakerTopic?: string;
+} {
   try {
     return JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
   } catch {
@@ -26,7 +38,7 @@ export function DigitalPass({
   showToast,
   onEditProfile,
 }: {
-  user: { name?: string; role?: string; company?: string; email?: string; phone?: string; linkedin?: string; avatar_url?: string };
+  user: { name?: string; role?: string; company?: string; email?: string; phone?: string; linkedin?: string; website?: string; avatar_url?: string };
   isDark: boolean;
   showToast: (m: string, t?: "success" | "error" | "info") => void;
   onEditProfile: () => void;
@@ -35,6 +47,12 @@ export function DigitalPass({
   const [styleId, setStyleId] = useState(prefs.style || "violet");
   const [showEmail, setShowEmail] = useState(prefs.showEmail ?? true);
   const [showPhone, setShowPhone] = useState(prefs.showPhone ?? true);
+  const [mode, setMode] = useState<PassMode>(prefs.mode || "normal");
+  const [eventName, setEventName] = useState(prefs.eventName || "");
+  const [eventGoal, setEventGoal] = useState(prefs.eventGoal || "Collaborators & Partners");
+  const [salesPitch, setSalesPitch] = useState(prefs.salesPitch || "Consulting & Enterprise Solutions");
+  const [meetingUrl, setMeetingUrl] = useState(prefs.meetingUrl || "");
+  const [speakerTopic, setSpeakerTopic] = useState(prefs.speakerTopic || "Keynote Session");
   const [qr, setQr] = useState("");
   const [shine, setShine] = useState({ x: 50, y: 30, rx: 0, ry: 0 });
   const cardRef = useRef<HTMLDivElement>(null);
@@ -42,9 +60,31 @@ export function DigitalPass({
 
   useEffect(() => {
     try {
-      localStorage.setItem(PREFS_KEY, JSON.stringify({ style: styleId, showEmail, showPhone }));
+      localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({
+          style: styleId,
+          showEmail,
+          showPhone,
+          mode,
+          eventName,
+          eventGoal,
+          salesPitch,
+          meetingUrl,
+          speakerTopic,
+        })
+      );
     } catch {}
-  }, [styleId, showEmail, showPhone]);
+  }, [styleId, showEmail, showPhone, mode, eventName, eventGoal, salesPitch, meetingUrl, speakerTopic]);
+
+  let contextualNote = "Connected via NetworQ";
+  if (mode === "event") {
+    contextualNote = `Event: ${eventName || "Conference"} | Looking for: ${eventGoal} | Connected via NetworQ`;
+  } else if (mode === "sales") {
+    contextualNote = `Services: ${salesPitch} ${meetingUrl ? `| Book: ${meetingUrl}` : ""} | Connected via NetworQ`;
+  } else if (mode === "speaker") {
+    contextualNote = `Speaker Talk: ${speakerTopic} | Connected via NetworQ`;
+  }
 
   const profile: PassProfile = {
     name: user?.name || "",
@@ -52,7 +92,9 @@ export function DigitalPass({
     company: user?.company || "",
     email: showEmail ? user?.email || "" : "",
     phone: showPhone ? user?.phone || "" : "",
+    website: mode === "sales" && meetingUrl ? meetingUrl : user?.website || "",
     linkedin: user?.linkedin || "",
+    note: contextualNote,
   };
   const vcard = buildVCard(profile);
 
@@ -148,7 +190,19 @@ export function DigitalPass({
             <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.02em" }}>
               Networ<span style={{ color: st.id === "pearl" ? PURPLE : "#C4B5FD" }}>Q</span>
             </span>
-            <span style={label}>Member pass</span>
+            <span
+              style={{
+                ...label,
+                background: mode !== "normal" ? (st.id === "pearl" ? "rgba(124,58,237,0.14)" : "rgba(255,255,255,0.18)") : "transparent",
+                padding: mode !== "normal" ? "4px 8px" : 0,
+                borderRadius: 8,
+              }}
+            >
+              {mode === "normal" && "Member pass"}
+              {mode === "event" && `Attendee · ${eventName || "Event"}`}
+              {mode === "sales" && "Sales & Solutions"}
+              {mode === "speaker" && "Featured Speaker"}
+            </span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 22, position: "relative" }}>
@@ -162,6 +216,24 @@ export function DigitalPass({
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, overflowWrap: "anywhere" }}>{profile.name || "Your name"}</div>
               <div style={{ fontSize: 14, color: st.sub, marginTop: 3 }}>{[profile.title, profile.company].filter(Boolean).join(" · ") || "Add your role in Settings"}</div>
+              {mode === "event" && (
+                <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
+                  <span>🎯 Looking for:</span>
+                  <span>{eventGoal}</span>
+                </div>
+              )}
+              {mode === "sales" && (
+                <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
+                  <span>💼 Services:</span>
+                  <span>{salesPitch}</span>
+                </div>
+              )}
+              {mode === "speaker" && (
+                <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
+                  <span>🎤 Session:</span>
+                  <span>{speakerTopic}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -201,6 +273,96 @@ export function DigitalPass({
 
       {/* Customise */}
       <section style={{ background: surface, border: `1px solid ${border}`, borderRadius: 18, padding: 16 }} aria-label="Customise pass">
+        {/* Contextual Mode Selector (Part 43) */}
+        <div style={{ fontSize: 13, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pass Mode</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 6, marginTop: 8, marginBottom: 18 }}>
+          {(["normal", "event", "sales", "speaker"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              style={{
+                padding: "8px 4px",
+                borderRadius: 10,
+                border: "none",
+                background: mode === m ? PURPLE : isDark ? "rgba(255,255,255,0.06)" : "#F2F2F7",
+                color: mode === m ? "#FFFFFF" : isDark ? "#A1A1AA" : "#52525B",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                textTransform: "capitalize",
+              }}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {/* Mode-specific configuration inputs */}
+        {mode === "event" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, padding: 12, borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB" }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: muted }}>Event Name</label>
+              <input
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="e.g. TechSummit 2026"
+                style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${border}`, background: surface, color: isDark ? "#FFF" : "#000", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: muted }}>Looking For</label>
+              <input
+                type="text"
+                value={eventGoal}
+                onChange={(e) => setEventGoal(e.target.value)}
+                placeholder="e.g. Collaborators, Investors, Clients"
+                style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${border}`, background: surface, color: isDark ? "#FFF" : "#000", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+        )}
+
+        {mode === "sales" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, padding: 12, borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB" }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: muted }}>Services / Value Pitch</label>
+              <input
+                type="text"
+                value={salesPitch}
+                onChange={(e) => setSalesPitch(e.target.value)}
+                placeholder="e.g. Custom AI & Software Engineering"
+                style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${border}`, background: surface, color: isDark ? "#FFF" : "#000", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: muted }}>Booking / Meeting URL</label>
+              <input
+                type="url"
+                value={meetingUrl}
+                onChange={(e) => setMeetingUrl(e.target.value)}
+                placeholder="https://calendly.com/your-link"
+                style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${border}`, background: surface, color: isDark ? "#FFF" : "#000", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+        )}
+
+        {mode === "speaker" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, padding: 12, borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "#F9FAFB" }}>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: muted }}>Session / Talk Topic</label>
+              <input
+                type="text"
+                value={speakerTopic}
+                onChange={(e) => setSpeakerTopic(e.target.value)}
+                placeholder="e.g. Scaling Realtime AI on the Edge"
+                style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${border}`, background: surface, color: isDark ? "#FFF" : "#000", fontSize: 13, boxSizing: "border-box" }}
+              />
+            </div>
+          </div>
+        )}
+
         <div style={{ fontSize: 13, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.04em" }}>Style</div>
         <div role="radiogroup" aria-label="Pass style" style={{ display: "flex", gap: 12, marginTop: 10 }}>
           {STYLES.map((s) => (

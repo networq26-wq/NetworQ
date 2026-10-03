@@ -9,6 +9,7 @@ export interface PassProfile {
   phone?: string;
   website?: string;
   linkedin?: string;
+  note?: string;
 }
 
 const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1");
@@ -28,6 +29,7 @@ export function buildVCard(p: PassProfile): string {
     p.phone && `TEL;TYPE=CELL:${p.phone.trim()}`,
     p.website && `URL:${p.website.trim()}`,
     p.linkedin && `X-SOCIALPROFILE;TYPE=linkedin:${p.linkedin.trim()}`,
+    p.note && `NOTE:${esc(p.note.trim())}`,
     "END:VCARD",
   ];
   return lines.filter(Boolean).join("\r\n");
