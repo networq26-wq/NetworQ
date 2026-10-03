@@ -158,9 +158,31 @@ export class MockSupabase {
         };
         return prof.notification_prefs;
       }
+      case "nearby_status": {
+        const e = this.events.find((ev) => ev.external_id === "networq:nearby");
+        const m = e && this.attendees.find((x) => x.event_id === e.id && x.user_id === uid);
+        return m ? { ...this.eventJson(e!, uid), settings: { radar_on: m.radar_on, visible: m.visible, show_distance: m.show_distance, show_profile: m.show_profile } } : null;
+      }
+      case "join_nearby": {
+        let e = this.events.find((ev) => ev.external_id === "networq:nearby");
+        if (!e) {
+          e = { id: randomUUID(), external_id: "networq:nearby", name: "Nearby", venue: null, starts_at: null, join_code: null, source: "nearby" as any, created_by: null as any };
+          this.events.push(e);
+        }
+        this.join(e.id, uid);
+        const m = this.member(e.id, uid);
+        Object.assign(m, { radar_on: true, visible: !!a.p_discoverable });
+        if (!m.visible) this.tokens = this.tokens.filter((t) => !(t.event_id === e!.id && t.user_id === uid));
+        return { ...this.eventJson(e, uid), settings: { radar_on: m.radar_on, visible: m.visible, show_distance: m.show_distance, show_profile: m.show_profile } };
+      }
+      case "leave_nearby": {
+        const e = this.events.find((ev) => ev.external_id === "networq:nearby");
+        if (e) return this.rpc("leave_event", { p_event_id: e.id }, uid);
+        return null;
+      }
       case "my_events":
         return this.attendees
-          .filter((x) => x.user_id === uid)
+          .filter((x) => x.user_id === uid && this.events.find((ev) => ev.id === x.event_id)?.external_id !== "networq:nearby")
           .map((x) => {
             const e = this.events.find((ev) => ev.id === x.event_id)!;
             return { ...this.eventJson(e, uid), attendee_count: this.attendees.filter((y) => y.event_id === e.id).length, settings: { radar_on: x.radar_on, visible: x.visible, show_distance: x.show_distance, show_profile: x.show_profile } };
@@ -225,6 +247,7 @@ export class MockSupabase {
       case "list_event_attendees": {
         const me = this.member(a.p_event_id, uid);
         me.last_seen_at = Date.now();
+        if (this.events.find((ev) => ev.id === a.p_event_id)?.external_id === "networq:nearby") return { people: [], hidden_count: 0 };
         const people = this.attendees
           .filter((x) => x.event_id === a.p_event_id && x.user_id !== uid && x.radar_on && x.visible && Date.now() - x.last_seen_at < 15 * 60_000)
           .map((x) => ({ ...this.profileOf(x.user_id, x.show_profile), user_id: x.user_id, show_distance: false }));

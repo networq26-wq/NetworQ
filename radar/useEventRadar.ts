@@ -61,6 +61,8 @@ export function useEventRadar(opts: {
   const eventId = event?.id ?? null;
 
   const [settings, setSettings] = useState<RadarSettings | null>(event?.settings ?? null);
+  // What the server has actually saved — tokens are issued against this, never the optimistic UI value
+  const [saved, setSaved] = useState<RadarSettings | null>(event?.settings ?? null);
   const [mode, setMode] = useState<RadarMode>(hasNativeShell() ? "native" : "web");
   const [nativeState, setNativeState] = useState<NativeState | null>(null);
   const [permission, setPermission] = useState<PermissionState | null>(null);
@@ -78,7 +80,10 @@ export function useEventRadar(opts: {
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
-  useEffect(() => setSettings(event?.settings ?? null), [eventId, event?.settings]);
+  useEffect(() => {
+    setSettings(event?.settings ?? null);
+    setSaved(event?.settings ?? null);
+  }, [eventId, event?.settings]);
 
   // Fresh state per event
   useEffect(() => {
@@ -131,8 +136,8 @@ export function useEventRadar(opts: {
     return () => window.removeEventListener(NATIVE_EVENT, handler);
   }, []);
 
-  const active = !!eventId && !!settings?.radar_on;
-  const visible = !!settings?.visible;
+  const active = !!eventId && !!saved?.radar_on;
+  const visible = !!saved?.visible;
 
   // Token lifecycle + BLE start/stop (Android app)
   const [startNonce, setStartNonce] = useState(0);
@@ -283,7 +288,9 @@ export function useEventRadar(opts: {
       const next = { ...settings, ...patch };
       setSettings(next);
       try {
-        setSettings(await api.updateSettings(eventId, next));
+        const result = await api.updateSettings(eventId, next);
+        setSettings(result);
+        setSaved(result);
       } catch (err: any) {
         setSettings(settings);
         onErrorRef.current?.(err.message);

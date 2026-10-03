@@ -123,6 +123,48 @@ test.describe("Event Radar", () => {
     await bob.ctx.close();
   });
 
+  test("Nearby (no event): off by default, discoverable people found over BLE, request works, hidden people vanish", async ({ browser, db }) => {
+    seed(db);
+    const asha = await newPage(browser, db);
+    const bob = await newPage(browser, db);
+    for (const [p, email] of [[asha.page, "asha@acme.test"], [bob.page, "bob@acme.test"]] as const) {
+      await login(p, email);
+      await openRadar(p);
+      await p.getByRole("tab", { name: "Nearby" }).click();
+      await expect(p.getByRole("button", { name: "Turn on Nearby" })).toBeVisible();
+    }
+    expect(db.tokenFor("bob@acme.test")).toBeUndefined(); // nothing broadcast before opting in
+    for (const p of [asha.page, bob.page]) await p.getByRole("button", { name: "Turn on Nearby" }).click();
+    await expect(bob.page.getByRole("switch", { name: "Discoverable" })).toHaveAttribute("aria-checked", "true");
+
+    await expect.poll(() => db.tokenFor("bob@acme.test")).toMatch(/^[0-9a-f]{16}$/);
+    await sendSightings(asha.page, db.tokenFor("bob@acme.test")!, -79, 6);
+    const nearby = asha.page.getByRole("list", { name: "Nearby attendees" });
+    await expect(nearby.getByText("Bob Iyer")).toBeVisible();
+    await nearby.getByRole("button", { name: "Connect" }).click();
+    await expect(bob.page.getByRole("region", { name: "Connection requests" }).getByText("Asha Rao")).toBeVisible({ timeout: 15_000 });
+
+    // Bob hides: his token is revoked and a fresh sighting of it resolves to nobody
+    const old = db.tokenFor("bob@acme.test")!;
+    await bob.page.getByRole("switch", { name: "Discoverable" }).click();
+    await expect.poll(() => db.tokenFor("bob@acme.test")).toBeUndefined();
+    // Bob back on: a new token is issued only after the server saved the change
+    await bob.page.getByRole("switch", { name: "Discoverable" }).click();
+    await expect.poll(() => db.tokenFor("bob@acme.test")).toMatch(/^[0-9a-f]{16}$/);
+    expect(db.tokenFor("bob@acme.test")).not.toBe(old);
+
+    // Nearby never appears as an event, and turning it off removes you
+    await asha.page.getByRole("tab", { name: "Events" }).click();
+    await expect(asha.page.getByRole("button", { name: "Create event" })).toBeVisible();
+    await bob.page.getByRole("button", { name: "Turn off Nearby" }).click();
+    await bob.page.getByRole("button", { name: "Confirm: Turn off Nearby" }).click();
+    await expect(bob.page.getByRole("button", { name: "Turn on Nearby" })).toBeVisible();
+    expect(db.tokenFor("bob@acme.test")).toBeUndefined();
+    expect([...asha.errors, ...bob.errors]).toEqual([]);
+    await asha.ctx.close();
+    await bob.ctx.close();
+  });
+
   test("signals from people at other events are ignored", async ({ browser, db }) => {
     seed(db);
     const asha = await newPage(browser, db);

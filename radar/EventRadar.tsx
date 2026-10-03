@@ -75,6 +75,8 @@ export function EventRadar({
   const [selected, setSelected] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [scope, setScope] = useState<"nearby" | "events">(() => (readScope() || "events"));
+  const [nearby, setNearby] = useState<RadarEvent | null | undefined>(undefined); // undefined = loading
 
   const loadEvents = useCallback(async () => {
     try {
@@ -103,11 +105,31 @@ export function EventRadar({
   }, [events, activeId]);
 
   useEffect(() => writeStored(activeEvent?.id ?? null), [activeEvent?.id]);
+  useEffect(() => writeScope(scope), [scope]);
+  useEffect(() => {
+    api.nearbyStatus().then(setNearby).catch(() => setNearby(null));
+  }, [api]);
+
+  const setNearbyOn = async (on: boolean, discoverable = true) => {
+    setBusy(true);
+    try {
+      if (on) setNearby(await api.joinNearby(discoverable));
+      else {
+        await api.leaveNearby();
+        setNearby(null);
+      }
+    } catch (err: any) {
+      showToast(err.message, "error");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const enterEvent = useCallback(
     async (ev: RadarEvent, message: string) => {
       const list = await loadEvents();
       setActiveId(ev.id);
+      setScope("events");
       if (!list.some((e) => e.id === ev.id)) setEvents((cur) => [ev, ...(cur || [])]);
       showToast(message, "success");
     },
@@ -151,7 +173,7 @@ export function EventRadar({
   const radar = useEventRadar({
     api,
     supabase,
-    event: activeEvent,
+    event: scope === "nearby" ? nearby || null : activeEvent,
     onContactsChanged,
     onError: (m) => showToast(m, "error"),
   });
@@ -172,49 +194,8 @@ export function EventRadar({
 
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
 
-  if (events === null) {
-    return (
-      <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">
-        Loading your events…
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
-      {!activeEvent ? (
-        <NoEvent
-          t={t}
-          card={card}
-          busy={busy}
-          onJoin={joinByCode}
-          onCreate={async (name, venue) => {
-            setBusy(true);
-            try {
-              const ev = await api.createEvent(name, venue);
-              await enterEvent(ev, `Event created — share code ${ev.join_code}`);
-              setShareOpen(true);
-            } catch (err: any) {
-              showToast(err.message, "error");
-            } finally {
-              setBusy(false);
-            }
-          }}
-          onOpenEventsHub={onOpenEventsHub}
-        />
-      ) : (
-        <>
-          <EventHeader
-            t={t}
-            card={card}
-            event={activeEvent}
-            events={events}
-            onSwitch={setActiveId}
-            onShare={() => setShareOpen(true)}
-            onLeave={leave}
-            onAddEvent={() => setActiveId("__new__")}
-          />
-
+  const radarBody = (
+    <>
           <StatusBanner t={t} status={radar.status} mode={radar.mode} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
 
           {radar.incoming.length > 0 && (
@@ -259,7 +240,9 @@ export function EventRadar({
                 <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: "10px 0 0" }}>
                   {radar.mode === "native"
                     ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy."
-                    : "Attendees active at this event in the last 15 minutes."}
+                    : scope === "nearby"
+                      ? "Nearby uses Bluetooth, so it works in the NetworQ Android app."
+                      : "Attendees active at this event in the last 15 minutes."}
                 </p>
                 {radar.hiddenCount > 0 && (
                   <p style={{ textAlign: "center", fontSize: 13, margin: "10px 0 0" }}>
@@ -291,14 +274,89 @@ export function EventRadar({
               }}
               onCancel={radar.cancelRequest}
               mode={radar.mode}
+              nearbyScope={scope === "nearby"}
             />
           )}
 
-          {radar.settings && <PrivacyPanel t={t} card={card} settings={radar.settings} onChange={radar.updateSettings} />}
+          {radar.settings && <PrivacyPanel t={t} card={card} settings={radar.settings} onChange={radar.updateSettings} nearby={scope === "nearby"} />}
+    </>
+  );
+
+  if (events === null) {
+    return (
+      <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">
+        Loading your events…
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
+      <ScopeSwitch t={t} scope={scope} onChange={setScope} />
+      {scope === "nearby" ? (
+        nearby === undefined ? (
+          <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">Loading…</div>
+        ) : !nearby ? (
+          <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
+        ) : (
+          <>
+            <section style={card} aria-label="Nearby">
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <h2 style={{ margin: 0, fontSize: 22, letterSpacing: "-0.01em" }}>Nearby</h2>
+                  <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>NetworQ people within Bluetooth range — anywhere, no event needed.</div>
+                </div>
+                <ConfirmLink t={t} label="Turn off" confirmLabel="Turn off?" ariaLabel="Turn off Nearby" onConfirm={() => setNearbyOn(false)} />
+              </div>
+              <Switch
+                t={t}
+                label="Discoverable"
+                hint={radar.settings?.visible ? "People near you can see you and send a request." : "Hidden. You'll only see how many people are near."}
+                checked={!!radar.settings?.visible}
+                onChange={(v) => radar.updateSettings({ visible: v })}
+              />
+            </section>
+            {radarBody}
+          </>
+        )
+      ) : !activeEvent ? (
+        <NoEvent
+          t={t}
+          card={card}
+          busy={busy}
+          onJoin={joinByCode}
+          onCreate={async (name, venue) => {
+            setBusy(true);
+            try {
+              const ev = await api.createEvent(name, venue);
+              await enterEvent(ev, `Event created — share code ${ev.join_code}`);
+              setShareOpen(true);
+            } catch (err: any) {
+              showToast(err.message, "error");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          onOpenEventsHub={onOpenEventsHub}
+        />
+      ) : (
+        <>
+          <EventHeader
+            t={t}
+            card={card}
+            event={activeEvent}
+            events={events}
+            onSwitch={setActiveId}
+            onShare={() => setShareOpen(true)}
+            onLeave={leave}
+            onAddEvent={() => setActiveId("__new__")}
+          />
+
+          {radarBody}
         </>
       )}
 
-      {activeId === "__new__" && activeEvent && (
+      {scope === "events" && activeId === "__new__" && activeEvent && (
         <Sheet t={t} title="Join another event" onClose={() => setActiveId(activeEvent.id)}>
           <NoEvent
             t={t}
@@ -352,6 +410,58 @@ export function EventRadar({
 }
 
 // ── Pieces ────────────────────────────────────────────────────────────────────
+const SCOPE_KEY = "networq.radar.scope";
+function readScope(): "nearby" | "events" | null {
+  try {
+    const v = localStorage.getItem(SCOPE_KEY);
+    return v === "nearby" || v === "events" ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeScope(v: "nearby" | "events") {
+  try {
+    localStorage.setItem(SCOPE_KEY, v);
+  } catch {}
+}
+
+function ScopeSwitch({ t, scope, onChange }: { t: Theme; scope: "nearby" | "events"; onChange: (s: "nearby" | "events") => void }) {
+  return (
+    <div role="tablist" aria-label="Radar mode" style={{ display: "flex", padding: 3, borderRadius: 12, background: t.raised, alignSelf: "center", width: "100%", maxWidth: 360 }}>
+      {(["nearby", "events"] as const).map((k) => (
+        <button
+          key={k}
+          role="tab"
+          aria-selected={scope === k}
+          onClick={() => onChange(k)}
+          style={{ flex: 1, minHeight: 34, borderRadius: 9, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", background: scope === k ? t.surface : "transparent", color: scope === k ? t.text : t.muted, boxShadow: scope === k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}
+        >
+          {k === "nearby" ? "Nearby" : "Events"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function NearbyIntro({ t, card, busy, onTurnOn }: { t: Theme; card: React.CSSProperties; busy: boolean; onTurnOn: () => void }) {
+  return (
+    <section style={{ ...card, textAlign: "center", padding: "32px 20px" }} aria-label="Nearby">
+      <div aria-hidden style={{ width: 72, height: 72, borderRadius: 36, margin: "0 auto 16px", background: "rgba(124,58,237,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 40, height: 40, borderRadius: 20, border: `3px solid ${PURPLE}`, boxShadow: `0 0 0 8px rgba(124,58,237,0.15)` }} />
+      </div>
+      <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Find people near you</h2>
+      <p style={{ color: t.muted, fontSize: 14, lineHeight: 1.5, maxWidth: 360, margin: "0 auto 20px" }}>
+        See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
+      </p>
+      <button style={{ ...btn(t, "primary"), minWidth: 220 }} onClick={onTurnOn} disabled={busy}>
+        {busy ? "Turning on…" : "Turn on Nearby"}
+      </button>
+      <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 340, margin: "16px auto 0" }}>
+        You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
+      </p>
+    </section>
+  );
+}
 
 function btn(t: Theme, kind: "primary" | "ghost" | "danger"): React.CSSProperties {
   const base: React.CSSProperties = {
@@ -653,6 +763,7 @@ function NearbyList({
   onConnect,
   onCancel,
   mode,
+  nearbyScope,
 }: {
   t: Theme;
   card: React.CSSProperties;
@@ -662,15 +773,20 @@ function NearbyList({
   onConnect: (id: string) => void;
   onCancel: (id: string) => void;
   mode: "native" | "web";
+  nearbyScope?: boolean;
 }) {
   return (
     <section style={card}>
-      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>{mode === "native" ? "Nearby" : "At this event"} · {people.length}</h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>{mode === "native" || nearbyScope ? "Nearby" : "At this event"} · {people.length}</h3>
       {people.length === 0 ? (
         <div style={{ color: t.muted, fontSize: 14, padding: "8px 0" }}>
           {mode === "native"
-            ? "Looking for attendees… Ask people near you to open Radar in NetworQ."
-            : "No one else is active yet. Share the event code to invite people."}
+            ? nearbyScope
+              ? "Looking for NetworQ people around you… They need Nearby on and Discoverable."
+              : "Looking for attendees… Ask people near you to open Radar in NetworQ."
+            : nearbyScope
+              ? "Open NetworQ in the Android app to find people around you over Bluetooth. Browsers can't use Bluetooth for this."
+              : "No one else is active yet. Share the event code to invite people."}
         </div>
       ) : (
         <ul aria-label="Nearby attendees" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
@@ -720,12 +836,16 @@ function Switch({ t, label, hint, checked, onChange, disabled }: { t: Theme; lab
   );
 }
 
-function PrivacyPanel({ t, card, settings, onChange }: { t: Theme; card: React.CSSProperties; settings: RadarSettings; onChange: (p: Partial<RadarSettings>) => void }) {
+function PrivacyPanel({ t, card, settings, onChange, nearby }: { t: Theme; card: React.CSSProperties; settings: RadarSettings; onChange: (p: Partial<RadarSettings>) => void; nearby?: boolean }) {
   return (
     <section style={card} aria-label="Radar privacy">
       <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>Privacy</h3>
-      <Switch t={t} label="Radar" hint="Discover attendees around you at this event." checked={settings.radar_on} onChange={(v) => onChange({ radar_on: v })} />
-      <Switch t={t} label="Visible to nearby attendees" hint="Off = incognito. You'll only see how many people are near." checked={settings.visible} onChange={(v) => onChange({ visible: v })} disabled={!settings.radar_on} />
+      {!nearby && (
+        <>
+          <Switch t={t} label="Radar" hint="Discover attendees around you at this event." checked={settings.radar_on} onChange={(v) => onChange({ radar_on: v })} />
+          <Switch t={t} label="Visible to nearby attendees" hint="Off = incognito. You'll only see how many people are near." checked={settings.visible} onChange={(v) => onChange({ visible: v })} disabled={!settings.radar_on} />
+        </>
+      )}
       <Switch t={t} label="Show distance" hint="Let others see roughly how far away you are." checked={settings.show_distance} onChange={(v) => onChange({ show_distance: v })} disabled={!settings.radar_on || !settings.visible} />
       <Switch t={t} label="Show profile" hint="Off shows only your first name and title." checked={settings.show_profile} onChange={(v) => onChange({ show_profile: v })} disabled={!settings.radar_on || !settings.visible} />
       <p style={{ color: t.muted, fontSize: 12, margin: "8px 0 0" }}>

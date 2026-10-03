@@ -15,7 +15,7 @@ export interface RadarEvent {
   starts_at: string | null;
   ends_at: string | null;
   join_code: string | null;
-  source: "listed" | "user";
+  source: "listed" | "user" | "nearby";
   external_id: string | null;
   is_owner: boolean;
   attendee_count?: number;
@@ -89,6 +89,9 @@ export function createRadarApi(supabase: SupabaseClient) {
     joinByCode: (code: string) => call<RadarEvent>(supabase, "join_event_by_code", { p_code: code }),
     joinListed: (externalId: string, name: string, venue?: string | null, startsAt?: string | null) =>
       call<RadarEvent>(supabase, "join_listed_event", { p_external_id: externalId, p_name: name, p_venue: venue || null, p_starts_at: startsAt || null }),
+    nearbyStatus: () => call<RadarEvent | null>(supabase, "nearby_status"),
+    joinNearby: (discoverable: boolean) => call<RadarEvent>(supabase, "join_nearby", { p_discoverable: discoverable }),
+    leaveNearby: () => call<void>(supabase, "leave_nearby"),
     leave: (eventId: string) => call<void>(supabase, "leave_event", { p_event_id: eventId }),
     updateSettings: (eventId: string, s: RadarSettings) =>
       call<RadarSettings>(supabase, "update_radar_settings", {

@@ -58,6 +58,7 @@ const MIGRATIONS = [
   "20261005_connections_dedupe.sql",
   "20261006_realtime_notifications.sql",
   "20261007_prospect_research.sql",
+  "20261008_nearby_radar.sql",
 ];
 
 const authConfig = {
