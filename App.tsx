@@ -6,6 +6,7 @@ import { SettingsScreen } from "./settings/SettingsScreen";
 import { apiBase, createAccountApi } from "./settings/accountApi";
 import { PasswordInput } from "./ui/PasswordInput";
 import { EventsHub } from "./events/EventsHub";
+import { createVoicePlayer } from "./voice/voicePlayer";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -2260,39 +2261,20 @@ function NetworQApp() {
     );
   };
 
-  const playAiVoice = (speechText: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    window.speechSynthesis.cancel();
+  // Natural female voice (server Orpheus → device female voice fallback); new speech interrupts old
+  const voicePlayer = useMemo(
+    () =>
+      createVoicePlayer({
+        endpoint: `${apiBase(AI_PROXY)}/api/tts`,
+        getToken: async () => (await supabase.auth.getSession()).data.session?.access_token ?? null,
+      }),
+    []
+  );
+  useEffect(() => () => voicePlayer.stop(), [voicePlayer]);
 
-    const cleanText = speechText
-      .replace(/[*_#`[\]()~]/g, " ")
-      .replace(/•/g, ", ")
-      .replace(/\bCRM\b/g, "C R M")
-      .replace(/\bAI\b/g, "A I")
-      .replace(/https?:\/\/\S+/g, "link")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 420);
-
-    if (!cleanText) return;
-
-    const utter = new SpeechSynthesisUtterance(cleanText);
-    const targetVoice =
-      speechVoices.find((v) => /(natural|samantha|ava|google us english|daniel|george)/i.test(v.name)) ||
-      speechVoices.find((v) => v.lang.startsWith("en-US")) ||
-      speechVoices.find((v) => v.lang.startsWith("en")) ||
-      speechVoices[0];
-
-    if (targetVoice) {
-      utter.voice = targetVoice;
-    }
-    utter.rate = 1.0;
-    utter.pitch = 1.0;
-
-    utter.onend = () => setIsSpeakingReply(false);
-    utter.onerror = () => setIsSpeakingReply(false);
+  const playAiVoice = (text: string) => {
     setIsSpeakingReply(true);
-    window.speechSynthesis.speak(utter);
+    voicePlayer.speak(text).finally(() => setIsSpeakingReply(false));
   };
   const playJarvisVoice = playAiVoice;
 
@@ -2432,7 +2414,7 @@ VOICE & ASSISTANT DIRECTIVES:
       return;
     }
     if (isSpeakingReply) {
-      window.speechSynthesis.cancel();
+      voicePlayer.stop();
       setIsSpeakingReply(false);
     }
     setVoiceReplyEnabled(!voiceReplyEnabled);
@@ -7333,9 +7315,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <button
                 onClick={() => {
                   setAiOpen(false);
-                  if (typeof window !== "undefined" && "speechSynthesis" in window) {
-                    window.speechSynthesis.cancel();
-                  }
+                  voicePlayer.stop();
                   if (aiListening && speechRecRef.current) {
                     speechRecRef.current.stop();
                     setAiListening(false);
@@ -7384,9 +7364,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
               <button
                 onClick={() => {
-                  if (typeof window !== "undefined" && "speechSynthesis" in window) {
-                    window.speechSynthesis.cancel();
-                  }
+                  voicePlayer.stop();
                   setIsSpeakingReply(false);
                 }}
                 style={{
@@ -7509,7 +7487,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       <button
                         onClick={() => {
                           if (isSpeakingReply) {
-                            window.speechSynthesis.cancel();
+                            voicePlayer.stop();
                             setIsSpeakingReply(false);
                           } else {
                             playJarvisVoice(m.content);

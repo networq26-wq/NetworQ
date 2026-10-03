@@ -13,6 +13,7 @@ const { startReminderEngine } = require("./api/reminders");
 const { createAccountRouter, productionDeps, purgeDeletedAccounts } = require("./api/account");
 const { createEventsRouter, productionDeps: eventsDeps } = require("./api/events");
 const { startEventsCrawler } = require("./api/eventsCrawler");
+const { createTtsRouter, productionDeps: ttsDeps } = require("./api/tts");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -69,6 +70,7 @@ app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
 app.use("/api/email", limiter(60 * 1000, 20));
 app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 app.use("/api/events", limiter(60 * 1000, 20));
+app.use("/api/tts", limiter(60 * 1000, 30));
 
 function parseEnvContent(content) {
   if (!content) return;
@@ -261,6 +263,11 @@ if (process.env.NODE_ENV !== "production") {
     res.json({ heard });
   });
 }
+
+// ── Natural voice for the AI assistant ───────────────────────────────────────
+const ttsD = ttsDeps();
+if (ttsD) app.use("/api", createTtsRouter(ttsD));
+else app.post("/api/tts", (req, res) => res.status(503).json({ error: "Voice is unavailable on this server." }));
 
 // ── Email sending ─────────────────────────────────────────────────────────────
 app.post("/api/email", async (req, res) => emailHandler(req, res));
