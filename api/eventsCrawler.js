@@ -24,17 +24,24 @@ function buildSources() {
     s.push({ id: `luma:${city}`, kind: "links", city, url: `https://lu.ma/${slug(city)}`, linkPattern: /href="\/([a-z0-9][a-z0-9-]{4,})"/gi, linkBase: "https://lu.ma/", limit: 12, delayMs: 1500 });
   }
   // AllEvents city listings carry Event JSON-LD directly (India).
-  // Meetup's robots.txt disallows its search pages for bots, so Meetup events come from pasted links only.
+  // Meetup's robots.txt disallows its search pages for bots, and BookMyShow / Insider refuse automated
+  // requests, so events from those sites come from pasted links only.
   for (const city of INDIA) {
-    s.push({ id: `allevents:${city}`, kind: "listing", city, url: `https://allevents.in/${slug(city)}/business`, delayMs: 10000 });
+    for (const cat of ["business", "tech", "startups"]) {
+      s.push({ id: `allevents:${city}:${cat}`, kind: "listing", city, url: `https://allevents.in/${slug(city)}/${cat}`, delayMs: 10000 });
+    }
   }
   // Eventbrite listings → event pages (India + global hubs)
   const eb = {
     Hyderabad: "india--hyderabad", Bengaluru: "india--bangalore", Mumbai: "india--mumbai", Delhi: "india--new-delhi",
+    Pune: "india--pune", Chennai: "india--chennai", Kolkata: "india--kolkata", Ahmedabad: "india--ahmedabad",
     "New York": "ny--new-york", London: "united-kingdom--london", Singapore: "singapore--singapore", Dubai: "united-arab-emirates--dubai",
+    "San Francisco": "ca--san-francisco", Toronto: "canada--toronto", Sydney: "australia--sydney", Berlin: "germany--berlin",
   };
   for (const [city, path] of Object.entries(eb)) {
-    s.push({ id: `eventbrite:${city}`, kind: "links", city, url: `https://www.eventbrite.com/d/${path}/business--events/`, linkPattern: /(https:\/\/www\.eventbrite\.[a-z.]+\/e\/[a-z0-9-]+)/gi, linkBase: "", limit: 10, delayMs: 1500 });
+    for (const cat of ["business", "science-and-tech"]) {
+      s.push({ id: `eventbrite:${city}:${cat}`, kind: "links", city, url: `https://www.eventbrite.com/d/${path}/${cat}--events/`, linkPattern: /(https:\/\/www\.eventbrite\.[a-z.]+\/e\/[a-z0-9-]+)/gi, linkBase: "", limit: 8, delayMs: 1500 });
+    }
   }
   return s;
 }

@@ -39,21 +39,38 @@ test.describe("Events Hub (real events only)", () => {
     await expect(page.getByText("We couldn't find event details on that page.")).toBeVisible();
   });
 
-  test("past events are hidden; search and city filters narrow the list", async ({ page, db }) => {
+  test("past events are hidden; search, city, date and category filters narrow the list", async ({ page, db }) => {
     const day = 86400000;
     db.addPublicEvent({ title: "Yesterday's Meetup", starts_at: new Date(Date.now() - 2 * day).toISOString(), url: "https://lu.ma/old", city: "Hyderabad" });
-    db.addPublicEvent({ title: "Hyderabad Fintech Forum", starts_at: new Date(Date.now() + 2 * day).toISOString(), url: "https://lu.ma/fin", city: "Hyderabad", verified: true });
-    db.addPublicEvent({ title: "Bengaluru Product Circle", starts_at: new Date(Date.now() + 3 * day).toISOString(), url: "https://lu.ma/pc", city: "Bengaluru" });
+    db.addPublicEvent({ title: "Hyderabad Fintech Forum", starts_at: new Date(Date.now() + 2 * day).toISOString(), url: "https://lu.ma/fin", city: "Hyderabad", verified: true, category: "Finance & Web3" });
+    db.addPublicEvent({ title: "Bengaluru Product Circle", starts_at: new Date(Date.now() + 3 * day).toISOString(), url: "https://lu.ma/pc", city: "Bengaluru", category: "Design & Product" });
+    db.addPublicEvent({ title: "London AI Summit", starts_at: new Date(Date.now() + 40 * day).toISOString(), url: "https://lu.ma/lon", city: "London", category: "AI & Data" });
     await login(page, "asha@acme.test");
     await openEvents(page);
     const list = page.getByRole("list", { name: "Upcoming events" });
-    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await expect(list.getByRole("listitem")).toHaveCount(3);
     await expect(page.getByText("Yesterday's Meetup")).toHaveCount(0);
     await expect(list.getByText("Verified")).toHaveCount(1);
+    await expect(list.getByText("Finance & Web3")).toBeVisible();
 
-    await page.getByRole("group", { name: "Filter by city" }).getByRole("button", { name: "Bengaluru" }).click();
+    await page.getByLabel("City").selectOption("Bengaluru");
     await expect(list.getByRole("listitem")).toHaveCount(1);
-    await page.getByRole("group", { name: "Filter by city" }).getByRole("button", { name: "All" }).click();
+    await page.getByLabel("City").selectOption("All India");
+    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await page.getByLabel("City").selectOption("Worldwide");
+    await expect(list.getByText("London AI Summit")).toBeVisible();
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await page.getByLabel("City").selectOption("All");
+
+    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "This month" }).click();
+    await expect(page.getByText("London AI Summit")).toHaveCount(0);
+    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "Any time" }).click();
+
+    const cats = page.getByRole("group", { name: "Filter by category" });
+    await expect(cats.getByRole("button", { name: "All · 3" })).toBeVisible();
+    await cats.getByRole("button", { name: "AI & Data · 1" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await page.getByRole("button", { name: "Clear filters" }).click();
     await page.getByLabel("Search events").fill("fintech");
     await expect(list.getByRole("listitem")).toHaveCount(1);
     await expect(list.getByText("Hyderabad Fintech Forum")).toBeVisible();
