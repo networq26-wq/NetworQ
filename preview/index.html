@@ -41,6 +41,7 @@
     <select id="ble"><option value="-55">Very close</option><option value="-71">~3 m</option><option value="-79" selected>~5 m</option><option value="-86">~10 m</option><option value="-95">~20 m</option></select>
   </label>
   <label>Zoom <select id="zoom"><option>0.6</option><option>0.75</option><option selected>0.85</option><option>1</option></select></label>
+  <label title="Signs the frames into the two preview test accounts"><input type="checkbox" id="auto" checked /> Auto sign-in (A + B)</label>
   <label><input type="checkbox" id="dark" /> Dark status bars</label>
   <button class="primary" id="reload">Reload all</button>
   <span class="status"><span class="dot"></span>Fast Refresh — edits appear automatically</span>
@@ -49,25 +50,29 @@
 <p class="help">
   All three devices run the live dev app from <code>http://localhost:8081</code>. Fast Refresh updates them a few seconds after any code change, keeping your state.
   Each frame reserves the status bar and gesture area the way the Android shell does (safe areas), so layouts match the APK.
-  The frames share one session — sign in once. To test two users (Radar, connection requests), open a second preview in a private window.
+  <b>Auto sign-in</b> logs the iPhone (and small Android) in as <b>Person A — preview.a@networq.co.in</b> and the Pixel as <b>Person B — preview.b@networq.co.in</b> (password <code>Preview#2026</code>).
+  They run on different hosts (localhost vs 127.0.0.1) so both stay signed in at once — perfect for Radar and connection requests. Untick it to test the sign-in screens.
   Use <b>Screen</b> to open a path such as <code>/?join=NQ-ABC123</code>. <b>Mode</b> switches between the Android app layout and the mobile website.
   The dev app uses your real Supabase project.
 </p>
 <script>
+  // Different hosts = separate browser sessions, so Person A and Person B stay signed in side by side
   const DEVICES = [
-    { id: "iphone", name: "iPhone 15 Pro", w: 393, h: 852, sb: 54, nb: 34, r: 56, notch: "island" },
-    { id: "pixel", name: "Pixel 8 (Android)", w: 412, h: 915, sb: 32, nb: 24, r: 44, notch: "punch" },
-    { id: "small", name: "Small Android (360 × 740)", w: 360, h: 740, sb: 28, nb: 20, r: 36, notch: "punch" },
+    { id: "iphone", name: "iPhone 15 Pro", w: 393, h: 852, sb: 54, nb: 34, r: 56, notch: "island", host: "http://localhost:8081", who: "a" },
+    { id: "pixel", name: "Pixel 8 (Android)", w: 412, h: 915, sb: 32, nb: 24, r: 44, notch: "punch", host: "http://127.0.0.1:8081", who: "b" },
+    { id: "small", name: "Small Android (360 × 740)", w: 360, h: 740, sb: 28, nb: 20, r: 36, notch: "punch", host: "http://localhost:8081", who: "a" },
   ];
-  const APP = "http://localhost:8081";
+  const WHO = { a: "Person A · Preview Asha", b: "Person B · Preview Bob" };
   const $ = (id) => document.getElementById(id);
   const saved = JSON.parse(localStorage.getItem("nq-preview") || "{}");
   for (const k of ["path", "mode", "zoom", "ble"]) if (saved[k]) $(k).value = saved[k];
   $("dark").checked = !!saved.dark;
+  if (saved.auto === false) $("auto").checked = false;
 
-  function src() {
+  function src(d) {
     const p = $("path").value || "/";
-    const url = new URL(p, APP);
+    const url = new URL(p, d.host);
+    if ($("auto").checked) url.searchParams.set("devLogin", d.who);
     if ($("mode").value === "android") {
       url.searchParams.set("shell", "android");
       url.searchParams.set("bleRssi", $("ble").value);
@@ -75,7 +80,7 @@
     return url.toString();
   }
   function render() {
-    localStorage.setItem("nq-preview", JSON.stringify({ path: $("path").value, mode: $("mode").value, zoom: $("zoom").value, ble: $("ble").value, dark: $("dark").checked }));
+    localStorage.setItem("nq-preview", JSON.stringify({ path: $("path").value, mode: $("mode").value, zoom: $("zoom").value, ble: $("ble").value, dark: $("dark").checked, auto: $("auto").checked }));
     const z = +$("zoom").value;
     $("devices").innerHTML = DEVICES.map((d) => `
       <figure>
@@ -83,15 +88,15 @@
         <div class="device ${$("dark").checked ? "dark" : ""}" style="--w:${d.w}px;--h:${d.h}px;--sb:${d.sb}px;--nb:${d.nb}px;--r:${d.r}px;transform:scale(${z});transform-origin:top left;position:absolute;left:0;top:0">
           <div class="screen">
             <div class="statusbar"><span>9:41</span><div class="${d.notch}"></div><span>●●● 100%</span></div>
-            <iframe title="${d.name}" src="${src()}" allow="camera; microphone; clipboard-write"></iframe>
+            <iframe title="${d.name}" src="${src(d)}" allow="camera; microphone; clipboard-write"></iframe>
             <div class="navbar"><i></i></div>
           </div>
         </div>
         </div>
-        <figcaption>${d.name} · ${d.w}×${d.h - d.sb - d.nb} usable</figcaption>
+        <figcaption>${d.name} · ${$("auto").checked ? WHO[d.who] : "signed-out"} · ${d.w}×${d.h - d.sb - d.nb}</figcaption>
       </figure>`).join("");
   }
-  for (const id of ["mode", "zoom", "dark", "ble"]) $(id).addEventListener("change", render);
+  for (const id of ["mode", "zoom", "dark", "ble", "auto"]) $(id).addEventListener("change", render);
   $("path").addEventListener("keydown", (e) => e.key === "Enter" && render());
   $("reload").addEventListener("click", render);
   render();

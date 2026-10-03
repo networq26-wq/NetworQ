@@ -501,33 +501,43 @@ function EventHeader({
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   return (
-    <section style={{ ...card, display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center" }}>
-      <div style={{ flex: "1 1 240px", minWidth: 0 }}>
-        <div style={{ color: PURPLE, fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Live at</div>
-        {events.length > 1 ? (
-          <select
-            aria-label="Switch event"
-            value={event.id}
-            onChange={(e) => (e.target.value === "__new__" ? onAddEvent() : onSwitch(e.target.value))}
-            style={{ fontSize: 20, fontWeight: 700, background: "transparent", color: t.text, border: "none", padding: 0, maxWidth: "100%" }}
-          >
-            {events.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-            <option value="__new__">+ Join another event</option>
-          </select>
-        ) : (
-          <div style={{ fontSize: 20, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis" }}>{event.name}</div>
-        )}
-        <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>
-          {[event.venue, event.attendee_count ? `${event.attendee_count} joined` : null].filter(Boolean).join(" · ")}
+    <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: PURPLE, fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Live at</div>
+          {events.length > 1 ? (
+            <select
+              aria-label="Switch event"
+              value={event.id}
+              onChange={(e) => (e.target.value === "__new__" ? onAddEvent() : onSwitch(e.target.value))}
+              style={{ fontSize: 20, fontWeight: 700, background: "transparent", color: t.text, border: "none", padding: 0, maxWidth: "100%" }}
+            >
+              {events.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+              <option value="__new__">+ Join another event</option>
+            </select>
+          ) : (
+            <div style={{ fontSize: 20, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.name}</div>
+          )}
+          <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>
+            {[event.venue, event.attendee_count ? `${event.attendee_count} joined` : null].filter(Boolean).join(" · ")}
+          </div>
         </div>
+        <button
+          style={{ ...btn(t, "danger"), minHeight: 36, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap", flex: "none" }}
+          onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
+          onBlur={() => setConfirmLeave(false)}
+          aria-label={confirmLeave ? "Confirm leave event" : "Leave event"}
+        >
+          {confirmLeave ? "Tap to confirm" : "Leave"}
+        </button>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "nowrap", width: "100%", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 8 }}>
         {event.join_code && (
-          <button style={{ ...btn(t, "ghost"), flex: "1 1 auto", whiteSpace: "nowrap" }} onClick={onShare} aria-label={`Share event code ${event.join_code}`}>
+          <button style={{ ...btn(t, "ghost"), flex: 1, minWidth: 0 }} onClick={onShare} aria-label={`Share event code ${event.join_code}`}>
             <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.04em" }}>{event.join_code}</span>
             <span aria-hidden="true">· Share</span>
           </button>
@@ -537,14 +547,6 @@ function EventHeader({
             + Event
           </button>
         )}
-        <button
-          style={{ ...btn(t, "danger"), whiteSpace: "nowrap" }}
-          onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
-          onBlur={() => setConfirmLeave(false)}
-          aria-label={confirmLeave ? "Confirm leave event" : "Leave event"}
-        >
-          {confirmLeave ? "Tap to confirm" : "Leave"}
-        </button>
       </div>
     </section>
   );

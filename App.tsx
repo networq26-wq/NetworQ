@@ -2669,7 +2669,8 @@ VOICE & ASSISTANT DIRECTIVES:
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     setAuthMsg(null);
-    if (NATIVE_GOOGLE_AUTH) {
+    const framedPreview = typeof window !== "undefined" && window.self !== window.top;
+    if (NATIVE_GOOGLE_AUTH && !framedPreview) {
       const onNative = async (e: Event) => {
         const msg = (e as CustomEvent).detail;
         if (msg?.type !== "auth:session" && msg?.type !== "auth:error") return;
@@ -2688,13 +2689,22 @@ VOICE & ASSISTANT DIRECTIVES:
       return;
     }
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      // Google refuses to render its sign-in page inside a frame (403). When framed
+      // (e.g. the device preview), sign in in a new tab; the session syncs back via storage.
+      const framed = typeof window !== "undefined" && window.self !== window.top;
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+          skipBrowserRedirect: framed,
         },
       });
       if (error) throw error;
+      if (framed && data?.url) {
+        window.open(data.url, "_blank", "noopener");
+        setAuthMsg({ text: "Finish signing in with Google in the new tab — this screen updates automatically.", type: "success" });
+        setGoogleLoading(false);
+      }
     } catch (err: any) {
       setAuthMsg({ text: err.message || "Google authentication failed.", type: "error" });
       setGoogleLoading(false);
@@ -5015,7 +5025,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)",
+                gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
                 gap: 14,
                 marginBottom: 24,
               }}
@@ -5031,25 +5041,26 @@ Keep it punchy, sharp, and directly actionable.`;
                   style={{
                     ...themeStyles.glassCard,
                     borderRadius: 16,
-                    padding: "16px 20px",
+                    padding: isMobile ? "14px" : "16px 20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    gap: 12,
+                    gap: 10,
+                    minWidth: 0,
                   }}
                 >
-                  <div>
+                  <div style={{ minWidth: 0 }}>
                     <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "'Poppins', sans-serif", color: themeStyles.text, lineHeight: 1.1 }}>
                       {m.count}
                     </div>
-                    <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500 }}>
+                    <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {m.label}
                     </div>
                   </div>
                   <div
                     style={{
-                      width: 42,
-                      height: 42,
+                      width: isMobile ? 36 : 42,
+                      height: isMobile ? 36 : 42,
                       borderRadius: 12,
                       background: m.bg,
                       display: "flex",
