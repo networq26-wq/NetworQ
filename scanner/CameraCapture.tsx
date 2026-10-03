@@ -1,15 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
+import { haptic } from "../ui/haptics";
 
 // Full-screen, iOS-style card camera: live viewfinder, card-shaped guide with corner
 // brackets, and a classic white shutter (ring + disc) that shrinks while pressed.
 // If the browser can't stream the camera (permission denied / unsupported), it offers
 // the phone's own camera app via `onFallback` instead of failing silently.
-
-const vibrate = (ms: number) => {
-  try {
-    navigator.vibrate?.(ms);
-  } catch {}
-};
 
 export function CameraCapture({
   open,
@@ -75,7 +70,7 @@ export function CameraCapture({
   const snap = () => {
     const v = videoRef.current;
     if (!v || !ready) return;
-    vibrate(15);
+    haptic(15);
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
     const canvas = document.createElement("canvas");

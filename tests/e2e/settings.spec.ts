@@ -133,6 +133,38 @@ test.describe("Settings & account security", () => {
     expect(db.table("profiles")[0].deletion_scheduled_at).toBeNull();
   });
 
+  test("blocked people can be unblocked; devices, connection emails, vibration and version are shown", async ({ page, db }) => {
+    const bob = db.addUser("bob@acme.test", PASSWORD, { profile: { name: "Bob Iyer" } });
+    await login(page, "asha@acme.test");
+    const me = db.users.find((u) => u.email === "asha@acme.test")!;
+    db.blocks.push({ blocker: me.id, blocked: bob.id });
+    db.table("login_devices").push({ user_id: me.id, device_hash: "a".repeat(64), user_agent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36", first_seen: "2026-09-01T10:00:00Z", last_seen: "2026-10-02T09:00:00Z" });
+    await openSettings(page);
+
+    const blocked = page.getByRole("list", { name: "Blocked people" });
+    await expect(blocked.getByText("Bob Iyer")).toBeVisible();
+    await blocked.getByRole("button", { name: "Unblock Bob Iyer" }).click();
+    await expect(page.getByText("You haven't blocked anyone.")).toBeVisible();
+    expect(db.blocks).toHaveLength(0);
+
+    await expect(page.getByRole("list", { name: "Recent devices" }).getByText("Chrome on Android")).toBeVisible();
+
+    const conn = page.getByRole("switch", { name: "Connection emails" });
+    await expect(conn).toHaveAttribute("aria-checked", "true");
+    await conn.click();
+    await expect.poll(() => db.table("profiles").find((p) => p.id === me.id).notification_prefs.connection_emails).toBe(false);
+
+    const vib = page.getByRole("switch", { name: "Vibration" });
+    await expect(vib).toHaveAttribute("aria-checked", "true");
+    await vib.click();
+    await expect(vib).toHaveAttribute("aria-checked", "false");
+    expect(await page.evaluate(() => localStorage.getItem("networq.haptics"))).toBe("off");
+
+    await expect(page.getByLabel("App version")).toContainText("1.0.0");
+    await expect(page.getByText(/^Online · /)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", /^mailto:support@networq\.co\.in/);
+  });
+
   test("privacy, terms and delete-account pages are reachable", async ({ page }) => {
     await gotoLogin(page);
     await expect(page.getByRole("link", { name: "Privacy" })).toHaveAttribute("href", "/privacy");

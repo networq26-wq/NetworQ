@@ -150,11 +150,12 @@ export class MockSupabase {
     switch (fn) {
       case "update_notification_prefs": {
         const prof = this.table("profiles").find((r) => r.id === uid)!;
-        const cur = prof.notification_prefs || { login_alerts: true, reminder_emails: true, product_updates: false };
+        const cur = prof.notification_prefs || { login_alerts: true, reminder_emails: true, product_updates: false, connection_emails: true };
         prof.notification_prefs = {
           login_alerts: a.p_prefs?.login_alerts ?? cur.login_alerts,
           reminder_emails: a.p_prefs?.reminder_emails ?? cur.reminder_emails,
           product_updates: a.p_prefs?.product_updates ?? cur.product_updates,
+          connection_emails: a.p_prefs?.connection_emails ?? cur.connection_emails ?? true,
         };
         return prof.notification_prefs;
       }

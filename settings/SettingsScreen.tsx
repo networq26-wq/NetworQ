@@ -5,6 +5,8 @@ import { PasswordInput } from "../ui/PasswordInput";
 import type { AccountApi } from "./accountApi";
 import { OrganizationForm } from "../prospect/OrganizationForm";
 import type { ProspectApi } from "../prospect/prospectApi";
+import { BlockedUsers, HelpAbout, RecentDevices } from "./MoreSettings";
+import { hapticsEnabled, setHapticsEnabled, haptic } from "../ui/haptics";
 
 const PURPLE = "#7C3AED";
 type Toast = (message: string, type?: "success" | "error" | "info") => void;
@@ -13,9 +15,10 @@ interface Prefs {
   login_alerts: boolean;
   reminder_emails: boolean;
   product_updates: boolean;
+  connection_emails: boolean;
 }
 
-const DEFAULT_PREFS: Prefs = { login_alerts: true, reminder_emails: true, product_updates: false };
+const DEFAULT_PREFS: Prefs = { login_alerts: true, reminder_emails: true, product_updates: false, connection_emails: true };
 
 function theme(isDark: boolean) {
   return isDark
@@ -52,6 +55,7 @@ export function SettingsScreen({
   onToggleTheme,
   onSignOut,
   prospectApi,
+  apiBaseUrl,
 }: {
   supabase: SupabaseClient;
   account: AccountApi;
@@ -64,7 +68,9 @@ export function SettingsScreen({
   onToggleTheme: () => void;
   onSignOut: () => void;
   prospectApi?: ProspectApi;
+  apiBaseUrl?: string;
 }) {
+  const [vibration, setVibration] = useState(hapticsEnabled());
   const t = theme(isDark);
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
   const input: React.CSSProperties = { minHeight: 44, padding: "10px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.raised, color: t.text, fontSize: 16, width: "100%", boxSizing: "border-box" };
@@ -319,17 +325,14 @@ export function SettingsScreen({
           </button>
         </div>
 
-        <h4 style={{ margin: "22px 0 6px", fontSize: 15 }}>Devices</h4>
-        <div style={{ color: t.muted, fontSize: 13, marginBottom: 10 }}>Lost a phone or signed in somewhere shared? Sign out everywhere, including this device.</div>
-        <button style={btn("ghost")} onClick={signOutEverywhere}>
-          Sign out of all devices
-        </button>
+        <RecentDevices supabase={supabase} t={t} btn={btn("ghost")} onSignOutEverywhere={signOutEverywhere} />
       </section>
 
       <section style={card} aria-labelledby="settings-notifications">
         <h3 id="settings-notifications" style={{ margin: "0 0 4px", fontSize: 18 }}>Email notifications</h3>
         <Switch id="login_alerts" title="New sign-in alerts" hint="Email me when my account is used on a new device." />
         <Switch id="reminder_emails" title="Follow-up reminders" hint="Email me when a contact reminder is due." />
+        <Switch id="connection_emails" title="Connection emails" hint="Email me when someone wants to connect or accepts my request." />
         <Switch id="product_updates" title="Product updates" hint="Occasional news about new NetworQ features." />
       </section>
 
@@ -350,7 +353,29 @@ export function SettingsScreen({
             <span style={{ display: "block", width: 28, height: 28, borderRadius: 14, background: "#FFFFFF", transform: `translateX(${isDark ? 20 : 0}px)`, transition: "transform 0.2s" }} />
           </button>
         </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600 }}>Vibration</div>
+            <div style={{ color: t.muted, fontSize: 13 }}>A light buzz for requests, accepts and the camera shutter.</div>
+          </div>
+          <button
+            role="switch"
+            aria-checked={vibration}
+            aria-label="Vibration"
+            onClick={() => {
+              const next = !vibration;
+              setHapticsEnabled(next);
+              setVibration(next);
+              if (next) haptic(20);
+            }}
+            style={{ width: 52, minWidth: 52, height: 32, borderRadius: 16, border: "none", padding: 2, cursor: "pointer", background: vibration ? PURPLE : t.raised, boxShadow: `inset 0 0 0 1px ${t.border}` }}
+          >
+            <span style={{ display: "block", width: 28, height: 28, borderRadius: 14, background: "#FFFFFF", transform: `translateX(${vibration ? 20 : 0}px)`, transition: "transform 0.2s" }} />
+          </button>
+        </div>
       </section>
+
+      <BlockedUsers supabase={supabase} t={t} card={card} showToast={showToast} />
 
       <section style={card} aria-labelledby="settings-data">
         <h3 id="settings-data" style={{ margin: "0 0 12px", fontSize: 18 }}>Your data</h3>
@@ -358,14 +383,10 @@ export function SettingsScreen({
           <button style={btn("ghost")} onClick={onExportContacts}>
             Export contacts (CSV)
           </button>
-          <a href="/privacy" target="_blank" rel="noopener" style={{ ...btn("ghost"), textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
-            Privacy policy
-          </a>
-          <a href="/terms" target="_blank" rel="noopener" style={{ ...btn("ghost"), textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
-            Terms
-          </a>
         </div>
       </section>
+
+      <HelpAbout t={t} card={card} btn={btn("ghost")} userEmail={currentUser?.email} apiBaseUrl={apiBaseUrl} />
 
       <button style={{ ...btn("ghost"), width: "100%" }} onClick={onSignOut}>
         Sign out

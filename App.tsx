@@ -5256,6 +5256,7 @@ Keep it punchy, sharp, and directly actionable.`;
             onExportContacts={exportCSV}
             onToggleTheme={toggleTheme}
             prospectApi={prospectApi}
+            apiBaseUrl={apiBase(AI_PROXY)}
             onSignOut={async () => {
               await supabase.auth.signOut();
               handleSignedOut();

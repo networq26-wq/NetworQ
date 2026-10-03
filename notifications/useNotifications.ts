@@ -12,13 +12,7 @@ export interface AppNotification {
   created_at: string;
 }
 
-export function haptic(pattern: number | number[] = 25) {
-  try {
-    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(pattern);
-  } catch {
-    /* unsupported */
-  }
-}
+export { haptic } from "../ui/haptics";
 
 export function useNotifications(supabase: SupabaseClient, userId: string | null, onArrive?: (n: AppNotification) => void) {
   const [items, setItems] = useState<AppNotification[]>([]);
