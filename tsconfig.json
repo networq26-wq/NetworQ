@@ -3,5 +3,5 @@
   "compilerOptions": {
     "strict": true
   },
-  "exclude": ["node_modules", "dist", "voice_server", ".expo"]
+  "exclude": ["node_modules", "dist", "voice_server", ".expo", "landing"]
 }
