@@ -57,6 +57,9 @@ function theme(isDark: boolean) {
     : { surface: "#FFFFFF", raised: "#F2F2F7", text: "#1C1C1E", muted: "#6E6E73", border: "rgba(0,0,0,0.08)" };
 }
 
+// Date-only events are stored at midnight UTC — show them as "All day", not a fake early-morning time
+export const isAllDay = (iso: string) => /T00:00:00(\.0+)?(Z|\+00:00)$/.test(iso);
+
 function whenLabel(iso: string) {
   const d = new Date(iso);
   const days = Math.round((new Date(d.toDateString()).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
@@ -439,7 +442,7 @@ function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent;
   const d = new Date(ev.starts_at);
   const [c1, c2] = CATEGORY_TINT[ev.category || ""] || ["#3B1A7A", "#7C3AED"];
   const place = [ev.venue, ev.city && !(ev.venue || "").includes(ev.city) ? ev.city : null].filter(Boolean).join(" · ");
-  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const time = isAllDay(ev.starts_at) ? "All day" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const round: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: t.raised, color: t.text, textDecoration: "none" };
   const addToCalendar = () => {
     const blob = new Blob([icsFor(ev)], { type: "text/calendar" });

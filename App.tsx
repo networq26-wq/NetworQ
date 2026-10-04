@@ -25,6 +25,7 @@ import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
 import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
+import { ComingUp } from "./people/ComingUp";
 import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
 import { useVoiceRecorder } from "./voice/useVoiceRecorder";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
@@ -4330,6 +4331,8 @@ Keep it punchy, sharp, and directly actionable.`;
                 onMessage={(c) => { setChatPartner({ id: c.linkedUserId, name: c.name, avatar_url: c.photo || null }); setChatEvent(null); setChatOpen(true); }}
               />
             )}
+
+            <ComingUp supabase={supabase} isDark={isDark} onOpenEvents={() => setTab("events")} />
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
