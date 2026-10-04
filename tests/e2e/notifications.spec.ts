@@ -15,7 +15,7 @@ test.describe("Notifications & blocking", () => {
     await expect(centre.getByText("Bob Iyer wants to connect")).toBeVisible();
     await expect(centre.getByText("Cara accepted your request")).toBeVisible();
     await centre.getByText("Bob Iyer wants to connect").click();
-    await expect(page.getByText(/Event Radar|Live at/).first()).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Radar mode" })).toBeVisible(); // landed on Radar
     expect(db.table("notifications").find((n) => n.id === "n1")!.read_at).toBeTruthy();
     await expect(page.getByRole("button", { name: "Notifications & Reminders" })).toBeVisible();
   });

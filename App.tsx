@@ -17,6 +17,7 @@ import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
 import { DigitalPass } from "./pass/DigitalPass";
 import { parseContactQr } from "./pass/vcard";
+import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
@@ -705,6 +706,7 @@ async function sendEmailViaServer(payload: {
   body: string;
   fromName?: string;
   replyTo?: string;
+  ics?: string; // optional calendar invite attachment
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
@@ -721,6 +723,7 @@ async function sendEmailViaServer(payload: {
         body: payload.body,
         from_name: payload.fromName,
         reply_to: payload.replyTo,
+        ...(payload.ics ? { ics: payload.ics } : {}),
       }),
     });
   } catch (netErr: any) {
@@ -753,11 +756,6 @@ function downscaleImage(dataUrl: string, maxSide = 1280, quality = 0.8): Promise
 }
 
 // Jitsi Meet rooms are created on first join, so a random room name is a real, working link
-function genMeetLink() {
-  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-  const seg = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `https://meet.jit.si/NetworQ-${seg(4)}-${seg(4)}-${seg(4)}`;
-}
 
 function avatar(name?: string, isDark = false) {
   return {
@@ -923,73 +921,59 @@ function loadGISScript(): Promise<void> {
   });
 }
 
-async function createCalendarEvent({
-  title,
-  description,
-  date,
-  time,
-  attendeeEmail,
-}: {
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  attendeeEmail: string;
-}): Promise<{ meetLink: string; eventLink: string }> {
-  await loadGISScript();
-  if (!(window as any).google?.accounts?.oauth2) {
-    throw new Error("Google Calendar is unavailable in this browser.");
-  }
+// Google Meet links can only be created through Google Calendar, which needs the user's consent.
+// requestCalendarToken MUST be called synchronously inside the tap handler, otherwise browsers
+// block the Google pop-up. GIS must already be loaded (preloaded when the meeting sheet opens).
+const GOOGLE_MEET_AVAILABLE =
+  !IS_NATIVE_WEBVIEW && !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
+
+function requestCalendarToken(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const client = (window as any).google.accounts.oauth2.initTokenClient({
+    const oauth2 = (window as any).google?.accounts?.oauth2;
+    if (!oauth2) return reject(new Error("Google sign-in didn't load. Check your connection, or paste a meeting link instead."));
+    const timer = setTimeout(() => reject(new Error("Google didn't respond. Try again, or paste a meeting link instead.")), 120_000);
+    const client = oauth2.initTokenClient({
       client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
       scope: "https://www.googleapis.com/auth/calendar.events",
-      callback: async (resp: any) => {
-        if (resp.error) {
-          reject(new Error(resp.error_description || resp.error));
-          return;
-        }
-        try {
-          const start = new Date(`${date}T${time || "10:00"}`);
-          const end = new Date(start.getTime() + 60 * 60 * 1000);
-          const res = await fetch(
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
-            {
-              method: "POST",
-              headers: { Authorization: `Bearer ${resp.access_token}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                summary: title,
-                description,
-                start: { dateTime: start.toISOString() },
-                end: { dateTime: end.toISOString() },
-                attendees: [{ email: attendeeEmail }],
-                conferenceData: {
-                  createRequest: {
-                    requestId: `networq-${Date.now()}`,
-                    conferenceSolutionKey: { type: "hangoutsMeet" },
-                  },
-                },
-              }),
-            }
-          );
-          if (!res.ok) {
-            const err = await res.json();
-            reject(new Error(err.error?.message || `Calendar API error ${res.status}`));
-            return;
-          }
-          const event = await res.json();
-          const meetLink =
-            event.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === "video")?.uri ||
-            event.hangoutLink ||
-            "";
-          resolve({ meetLink, eventLink: event.htmlLink || "" });
-        } catch (e: any) {
-          reject(e);
-        }
+      callback: (resp: any) => {
+        clearTimeout(timer);
+        if (resp.error || !resp.access_token) reject(new Error(resp.error_description || "Google Calendar access wasn't granted."));
+        else resolve(resp.access_token);
+      },
+      // Pop-up blocked or closed: fail clearly instead of hanging on "Sending…"
+      error_callback: (err: any) => {
+        clearTimeout(timer);
+        reject(new Error(err?.type === "popup_closed" ? "The Google window was closed before access was granted." : "Your browser blocked the Google window. Allow pop-ups for this site, or paste a meeting link instead."));
       },
     });
     client.requestAccessToken({ prompt: "" });
   });
+}
+
+// Creates the event in the organiser's Google Calendar with a Meet link; Google emails the invite.
+async function createGoogleMeetEvent(token: string, opts: { title: string; description: string; start: Date; minutes: number; attendeeEmail: string }) {
+  const end = new Date(opts.start.getTime() + opts.minutes * 60_000);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      summary: opts.title,
+      description: opts.description,
+      start: { dateTime: opts.start.toISOString() },
+      end: { dateTime: end.toISOString() },
+      attendees: [{ email: opts.attendeeEmail }],
+      conferenceData: { createRequest: { requestId: `networq-${Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } } },
+      reminders: { useDefault: true },
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 403) throw new Error("Google Calendar isn't enabled for NetworQ yet. Paste a meeting link instead.");
+    throw new Error(json.error?.message || `Google Calendar error ${res.status}`);
+  }
+  const meetLink = json.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === "video")?.uri || json.hangoutLink || "";
+  if (!meetLink) throw new Error("Google created the event but no Meet link. Check that Google Meet is enabled for your account.");
+  return { meetLink, eventLink: json.htmlLink || "" };
 }
 
 function dbToContact(row: any) {
@@ -1391,6 +1375,17 @@ function NetworQApp() {
   const [meetDetails, setMeetDetails] = useState({ date: "", time: "", notes: "" });
   const [meetSent, setMeetSent] = useState(false);
   const [meetSending, setMeetSending] = useState(false);
+  // How the video link is made: Google Meet (website, via Google Calendar), a pasted link, or a free Jitsi room
+  const [meetMode, setMeetMode] = useState<"google" | "paste" | "jitsi">(GOOGLE_MEET_AVAILABLE ? "google" : "paste");
+  const [meetLinkInput, setMeetLinkInput] = useState(() => {
+    try {
+      return localStorage.getItem("networq.meet.link") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [meetDuration, setMeetDuration] = useState(30);
+  const [meetResult, setMeetResult] = useState<{ link: string; via: "google" | "email"; ics?: string } | null>(null);
   const [remindersOpen, setRemindersOpen] = useState(true);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepBrief, setPrepBrief] = useState<string | null>(null);
@@ -2429,83 +2424,96 @@ Keep it punchy, sharp, and directly actionable.`;
     recognition.start();
   };
 
+  useEffect(() => {
+    if (!meetModal) return;
+    setMeetResult(null);
+    if (GOOGLE_MEET_AVAILABLE) loadGISScript(); // so the Google window can open instantly on tap
+  }, [meetModal]);
+
   const sendMeeting = async () => {
     if (!meetModal?.email) {
       showToast("This contact has no email address.", "error");
       return;
     }
+    const start = new Date(`${meetDetails.date}T${meetDetails.time}`);
+    if (isNaN(start.getTime())) return showToast("Pick a date and time.", "error");
+    if (start.getTime() < Date.now() - 5 * 60_000) return showToast("That time is in the past.", "error");
+    // Google: ask for consent right now, inside the tap, before any await (or the pop-up is blocked)
+    const tokenPromise = meetMode === "google" ? requestCalendarToken() : null;
     setMeetSending(true);
     try {
-      const meetDateStr = meetDetails.date + " " + meetDetails.time;
+      const title = `${currentUser?.name || "NetworQ"} <> ${meetModal.name}`;
+      const agenda = meetDetails.notes?.trim() || "";
       let link = "";
-      const useGCal =
-        !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID &&
-        process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
+      let via: "google" | "email" = "email";
+      let ics: string | undefined;
 
-      let calendarInviteSent = false;
-      if (useGCal) {
-        try {
-          const result = await createCalendarEvent({
-            title: `Meeting with ${meetModal.name}`,
-            description: meetDetails.notes || `Scheduled via NetworQ by ${currentUser?.name}`,
-            date: meetDetails.date,
-            time: meetDetails.time,
-            attendeeEmail: meetModal.email,
-          });
-          link = result.meetLink;
-          calendarInviteSent = true;
-        } catch (calErr: any) {
-          console.warn("Calendar invite failed, falling back to email invite:", calErr?.message);
+      if (tokenPromise) {
+        const token = await tokenPromise;
+        const ev = await createGoogleMeetEvent(token, { title, description: agenda || `Scheduled with NetworQ`, start, minutes: meetDuration, attendeeEmail: meetModal.email });
+        link = ev.meetLink;
+        via = "google"; // Google emails the invite (with Accept / Decline) and adds it to both calendars
+      } else {
+        const chosen = meetMode === "jitsi" ? jitsiRoom() : normaliseMeetingLink(meetLinkInput);
+        if (!chosen) throw new Error("Paste a valid meeting link (for example https://meet.google.com/abc-defg-hij).");
+        link = chosen;
+        if (meetMode === "paste") {
+          try {
+            localStorage.setItem("networq.meet.link", chosen);
+          } catch {}
         }
-      }
-
-      if (!calendarInviteSent || !link) {
-        link = link || genMeetLink();
-        const messageBody = [
-          `Hi ${meetModal.name},`,
-          "",
-          `I'd like to schedule a meeting with you.`,
-          "",
-          `Date: ${meetDetails.date}`,
-          `Time: ${meetDetails.time}`,
-          `Video call: ${link}`,
-          meetDetails.notes ? `\nAgenda:\n${meetDetails.notes}` : "",
-          "",
-          `Looking forward to connecting!`,
-          "",
-          currentUser?.name,
-        ].join("\n");
-
+        ics = buildInvite({
+          uid: `${Date.now()}-${Math.random().toString(36).slice(2)}@networq.co.in`,
+          start,
+          durationMinutes: meetDuration,
+          title,
+          description: agenda,
+          link,
+          organizerName: currentUser?.name || "NetworQ member",
+          organizerEmail: currentUser?.email || "noreply@networq.co.in",
+          attendeeName: meetModal.name,
+          attendeeEmail: meetModal.email,
+        });
+        const when = start.toLocaleString([], { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
         await sendEmailViaServer({
           to: meetModal.email,
-          subject: `Meeting invite from ${currentUser?.name} — ${meetDetails.date} at ${meetDetails.time}`,
-          body: messageBody,
+          subject: `Invitation: ${title} — ${when}`,
+          body: [
+            `Hi ${(meetModal.name || "").split(" ")[0] || "there"},`,
+            "",
+            `I've set up a ${meetDuration}-minute call for us.`,
+            "",
+            `When: ${when}`,
+            `Join: ${link}`,
+            agenda ? `\nAgenda:\n${agenda}` : "",
+            "",
+            "The calendar invite is attached — tap Accept to add it to your calendar.",
+            "",
+            currentUser?.name || "",
+          ].join("\n"),
           fromName: currentUser?.name || "",
           replyTo: currentUser?.email || "",
+          ics,
         });
       }
 
+      const meetDateStr = `${meetDetails.date} ${meetDetails.time}`;
       await supabase.from("meetings").insert({
         user_id: currentUser?.id,
         contact_id: meetModal.id,
         meet_link: link,
         meet_date: meetDetails.date,
         meet_time: meetDetails.time,
-        notes: meetDetails.notes || null,
+        notes: agenda || null,
       });
       await supabase.from("contacts").update({ meet_link: link, meet_date: meetDateStr }).eq("id", meetModal.id);
       setContacts((prev) => prev.map((c) => (c.id === meetModal.id ? { ...c, meetLink: link, meetDate: meetDateStr } : c)));
+      setMeetResult({ link, via, ics });
       setMeetSent(true);
       successFeedback();
-      showToast(calendarInviteSent ? `Calendar invite sent to ${meetModal.email}` : `Meeting invite sent to ${meetModal.email}`, "success");
-      setTimeout(() => {
-        setMeetModal(null);
-        setMeetSent(false);
-        setMeetDetails({ date: "", time: "", notes: "" });
-      }, 2000);
     } catch (err: any) {
       console.error("Meeting invite error:", err);
-      showToast(err?.text || err?.message || "Failed to send invite.", "error");
+      showToast(err?.message || "Couldn't send the invite.", "error");
     } finally {
       setMeetSending(false);
     }
@@ -6372,17 +6380,40 @@ Keep it punchy, sharp, and directly actionable.`;
         >
           <div style={{ ...S.card, maxWidth: 460, width: "100%", maxHeight: "min(90dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 22 }}>Schedule Meeting</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>Schedule a call</div>
               <button aria-label="Close" onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
             </div>
 
-            {meetSent ? (
-              <div style={{ textAlign: "center", padding: "32px 0" }}>
-                <Icons.CheckCircle size={44} style={{ margin: "0 auto 10px" }} />
-                <div style={{ fontSize: 22 }}>Invite Sent</div>
-                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Meeting invite delivered to {meetModal.email}</div>
+            {meetSent && meetResult ? (
+              <div style={{ textAlign: "center", padding: "20px 0 4px" }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><SuccessCheck size={60} /></div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>Invite sent</div>
+                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13, lineHeight: 1.45 }}>
+                  {meetResult.via === "google"
+                    ? `Google Calendar emailed ${meetModal.email} an invite with the Meet link. It's in your calendar too.`
+                    : `${meetModal.email} got an email with the link and a calendar invite to accept.`}
+                </div>
+                <div style={{ margin: "16px 0 0", padding: "10px 12px", borderRadius: 12, background: themeStyles.subtleBg, fontSize: 13, wordBreak: "break-all", textAlign: "left" }}>{meetResult.link}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button style={{ ...S.btnSmOut, padding: "9px 14px" }} onClick={() => { navigator.clipboard?.writeText(meetResult.link).then(() => showToast("Link copied.", "success"), () => {}); }}>Copy link</button>
+                  {meetResult.ics && (
+                    <button
+                      style={{ ...S.btnSmOut, padding: "9px 14px" }}
+                      onClick={() => {
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(new Blob([meetResult.ics!], { type: "text/calendar" }));
+                        a.download = "networq-meeting.ics";
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                      }}
+                    >
+                      Add to my calendar
+                    </button>
+                  )}
+                  <button style={{ ...S.btnSm, padding: "9px 16px" }} onClick={() => { setMeetModal(null); setMeetSent(false); setMeetDetails({ date: "", time: "", notes: "" }); }}>Done</button>
+                </div>
               </div>
             ) : (
               <>
@@ -6408,8 +6439,45 @@ Keep it punchy, sharp, and directly actionable.`;
                     placeholder="Key discussion topics…"
                   />
                 </div>
-                <div style={{ background: "rgba(124, 58, 237, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12 }}>
-                  <span style={{ color: "#818cf8", fontWeight: 700 }}>Video meeting link attached automatically</span>
+                <label style={S.label}>Length</label>
+                <div role="radiogroup" aria-label="Meeting length" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                  {[15, 30, 45, 60].map((m) => (
+                    <button key={m} role="radio" aria-checked={meetDuration === m} onClick={() => setMeetDuration(m)} style={{ flex: 1, minHeight: 40, borderRadius: 10, border: `1px solid ${meetDuration === m ? "#7C3AED" : themeStyles.tableRowBorder}`, background: meetDuration === m ? "rgba(124,58,237,0.1)" : "transparent", color: meetDuration === m ? "#7C3AED" : themeStyles.text, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+                <label style={S.label}>Video link</label>
+                <div role="radiogroup" aria-label="Video link" style={{ display: "flex", padding: 3, borderRadius: 12, background: themeStyles.subtleBg, marginBottom: 10 }}>
+                  {([
+                    ...(GOOGLE_MEET_AVAILABLE ? [{ k: "google", l: "Google Meet" }] : []),
+                    { k: "paste", l: "Paste link" },
+                    { k: "jitsi", l: "Free room" },
+                  ] as const).map((o) => (
+                    <button key={o.k} role="radio" aria-checked={meetMode === o.k} onClick={() => setMeetMode(o.k as any)} style={{ flex: 1, minHeight: 36, borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: meetMode === o.k ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent", color: meetMode === o.k ? themeStyles.text : themeStyles.textMuted, boxShadow: meetMode === o.k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
+                  {meetMode === "google" ? (
+                    "Google asks you to allow NetworQ to add events to your calendar, then creates a Meet link and emails the invite."
+                  ) : meetMode === "paste" ? (
+                    <>
+                      <input
+                        aria-label="Meeting link"
+                        style={{ ...S.input, marginBottom: 6 }}
+                        inputMode="url"
+                        autoCapitalize="none"
+                        placeholder="https://meet.google.com/abc-defg-hij"
+                        value={meetLinkInput}
+                        onChange={(e) => setMeetLinkInput(e.target.value)}
+                      />
+                      Your Google Meet, Zoom or Teams link — we'll remember it for next time.
+                    </>
+                  ) : (
+                    "Creates a free Jitsi video room. The first person to open it may be asked to sign in once."
+                  )}
                 </div>
                 <button
                   style={{ ...S.btn, width: "100%", opacity: !meetDetails.date || !meetDetails.time || meetSending ? 0.6 : 1 }}
@@ -6417,7 +6485,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   disabled={!meetDetails.date || !meetDetails.time || meetSending}
                 >
                   <Icons.Calendar size={14} />
-                  <span>{meetSending ? "Sending…" : "Send Calendar Invite"}</span>
+                  <span>{meetSending ? (meetMode === "google" ? "Waiting for Google…" : "Sending…") : "Send invite"}</span>
                 </button>
               </>
             )}

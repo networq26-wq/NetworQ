@@ -239,17 +239,15 @@ export function EventRadar({
           <section style={{ ...card, padding: 16 }}>
             {radar.settings?.radar_on ? (
               <>
-                <RadarCanvas
-                  people={radar.people}
-                  isDark={isDark}
-                  onSelect={setSelected}
-                  scanning={radar.status === "scanning" || radar.status === "scan_only" || radar.mode === "web"}
-                />
+                {/* The live radar needs Bluetooth, which only the Android app has — browsers show a list instead */}
+                {radar.mode === "native" && (
+                  <RadarCanvas people={radar.people} isDark={isDark} onSelect={setSelected} scanning={radar.status === "scanning" || radar.status === "scan_only"} />
+                )}
                 <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: "10px 0 0" }}>
                   {radar.mode === "native"
                     ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy."
                     : scope === "nearby"
-                      ? "Proximity Radar active · Detecting NetworQ peers within range."
+                      ? "Nearby uses Bluetooth, so it works in the NetworQ Android app. Browsers can't scan for people nearby."
                       : "Attendees active at this event in the last 15 minutes."}
                 </p>
                 {radar.hiddenCount > 0 && (
@@ -261,8 +259,8 @@ export function EventRadar({
             ) : (
               <div style={{ textAlign: "center", padding: "16px 12px" }}>
                 <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={false} />
-                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is in standby</div>
-                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on your radar beacon to discover professionals around you.</div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is off</div>
+                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on Radar to discover people around you.</div>
                 <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => radar.updateSettings({ radar_on: true })}>
                   Turn on Radar
                 </button>
@@ -321,9 +319,9 @@ export function EventRadar({
             <section style={{ ...card, padding: 16 }}>
               <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
               <div style={{ textAlign: "center", padding: "16px 12px 6px" }}>
-                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Nearby Proximity Radar</div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Find people near you</div>
                 <div style={{ color: t.muted, fontSize: 14, maxWidth: 440, margin: "0 auto 16px", lineHeight: 1.5 }}>
-                  Discover NetworQ professionals within range — anywhere, no event code needed. Your device broadcasts a privacy-preserving ephemeral beacon.
+                  See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
                 </div>
                 <button
                   style={{ ...btn(t, "primary"), padding: "12px 28px", fontSize: 15 }}
@@ -332,9 +330,11 @@ export function EventRadar({
                 >
                   {busy ? "Turning on…" : "Turn on Nearby"}
                 </button>
+                <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 360, margin: "14px auto 0" }}>
+                  You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
+                </p>
               </div>
             </section>
-            <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
           </>
         ) : (
           <>
@@ -511,25 +511,6 @@ function ScopeSwitch({ t, scope, onChange }: { t: Theme; scope: "nearby" | "even
   );
 }
 
-function NearbyIntro({ t, card, busy, onTurnOn }: { t: Theme; card: React.CSSProperties; busy: boolean; onTurnOn: () => void }) {
-  return (
-    <section style={{ ...card, textAlign: "center", padding: "32px 20px" }} aria-label="Nearby">
-      <div aria-hidden style={{ width: 72, height: 72, borderRadius: 36, margin: "0 auto 16px", background: "rgba(124,58,237,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 40, height: 40, borderRadius: 20, border: `3px solid ${PURPLE}`, boxShadow: `0 0 0 8px rgba(124,58,237,0.15)` }} />
-      </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Find people near you</h2>
-      <p style={{ color: t.muted, fontSize: 14, lineHeight: 1.5, maxWidth: 360, margin: "0 auto 20px" }}>
-        See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
-      </p>
-      <button style={{ ...btn(t, "primary"), minWidth: 220 }} onClick={onTurnOn} disabled={busy}>
-        {busy ? "Turning on…" : "Turn on Nearby"}
-      </button>
-      <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 340, margin: "16px auto 0" }}>
-        You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
-      </p>
-    </section>
-  );
-}
 
 function btn(t: Theme, kind: "primary" | "ghost" | "danger"): React.CSSProperties {
   const base: React.CSSProperties = {

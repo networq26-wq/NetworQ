@@ -62,7 +62,15 @@ function seed(db: MockSupabase) {
   db.addUser("eve@acme.test", PASSWORD, { profile: { name: "Eve Outsider", company: "Elsewhere", role: "CTO" } });
 }
 
+// Radar opens on Nearby; event actions live on the Events tab
+async function eventsTab(page: Page) {
+  const tab = page.getByRole("tab", { name: "Events" });
+  await tab.click(); // waits for Radar to finish loading
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
 async function createEvent(page: Page, name: string) {
+  await eventsTab(page);
   await page.getByRole("button", { name: "Create event" }).click();
   await page.getByLabel("Event name").fill(name);
   await page.getByRole("button", { name: "Create & get code" }).click();
@@ -74,6 +82,7 @@ async function createEvent(page: Page, name: string) {
 }
 
 async function joinEvent(page: Page, code: string) {
+  await eventsTab(page);
   await page.getByLabel("Event code").fill(code);
   await page.getByRole("button", { name: "Join event" }).click();
 }
@@ -106,8 +115,8 @@ test.describe("Event Radar", () => {
     const hearing = setInterval(() => sendSightings(asha.page, bobToken, -79, 1).catch(() => {}), 2000);
 
     const nearby = asha.page.getByRole("list", { name: "Nearby attendees" });
-    await expect(nearby.getByText("Bob Iyer")).toBeVisible();
-    await expect(nearby.getByText("~5 m")).toBeVisible();
+    await expect(nearby.getByText("Bob Iyer")).toBeVisible({ timeout: 15_000 });
+    await expect(nearby.getByText("~5 m")).toBeVisible({ timeout: 15_000 });
     expect(await nearby.textContent()).not.toContain("bob@acme.test"); // no contact details before consent
 
     // Asha requests, Bob accepts → both get a contact

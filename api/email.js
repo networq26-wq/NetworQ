@@ -18,7 +18,7 @@ function getSupabase() {
 const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
 // ── Resend HTTP API (no npm package needed) ───────────────────────────────────
-async function sendViaResend({ to, subject, html, text, fromName, replyTo }) {
+async function sendViaResend({ to, subject, html, text, fromName, replyTo, ics }) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) throw new Error("RESEND_API_KEY not set");
 
@@ -32,7 +32,12 @@ async function sendViaResend({ to, subject, html, text, fromName, replyTo }) {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from, to, subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}) }),
+    body: JSON.stringify({
+      from, to, subject, html, text,
+      ...(replyTo ? { reply_to: replyTo } : {}),
+      // Calendar invite: mail apps show it with Accept / Decline and add it to the calendar
+      ...(ics ? { attachments: [{ filename: "invite.ics", content: Buffer.from(ics, "utf8").toString("base64"), content_type: "text/calendar; method=REQUEST; charset=UTF-8" }] } : {}),
+    }),
   });
 
   const data = await res.json();
@@ -41,7 +46,7 @@ async function sendViaResend({ to, subject, html, text, fromName, replyTo }) {
 }
 
 // ── Nodemailer SMTP fallback ──────────────────────────────────────────────────
-async function sendViaSMTP({ to, subject, html, text, fromName, replyTo }) {
+async function sendViaSMTP({ to, subject, html, text, fromName, replyTo, ics }) {
   const nodemailer = require("nodemailer");
 
   let transporter;
@@ -66,6 +71,7 @@ async function sendViaSMTP({ to, subject, html, text, fromName, replyTo }) {
     from: `"${fromName || "NetworQ"}" <${fromEmail}>`,
     to, subject, html, text,
     ...(replyTo ? { replyTo } : {}),
+    ...(ics ? { icalEvent: { filename: "invite.ics", method: "REQUEST", content: ics } } : {}),
   });
 }
 
@@ -102,7 +108,15 @@ module.exports = async function emailHandler(req, res) {
   }
   if (!verify.ok) return res.status(verify.status).json({ error: verify.error });
 
-  const { to, subject, body, from_name, reply_to } = req.body || {};
+  const { to, subject, body, from_name, reply_to, ics: rawIcs } = req.body || {};
+  // Optional calendar invite (built by the app); only a well-formed single VEVENT is accepted
+  let ics;
+  if (rawIcs !== undefined && rawIcs !== null) {
+    if (typeof rawIcs !== "string" || rawIcs.length > 8000 || !/^BEGIN:VCALENDAR\r?\n/.test(rawIcs) || !/END:VCALENDAR\s*$/.test(rawIcs) || (rawIcs.match(/BEGIN:VEVENT/g) || []).length !== 1) {
+      return res.status(400).json({ error: "Invalid calendar invite." });
+    }
+    ics = rawIcs;
+  }
   if (!to || !subject || !body) {
     return res.status(400).json({ error: "Missing required fields: to, subject, body" });
   }
@@ -120,7 +134,7 @@ module.exports = async function emailHandler(req, res) {
   // Try Resend first
   if (process.env.RESEND_API_KEY) {
     try {
-      const data = await sendViaResend({ to: to.trim(), subject, html, text: body, fromName, replyTo });
+      const data = await sendViaResend({ to: to.trim(), subject, html, text: body, fromName, replyTo, ics });
       return res.json({ ok: true, provider: "resend", id: data.id });
     } catch (err) {
       console.warn("[Email] Resend failed:", err.message, "— trying SMTP fallback");
@@ -130,7 +144,7 @@ module.exports = async function emailHandler(req, res) {
   // Try SMTP fallback
   if (process.env.SMTP_HOST || (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD)) {
     try {
-      await sendViaSMTP({ to: to.trim(), subject, html, text: body, fromName, replyTo });
+      await sendViaSMTP({ to: to.trim(), subject, html, text: body, fromName, replyTo, ics });
       return res.json({ ok: true, provider: "smtp" });
     } catch (err) {
       console.warn("[Email] SMTP failed:", err.message);
