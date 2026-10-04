@@ -112,9 +112,33 @@ export function NetworQLogo({
   );
 }
 
+// The beam that scans inside the Q's opening — drawn over the official logo image, in the logo's own violets.
+const QSCAN_CSS = `
+.nq-qscan{position:absolute;left:84.4%;width:9.9%;top:21.9%;height:44.6%;overflow:hidden;pointer-events:none;border-radius:2px}
+.nq-qscan>i{position:absolute;inset:0;animation:nqQScan 2.4s cubic-bezier(.45,0,.55,1) infinite}
+.nq-qscan>i::before{content:"";position:absolute;left:0;right:0;bottom:100%;height:60%;background:linear-gradient(180deg,rgba(113,93,252,0),rgba(113,93,252,.28))}
+.nq-qscan>i::after{content:"";position:absolute;left:-10%;right:-10%;top:0;height:max(1.5px,8%);border-radius:2px;background:linear-gradient(90deg,rgba(94,53,245,0),#715DFC 25%,#E9E4FF 50%,#715DFC 75%,rgba(94,53,245,0));box-shadow:0 0 6px 1px rgba(94,53,245,.55)}
+@keyframes nqQScan{0%{transform:translateY(0)}50%{transform:translateY(100%)}100%{transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.nq-qscan{display:none}}
+`;
+
+function LogoImage({ src, size, scanning, className = "", style }: { src: string; size: number; scanning: boolean; className?: string; style?: React.CSSProperties | undefined }) {
+  return (
+    <span className={`relative select-none ${className}`} style={{ lineHeight: 0, ...style }}>
+      <img src={src} alt="NetworQ" style={{ height: size, width: "auto", display: "block" }} className="object-contain" draggable={false} />
+      {scanning && (
+        <span className="nq-qscan" aria-hidden>
+          <i />
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function Wordmark({
   className = "",
   size = 28,
+  scanning = true,
   theme = "auto",
   style,
 }: {
@@ -124,42 +148,19 @@ export function Wordmark({
   theme?: "auto" | "light" | "dark";
   style?: React.CSSProperties;
 }) {
-  if (theme === "light") {
-    return (
-      <img
-        src={networqLogo}
-        alt="NetworQ"
-        style={{ height: size, width: "auto", ...style }}
-        className={`object-contain select-none ${className}`}
-      />
-    );
-  }
-
-  if (theme === "dark") {
-    return (
-      <img
-        src={networqLogoDark}
-        alt="NetworQ"
-        style={{ height: size, width: "auto", ...style }}
-        className={`object-contain select-none ${className}`}
-      />
-    );
-  }
-
   return (
-    <div className={`inline-flex items-center select-none ${className}`} style={style}>
-      <img
-        src={networqLogo}
-        alt="NetworQ"
-        style={{ height: size, width: "auto" }}
-        className="dark:hidden block object-contain"
-      />
-      <img
-        src={networqLogoDark}
-        alt="NetworQ"
-        style={{ height: size, width: "auto" }}
-        className="hidden dark:block object-contain"
-      />
-    </div>
+    <>
+      <style>{QSCAN_CSS}</style>
+      {theme === "light" ? (
+        <LogoImage src={networqLogo} size={size} scanning={scanning} className={`inline-block ${className}`} style={style} />
+      ) : theme === "dark" ? (
+        <LogoImage src={networqLogoDark} size={size} scanning={scanning} className={`inline-block ${className}`} style={style} />
+      ) : (
+        <span className={`inline-flex items-center select-none ${className}`} style={style}>
+          <LogoImage src={networqLogo} size={size} scanning={scanning} className="inline-block dark:hidden" />
+          <LogoImage src={networqLogoDark} size={size} scanning={scanning} className="hidden dark:inline-block" />
+        </span>
+      )}
+    </>
   );
 }
