@@ -3,6 +3,9 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createChatApi } from "../chat/chatApi";
 import { I, Skeleton } from "../ui/icons";
+import { placeCall } from "../calls/CallLayer";
+
+type Contact = { id: string; name?: string; title?: string; company?: string; email?: string; phone?: string; image?: string; linkedUserId?: string | null };
 
 type Conversation = { chat_id: string; other_user: string; name: string; avatar: string | null; last_message_at: string; last_message: string | null; unread: number };
 
@@ -22,13 +25,18 @@ export function MessagesScreen({
   isDark,
   onOpenChat,
   onOpenRadar,
+  contacts = [],
+  inviterName = "",
 }: {
   supabase: SupabaseClient;
   userId: string;
   isDark: boolean;
   onOpenChat: (p: { id: string; name: string; avatar_url?: string | null }) => void;
   onOpenRadar: () => void;
+  contacts?: Contact[];
+  inviterName?: string;
 }) {
+  const [picking, setPicking] = useState(false);
   const api = useMemo(() => createChatApi(supabase), [supabase]);
   const [rows, setRows] = useState<Conversation[] | null>(null);
   const [error, setError] = useState(false);
@@ -62,7 +70,28 @@ export function MessagesScreen({
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto" }}>
-      <h2 style={{ margin: "4px 0 16px", fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Messages</h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "4px 0 16px" }}>
+        <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Messages</h2>
+        <button
+          onClick={() => setPicking(true)}
+          className="btn-press"
+          style={{ minHeight: 40, padding: "0 16px", borderRadius: 20, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          <I.UserPlus size={17} /> New message
+        </button>
+      </div>
+      {picking && (
+        <ContactPicker
+          contacts={contacts}
+          isDark={isDark}
+          inviterName={inviterName}
+          onClose={() => setPicking(false)}
+          onChat={(c) => {
+            setPicking(false);
+            onOpenChat({ id: c.linkedUserId!, name: c.name || "NetworQ member", avatar_url: c.image || null });
+          }}
+        />
+      )}
 
       {rows === null ? (
         <div role="status" aria-label="Loading messages" style={{ background: t.surface, borderRadius: 20, border: `1px solid ${t.border}`, padding: "4px 16px" }}>
@@ -83,10 +112,10 @@ export function MessagesScreen({
           </div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>{error ? "Couldn't load messages" : "No messages yet"}</div>
           <div style={{ color: t.muted, fontSize: 15, lineHeight: 1.5, maxWidth: 320, margin: "8px auto 20px" }}>
-            {error ? "Check your connection and try again." : "Connect with someone on Radar, then you can message each other here."}
+            {error ? "Check your connection and try again." : "Tap New message to write to one of your contacts, or meet new people on Radar."}
           </div>
-          <button onClick={error ? load : onOpenRadar} style={{ minHeight: 50, padding: "0 28px", borderRadius: 14, border: "none", background: "#7C3AED", color: "#FFF", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
-            {error ? "Try again" : "Open Radar"}
+          <button onClick={error ? load : () => setPicking(true)} style={{ minHeight: 50, padding: "0 28px", borderRadius: 14, border: "none", background: "#7C3AED", color: "#FFF", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
+            {error ? "Try again" : "New message"}
           </button>
         </div>
       ) : (
@@ -122,6 +151,120 @@ export function MessagesScreen({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+// Pick who to write to. People on NetworQ can be messaged or called right away; everyone else gets an invite.
+function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { contacts: Contact[]; isDark: boolean; inviterName: string; onClose: () => void; onChat: (c: Contact) => void }) {
+  const [q, setQ] = useState("");
+  const t = isDark
+    ? { sheet: "#1C1C1E", raised: "#2C2C2E", text: "#FFFFFF", muted: "#AEAEB2", line: "rgba(255,255,255,0.08)" }
+    : { sheet: "#FFFFFF", raised: "#F2F2F7", text: "#1C1C1E", muted: "#6E6E73", line: "rgba(0,0,0,0.06)" };
+  const needle = q.trim().toLowerCase();
+  const match = (c: Contact) => !needle || [c.name, c.company, c.title, c.email].some((v) => (v || "").toLowerCase().includes(needle));
+  const byName = (a: Contact, b: Contact) => (a.name || "").localeCompare(b.name || "");
+  const onApp = contacts.filter((c) => c.linkedUserId && match(c)).sort(byName);
+  const others = contacts.filter((c) => !c.linkedUserId && match(c)).sort(byName);
+
+  const invite = async (c: Contact) => {
+    const first = (c.name || "").split(" ")[0] || "there";
+    const text = `Hi ${first}, it's ${inviterName || "me"} — let's stay connected on NetworQ so we can message and call each other: https://www.networq.co.in`;
+    try {
+      if ((navigator as any).share) return void (await navigator.share({ text }));
+    } catch (e: any) {
+      if (e?.name === "AbortError") return;
+    }
+    if (c.phone) window.open(`https://wa.me/${c.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`, "_blank");
+    else if (c.email) window.location.href = `mailto:${c.email}?subject=${encodeURIComponent("Let's connect on NetworQ")}&body=${encodeURIComponent(text)}`;
+    else navigator.clipboard?.writeText(text);
+  };
+
+  const avatar = (c: Contact) =>
+    c.image ? (
+      <img src={c.image} alt="" width={44} height={44} style={{ borderRadius: 22, objectFit: "cover", flexShrink: 0 }} />
+    ) : (
+      <span aria-hidden style={{ width: 44, height: 44, borderRadius: 22, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: isDark ? "rgba(167,139,250,0.16)" : "#EDE9FE", color: "#7C3AED", fontWeight: 700, fontSize: 17 }}>
+        {(c.name || "?").trim().charAt(0).toUpperCase()}
+      </span>
+    );
+  const sub = (c: Contact) => [c.title, c.company].filter(Boolean).join(" · ");
+  const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+  const section = (title: string, hint: string) => (
+    <div style={{ margin: "18px 4px 8px" }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: t.muted, textTransform: "uppercase", letterSpacing: "0.04em" }}>{title}</div>
+      <div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>{hint}</div>
+    </div>
+  );
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="New message" style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div className="nq-backdrop" onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} />
+      <div className="nq-sheet-up" style={{ position: "relative", width: "100%", maxWidth: 560, height: "min(86dvh, 760px)", background: t.sheet, color: t.text, borderRadius: "28px 28px 0 0", display: "flex", flexDirection: "column", boxSizing: "border-box" }}>
+        <div style={{ padding: "10px 20px 0" }}>
+          <div aria-hidden style={{ width: 36, height: 5, borderRadius: 3, background: t.line, margin: "0 auto 12px" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>New message</h3>
+            <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <I.X size={16} />
+            </button>
+          </div>
+          <div style={{ position: "relative", marginTop: 14 }}>
+            <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: t.muted, display: "flex" }}>
+              <I.Search size={17} />
+            </span>
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search your contacts"
+              aria-label="Search your contacts"
+              autoFocus
+              style={{ width: "100%", boxSizing: "border-box", minHeight: 46, borderRadius: 14, border: "none", background: t.raised, color: t.text, padding: "0 14px 0 40px", fontSize: 16, fontFamily: "inherit", outline: "none" }}
+            />
+          </div>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 16px calc(20px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" }}>
+          {onApp.length > 0 && section("On NetworQ", "Message or call them right here")}
+          {onApp.length > 0 && (
+            <ul aria-label="Contacts on NetworQ" style={{ listStyle: "none", margin: 0, padding: 0, background: isDark ? "#2C2C2E" : "#F9F9FB", borderRadius: 18, overflow: "hidden" }}>
+              {onApp.map((c, i) => (
+                <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px", borderTop: i ? `1px solid ${t.line}` : "none" }}>
+                  <button onClick={() => onChat(c)} aria-label={`Message ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                    {avatar(c)}
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: 16, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                      {sub(c) && <span style={{ display: "block", fontSize: 13, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
+                    </span>
+                  </button>
+                  <button onClick={() => (onClose(), placeCall({ id: c.linkedUserId!, name: c.name || "NetworQ member", avatar_url: c.image || null }, "audio"))} aria-label={`Call ${c.name}`} style={iconBtn}>
+                    <I.Phone size={17} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {others.length > 0 && section("Not on NetworQ yet", "Invite them — once they join, you can message and call")}
+          {others.length > 0 && (
+            <ul aria-label="Contacts to invite" style={{ listStyle: "none", margin: 0, padding: 0, background: isDark ? "#2C2C2E" : "#F9F9FB", borderRadius: 18, overflow: "hidden" }}>
+              {others.map((c, i) => (
+                <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 14px", borderTop: i ? `1px solid ${t.line}` : "none" }}>
+                  {avatar(c)}
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: "block", fontSize: 16, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
+                    {sub(c) && <span style={{ display: "block", fontSize: 13, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
+                  </span>
+                  <button onClick={() => invite(c)} aria-label={`Invite ${c.name}`} style={{ flexShrink: 0, minHeight: 36, padding: "0 14px", borderRadius: 18, border: `1px solid ${isDark ? "rgba(167,139,250,0.4)" : "rgba(124,58,237,0.3)"}`, background: "transparent", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                    Invite
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!onApp.length && !others.length && (
+            <div style={{ textAlign: "center", color: t.muted, padding: "48px 16px", fontSize: 15 }}>{contacts.length ? `No contacts match “${q}”.` : "You haven't added anyone yet. Scan a card or use Radar to add people."}</div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

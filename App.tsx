@@ -5308,7 +5308,7 @@ Keep it punchy, sharp, and directly actionable.`;
         {/* ── ME: card + grouped settings ── */}
         {tab === "me" && currentUser && (
           <MeScreen
-            user={currentUser}
+            user={{ ...currentUser, avatar_url: currentUser?.avatar_url || currentUser?.photo }}
             isDark={isDark}
             section={meSection}
             onOpenSection={setMeSection}
@@ -5347,6 +5347,8 @@ Keep it punchy, sharp, and directly actionable.`;
           <MessagesScreen
             supabase={supabase}
             userId={currentUser.id}
+            contacts={effectiveContacts}
+            inviterName={currentUser?.name || ""}
             isDark={isDark}
             onOpenRadar={() => setTab("radar")}
             onOpenChat={(p) => {

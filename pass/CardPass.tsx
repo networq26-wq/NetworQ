@@ -144,9 +144,8 @@ export function CardPass({ user, prefs }: { user: User; prefs: PassPrefs }) {
         <div style={{ ...face, background: f.bg, color: f.fg, padding: "7% 7.5%", boxSizing: "border-box", display: "flex", flexDirection: "column", border: f.id === "pearl" ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
           <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(circle at ${tilt.x}% ${tilt.y}%, rgba(255,255,255,0.2), transparent 55%)` }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
-            <span style={{ fontWeight: 800, fontSize: 17, letterSpacing: "-0.02em" }}>
-              Networ<span style={{ color: f.accent }}>Q</span>
-            </span>
+            {/* Official wordmark: white on dark finishes, full colour on Pearl */}
+            <img src={f.id === "pearl" ? "/brand/networq-wordmark.png" : "/brand/networq-wordmark-white.png"} alt="NetworQ" draggable={false} style={{ height: 20, width: "auto", display: "block" }} />
             {/* Contactless-style mark: "tap / scan me" without words */}
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={f.sub} strokeWidth="1.8" strokeLinecap="round" aria-hidden>
               <path d="M8.5 16.5a6 6 0 0 0 0-9" />
@@ -155,10 +154,20 @@ export function CardPass({ user, prefs }: { user: User; prefs: PassPrefs }) {
             </svg>
           </div>
           {context && <div style={{ position: "relative", marginTop: 10, fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: f.sub }}>{context}</div>}
-          <div style={{ marginTop: "auto", position: "relative", textAlign: "left" }}>
-            <div style={{ fontSize: "clamp(20px, 6.2vw, 26px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name || "Your name"}</div>
-            <div style={{ fontSize: 13, color: f.sub, marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {[user?.role, user?.company].filter(Boolean).join(" · ") || "Add your role in Me → Profile"}
+          <div style={{ marginTop: "auto", position: "relative", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
+            {/* Profile photo (initials until you add one) */}
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" draggable={false} style={{ width: 56, height: 56, borderRadius: 28, objectFit: "cover", flexShrink: 0, boxShadow: `0 0 0 2px ${f.id === "pearl" ? "#FFFFFF" : "rgba(255,255,255,0.85)"}, 0 6px 14px rgba(0,0,0,0.25)` }} />
+            ) : (
+              <span aria-hidden style={{ width: 56, height: 56, borderRadius: 28, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, color: f.id === "pearl" ? "#7C3AED" : "#FFFFFF", background: f.id === "pearl" ? "#EDE9FE" : "rgba(255,255,255,0.16)", boxShadow: `0 0 0 2px ${f.id === "pearl" ? "#FFFFFF" : "rgba(255,255,255,0.5)"}` }}>
+                {(user?.name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}
+              </span>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: "clamp(19px, 5.6vw, 24px)", fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.name || "Your name"}</div>
+              <div style={{ fontSize: 13, color: f.sub, marginTop: 3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {[user?.role, user?.company].filter(Boolean).join(" · ") || "Add your role in Me → Profile"}
+              </div>
             </div>
           </div>
         </div>
@@ -168,6 +177,7 @@ export function CardPass({ user, prefs }: { user: User; prefs: PassPrefs }) {
           <div style={{ color: "#1C1C1E", textAlign: "left", maxWidth: "40%" }}>
             <div style={{ fontWeight: 700, fontSize: 15, lineHeight: 1.2 }}>Scan to save</div>
             <div style={{ fontSize: 12, color: "#6E6E73", marginTop: 4, lineHeight: 1.35 }}>Any phone camera adds you as a contact.</div>
+            <img src="/brand/networq-wordmark.png" alt="NetworQ" draggable={false} style={{ height: 14, width: "auto", display: "block", marginTop: 12, opacity: 0.9 }} />
           </div>
         </div>
       </button>

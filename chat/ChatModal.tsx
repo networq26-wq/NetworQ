@@ -36,6 +36,7 @@ export function ChatModal({
   const [sending, setSending] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
   const chatApi = useRef(createChatApi(supabase)).current;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -58,6 +59,7 @@ export function ChatModal({
         const history = await chatApi.loadMessages(resolvedChatId, eventId || null);
         if (isMounted) {
           setMessages(history);
+          setHistoryLoaded(true);
           if (resolvedChatId) {
             chatApi.markRead(resolvedChatId).catch(() => {});
           }
@@ -87,6 +89,7 @@ export function ChatModal({
         channelRef.current = channel;
 
       } catch (err: any) {
+        if (isMounted) setHistoryLoaded(true);
         console.warn("Chat init error:", err);
       }
     }
@@ -297,7 +300,13 @@ export function ChatModal({
             gap: 10,
           }}
         >
-          {messages.length === 0 ? (
+          {!historyLoaded ? (
+            <div role="status" aria-label="Loading messages" style={{ display: "flex", flexDirection: "column", gap: 10, padding: "8px 0" }}>
+              {[60, 42, 70].map((w, i) => (
+                <span key={i} className="nq-skeleton" style={{ alignSelf: i % 2 ? "flex-end" : "flex-start", width: `${w}%`, height: 38, borderRadius: 18 }} />
+              ))}
+            </div>
+          ) : messages.length === 0 ? (
             <div style={{ textAlign: "center", margin: "auto", padding: "20px", color: isDark ? "#6B7280" : "#9CA3AF" }}>
               <div style={{ width: 56, height: 56, borderRadius: 28, margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: "#7C3AED" }}><I.Mail size={26} /></div>
               <div style={{ fontWeight: 600, fontSize: 14, color: isDark ? "#E5E7EB" : "#374151" }}>
