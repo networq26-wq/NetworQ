@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, CheckCircle2, Share2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Share2, Sparkles, Loader2, Mail } from "lucide-react";
 import { Reveal } from "./reveal";
 
 const SUPABASE_URL = "https://jpuxmkkuzqojqeatespa.supabase.co";
@@ -124,41 +124,55 @@ export function Waitlist() {
               </div>
             </div>
           ) : (
-            <form
-              onSubmit={onSubmit}
-              className="mx-auto mt-8 sm:mt-10 flex w-full max-w-lg flex-col gap-3 sm:flex-row sm:items-center"
-            >
-              <label htmlFor="waitlist-email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="waitlist-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                disabled={status === "loading"}
-                className="h-[52px] sm:h-12 w-full flex-1 rounded-xl border border-input/90 bg-card px-4 sm:px-4.5 text-base sm:text-[15px] outline-none transition-all placeholder:text-muted-foreground/75 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 shadow-sm"
+            <div className="relative mx-auto mt-8 sm:mt-10 w-full max-w-xl px-2 sm:px-0">
+              {/* Subtle ambient violet back-glow */}
+              <div
+                aria-hidden="true"
+                className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-violet-600/35 via-purple-600/25 to-violet-600/35 blur-md opacity-80"
               />
-              <button
-                type="submit"
-                disabled={status === "loading"}
-                className="group inline-flex h-[52px] sm:h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base sm:text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all duration-200 hover:-translate-y-px active:scale-[0.99] disabled:opacity-50 shrink-0 whitespace-nowrap"
+
+              <form
+                onSubmit={onSubmit}
+                className="relative flex w-full flex-col sm:flex-row gap-2.5 sm:gap-2 rounded-2xl border border-white/20 bg-card/95 p-2 sm:p-2 backdrop-blur-xl shadow-2xl text-left"
+                style={{ width: "100%", boxSizing: "border-box" }}
               >
-                {status === "loading" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Reserving…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Get early access</span>
-                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </>
-                )}
-              </button>
-            </form>
+                <label htmlFor="waitlist-email" className="sr-only">
+                  Email address
+                </label>
+                <div className="relative flex flex-1 items-center" style={{ width: "100%", minHeight: "52px" }}>
+                  <Mail className="absolute left-4 h-5 w-5 text-muted-foreground/60 pointer-events-none" />
+                  <input
+                    id="waitlist-email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    disabled={status === "loading"}
+                    className="h-12 w-full rounded-xl bg-transparent pl-12 pr-4 text-base sm:text-[15px] text-foreground outline-none placeholder:text-muted-foreground/60 transition-colors focus:ring-0"
+                    style={{ minHeight: "52px", width: "100%", fontSize: "16px" }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="group inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base sm:text-sm font-semibold text-primary-foreground shadow-md transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 shrink-0 whitespace-nowrap cursor-pointer"
+                  style={{ minHeight: "52px" }}
+                >
+                  {status === "loading" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Reserving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Get early access</span>
+                      <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           )}
 
           {status === "error" && (
