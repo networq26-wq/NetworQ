@@ -5,25 +5,25 @@ const steps = ["Meet", "Exchange details", "Forget context", "Miss follow-up", "
 
 export function Problem() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-28 md:py-36">
-      <div className="grid grid-cols-1 gap-16 lg:grid-cols-[1.15fr_0.85fr] lg:gap-24">
+    <section className="mx-auto max-w-6xl px-6 py-16 md:py-32">
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-24">
         <div>
           <Reveal>
             <p className="label-eyebrow">The problem</p>
           </Reveal>
           <Reveal delay={0.05}>
-            <h2 className="mt-6 text-4xl leading-[1.06] font-semibold tracking-[-0.035em] text-balance sm:text-5xl">
+            <h2 className="mt-4 sm:mt-6 text-3xl leading-tight font-semibold tracking-[-0.035em] text-balance sm:text-5xl">
               The hardest part of networking
               <br className="hidden sm:block" /> isn't meeting people.
             </h2>
           </Reveal>
           <Reveal delay={0.12}>
-            <p className="mt-6 text-4xl font-semibold tracking-[-0.035em] text-primary sm:text-5xl">
+            <p className="mt-4 sm:mt-6 text-3xl font-semibold tracking-[-0.035em] text-primary sm:text-5xl">
               It's remembering them.
             </p>
           </Reveal>
           <Reveal delay={0.18}>
-            <div className="mt-9 max-w-md space-y-2 text-[17px] leading-relaxed text-muted-foreground">
+            <div className="mt-6 sm:mt-9 max-w-md space-y-2 text-[15px] sm:text-[17px] leading-relaxed text-muted-foreground">
               <p>You meet someone. Exchange details. Have a great conversation.</p>
               <p>A few days later, the context is gone.</p>
               <p>Their name. Their company. What you discussed.</p>
@@ -34,7 +34,7 @@ export function Problem() {
 
         <div className="lg:pt-4">
           <Reveal>
-            <figure className="mb-12 overflow-hidden rounded-2xl border border-border bg-card">
+            <figure className="mb-8 lg:mb-12 overflow-hidden rounded-2xl border border-border bg-card">
               <img
                 src={conversation}
                 alt="Two professionals connecting and exchanging contact at a conference"

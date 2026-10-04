@@ -77,11 +77,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "NetworQ — Smart Networking, Digitally." },
+      { title: "NetworQ — Never lose a conversation again." },
       {
         name: "description",
         content:
-          "NetworQ remembers the people you meet, the context behind every conversation, and when to follow up.",
+          "Never lose a conversation again. NetworQ remembers the people you meet, the context behind every conversation, and when to follow up.",
       },
       { name: "author", content: "NetworQ" },
       { property: "og:site_name", content: "NetworQ" },

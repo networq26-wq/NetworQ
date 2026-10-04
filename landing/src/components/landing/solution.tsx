@@ -36,28 +36,28 @@ const steps = [
 export function Solution() {
   return (
     <section id="how-it-works" className="section-dark">
-      <div className="mx-auto max-w-6xl px-6 py-28 md:py-36">
+      <div className="mx-auto max-w-6xl px-6 py-16 md:py-32">
         <Reveal>
           <p className="label-eyebrow">How it works</p>
         </Reveal>
         
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-baseline">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-baseline">
           <Reveal delay={0.05}>
-            <h2 className="text-3xl font-semibold tracking-[-0.035em] text-balance sm:text-4xl md:text-5xl">
+            <h2 className="text-2xl font-semibold tracking-[-0.035em] text-balance sm:text-4xl md:text-5xl">
               Your memory for professional relationships.
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <p className="text-[17px] leading-relaxed text-muted-foreground">
+            <p className="text-[15px] sm:text-[17px] leading-relaxed text-muted-foreground">
               NetworQ quietly remembers every connection, the context behind it, and the right moment to reconnect.
             </p>
           </Reveal>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 items-stretch">
+        <div className="mt-10 sm:mt-16 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4 items-stretch">
           {steps.map((s, i) => (
             <Reveal key={s.n} delay={i * 0.08} className="h-full">
-              <div className="h-full flex flex-col justify-between rounded-2xl border border-border bg-card/60 p-6 md:p-7 backdrop-blur-sm shadow-[var(--shadow-soft)] hover:border-primary/40 hover:shadow-lg transition-all duration-300">
+              <div className="h-full flex flex-col justify-between rounded-2xl border border-border bg-card/60 p-5 sm:p-6 md:p-7 backdrop-blur-sm shadow-[var(--shadow-soft)] hover:border-primary/40 hover:shadow-lg transition-all duration-300">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold tracking-[0.14em] uppercase text-primary">

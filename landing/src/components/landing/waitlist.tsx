@@ -74,26 +74,26 @@ export function Waitlist() {
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[480px] bg-gradient-to-tr from-violet-600/20 via-purple-600/10 to-indigo-600/0 rounded-full blur-[110px] pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:36px_36px] opacity-[0.08]" />
       </div>
-      <div className="relative mx-auto max-w-3xl px-6 py-28 text-center md:py-40">
+      <div className="relative mx-auto max-w-3xl px-6 py-16 text-center sm:py-24 md:py-36">
         <Reveal>
-          <h2 className="text-4xl leading-[1.14] font-semibold tracking-[-0.035em] text-balance sm:text-[3.25rem]">
+          <h2 className="text-2xl leading-snug font-semibold tracking-[-0.03em] text-balance sm:text-4xl md:text-[3.25rem]">
             You met <span className="font-serif italic text-[#8B5CF6] font-semibold">12</span> people at that event. You'll remember{" "}
             <span className="font-serif italic text-[#8B5CF6] font-semibold">2</span> by Friday.
           </h2>
         </Reveal>
         <Reveal delay={0.08}>
-          <p className="mx-auto mt-6 max-w-md text-[17px] text-muted-foreground">
+          <p className="mx-auto mt-4 sm:mt-6 max-w-md text-[15px] sm:text-[17px] text-muted-foreground leading-relaxed">
             NetworQ scans business cards and QR codes, drafts your follow-up emails, and nudges you to reconnect before people forget you ever met.
           </p>
         </Reveal>
 
         <Reveal delay={0.14}>
           {status === "success" || status === "already" ? (
-            <div className="mx-auto mt-10 max-w-md rounded-2xl border border-violet-500/30 bg-card/90 p-8 text-center backdrop-blur-xl shadow-2xl">
+            <div className="mx-auto mt-8 sm:mt-10 max-w-md rounded-2xl border border-violet-500/30 bg-card/90 p-6 sm:p-8 text-center backdrop-blur-xl shadow-2xl">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-600/20 text-violet-400">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <h3 className="mt-4 text-2xl font-bold text-foreground">
+              <h3 className="mt-4 text-xl sm:text-2xl font-bold text-foreground">
                 {status === "already" ? "You're already on the list!" : "You're on the early access list!"}
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -126,7 +126,7 @@ export function Waitlist() {
           ) : (
             <form
               onSubmit={onSubmit}
-              className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row"
+              className="mx-auto mt-8 sm:mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row"
             >
               <label htmlFor="waitlist-email" className="sr-only">
                 Email address
@@ -139,7 +139,7 @@ export function Waitlist() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email address"
                 disabled={status === "loading"}
-                className="h-12 flex-1 rounded-xl border border-input bg-card px-4 text-[15px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:opacity-50"
+                className="h-12 flex-1 rounded-xl border border-input bg-card px-4 text-base sm:text-[15px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:opacity-50"
               />
               <button
                 type="submit"

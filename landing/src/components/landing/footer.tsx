@@ -13,7 +13,7 @@ export function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-10 px-6 py-14 md:flex-row md:items-start md:justify-between">
         <div>
           <Wordmark />
-          <p className="mt-2 text-sm text-muted-foreground">Smart Networking, Digitally.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Never lose a conversation again.</p>
         </div>
         <nav className="flex flex-wrap gap-x-8 gap-y-3">
           {links.map((l) => (
