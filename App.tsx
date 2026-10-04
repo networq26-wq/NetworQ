@@ -4232,8 +4232,12 @@ Keep it punchy, sharp, and directly actionable.`;
                   padding: "4px 8px",
                   borderRadius: 8,
                 }}
+                aria-current={tab === "me" ? "page" : undefined}
               >
+                {/* Ring shows you're on your profile & settings (the only way in — no duplicate tab) */}
+                <span style={{ display: "inline-flex", borderRadius: 20, boxShadow: tab === "me" ? "0 0 0 2px #7C3AED" : "none", transition: "box-shadow 0.18s ease" }}>
                 <ContactAvatar name={currentUser?.name} image={currentUser?.avatar_url || currentUser?.photo} size={32} radius={16} isDark={isDark} />
+                </span>
                 {!isMobile && (
                   <div style={{ textAlign: "left" }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: themeStyles.text, lineHeight: 1.2 }}>
@@ -6555,7 +6559,6 @@ Keep it punchy, sharp, and directly actionable.`;
             { t: "messages", icon: I.Mail, label: "Messages" },
             { t: "radar", icon: Icons.Radar, label: "Radar" },
             { t: "events", icon: Icons.Calendar, label: "Events" },
-            { t: "me", icon: I.User, label: "Me" },
           ].map(({ t, icon: MobileIcon, label }) => {
             const active = tab === t;
             return (
