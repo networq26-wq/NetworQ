@@ -34,12 +34,13 @@ test("static TURN credentials are added", async () => {
   } finally { s.close(); }
 });
 
-test("Cloudflare TURN: generates credentials once and caches them; falls back to STUN on errors", async () => {
+test("Cloudflare TURN: a fresh 1-hour credential per request (never shared); falls back to STUN on errors", async () => {
   let calls = 0;
   const ok = async (url, init) => {
     calls++;
     assert.match(url, /\/turn\/keys\/k1\/credentials\/generate$/);
     assert.equal(init.headers.Authorization, "Bearer t1");
+    assert.equal(JSON.parse(init.body).ttl, 3600);
     return { ok: true, json: async () => ({ iceServers: { urls: ["turn:turn.cloudflare.com:3478"], username: "x", credential: "y" } }) };
   };
   const s = await serve({ CF_TURN_KEY_ID: "k1", CF_TURN_API_TOKEN: "t1" }, ok);
@@ -48,7 +49,7 @@ test("Cloudflare TURN: generates credentials once and caches them; falls back to
     await get(s.base, "good");
     assert.equal(d1.relay, true);
     assert.equal(d1.iceServers.at(-1).username, "x");
-    assert.equal(calls, 1, "credentials are cached");
+    assert.equal(calls, 2, "each request gets its own credential");
   } finally { s.close(); }
 
   const s2 = await serve({ CF_TURN_KEY_ID: "k1", CF_TURN_API_TOKEN: "t1" }, async () => ({ ok: false, status: 500 }));

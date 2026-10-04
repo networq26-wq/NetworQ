@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createDb } from "./harness.mjs";
 
-const M = ["20261002_event_radar.sql", "20261005_connections_dedupe.sql", "20261003_account_email_events.sql", "20261006_realtime_notifications.sql",
-           "20261008_nearby_radar.sql", "20261010_push_notifications.sql", "20261011_realtime_chat.sql", "20261012_chat_hardening.sql", "20261013_calls.sql"];
+const M = ["20261001_security_hardening.sql", "20261002_event_radar.sql", "20261005_connections_dedupe.sql", "20261003_account_email_events.sql", "20261006_realtime_notifications.sql",
+           "20261008_nearby_radar.sql", "20261010_push_notifications.sql", "20261011_realtime_chat.sql", "20261012_chat_hardening.sql", "20261013_calls.sql", "20261014_release_hardening.sql"];
 const rpc = async (h, u, fn, args = "", params = []) => (await h.as(u, `select ${fn}(${args}) as r`, params))[0].r;
 const call = (h, u, to, kind = "video") => rpc(h, u, "start_call", "$1::uuid, $2", [to, kind]);
 
@@ -86,10 +86,35 @@ test("blocking stops calls both ways, even mid-ring", async () => {
   await assert.rejects(rpc(h, b, "answer_call", "$1::uuid, true", [k.id]), /unavailable/);
 });
 
-test("rate limit: at most 10 calls in 5 minutes", async () => {
+test("rate limits: 3 rings to the same person, 10 calls overall, per 5 minutes", async () => {
   const { h, a, b } = await setup();
-  for (let i = 0; i < 10; i++) await call(h, a, b);
-  await assert.rejects(call(h, a, b), /rate_limited/);
+  for (let i = 0; i < 3; i++) await call(h, a, b);
+  await assert.rejects(call(h, a, b), /rate_limited/, "4th ring to the same person");
+  // overall cap: older calls to B age out of the per-pair window but still count overall
+  await h.db.query("update calls set created_at = now() - interval '4 minutes'");
+  const others = [];
+  for (let i = 0; i < 7; i++) others.push(await h.addUser(`Friend ${i}`));
+  for (const o of others) {
+    const ev = await rpc(h, a, "create_event", `'Meet ${o.slice(0, 4)}', null, null, null`);
+    await rpc(h, o, "join_event_by_code", `'${ev.join_code}'`);
+    const r = await rpc(h, a, "send_connection_request", `'${ev.id}', '${o}'`);
+    await rpc(h, o, "respond_connection_request", `'${r.id}', true`);
+    await call(h, a, o);
+  }
+  const extra = await h.addUser("One Too Many");
+  const ev = await rpc(h, a, "create_event", "'Last', null, null, null");
+  await rpc(h, extra, "join_event_by_code", `'${ev.join_code}'`);
+  const r = await rpc(h, a, "send_connection_request", `'${ev.id}', '${extra}'`);
+  await rpc(h, extra, "respond_connection_request", `'${r.id}', true`);
+  await assert.rejects(call(h, a, extra), /rate_limited/, "11th call overall");
+});
+
+test("transcription has a daily cap of 60", async () => {
+  const { h, a } = await setup();
+  let last;
+  for (let i = 0; i < 61; i++) last = await rpc(h, a, "increment_ai_usage", "$1::uuid, 'transcribe'", [a]);
+  assert.equal(last.allowed, false);
+  assert.equal(last.limit, 60);
 });
 
 test("no direct writes, and people only see their own calls (RLS)", async () => {

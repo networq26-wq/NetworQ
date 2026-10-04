@@ -3,13 +3,14 @@ const assert = require("node:assert/strict");
 const express = require("express");
 const { createTranscribeRouter, MODEL } = require("../../api/transcribe");
 
-function serve({ apiKey = "gsk_test", reply = { status: 200, json: { text: "Met Priya from Zoho, follow up Thursday." } } } = {}) {
+function serve({ apiKey = "gsk_test", reply = { status: 200, json: { text: "Met Priya from Zoho, follow up Thursday." } }, limited = false } = {}) {
   const seen = [];
   const app = express();
   app.use(express.json());
   app.use("/api", createTranscribeRouter({
     apiKey,
     getUser: async (t) => (t === "good" ? { id: "u1" } : null),
+    checkLimit: async () => (limited ? { ok: false, error: "You've used today's 60 voice notes." } : { ok: true }),
     fetchImpl: async (url, init) => {
       seen.push({ url, init });
       return { ok: reply.status < 400, status: reply.status, json: async () => reply.json };
@@ -60,4 +61,14 @@ test("provider busy / down / no key → friendly errors", async () => {
   try { assert.equal((await down.post(audio())).status, 502); } finally { down.close(); }
   const nokey = serve({ apiKey: "" });
   try { assert.equal((await nokey.post(audio())).status, 503); } finally { nokey.close(); }
+});
+
+test("daily cap: over the limit gets a plain 429 and nothing is sent to the provider", async () => {
+  const s = serve({ limited: true });
+  try {
+    const r = await s.post(audio());
+    assert.equal(r.status, 429);
+    assert.match((await r.json()).error, /today's 60 voice notes/);
+    assert.equal(s.seen.length, 0);
+  } finally { s.close(); }
 });

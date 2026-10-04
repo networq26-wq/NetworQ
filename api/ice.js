@@ -8,7 +8,6 @@ const STUN = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:
 
 function createIceRouter(deps) {
   const router = express.Router();
-  let cache = null; // { servers, until }
 
   router.get("/calls/ice", async (req, res) => {
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
@@ -19,19 +18,18 @@ function createIceRouter(deps) {
     const env = deps.env;
     try {
       if (env.CF_TURN_KEY_ID && env.CF_TURN_API_TOKEN) {
-        if (!cache || cache.until < Date.now()) {
-          const r = await deps.fetchImpl(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(env.CF_TURN_KEY_ID)}/credentials/generate`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${env.CF_TURN_API_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ ttl: 6 * 3600 }),
-          });
-          if (!r.ok) throw new Error(`turn ${r.status}`);
-          const d = await r.json();
-          const servers = Array.isArray(d.iceServers) ? d.iceServers : d.iceServers ? [d.iceServers] : [];
-          cache = { servers, until: Date.now() + 5 * 3600 * 1000 };
-        }
-        return res.json({ iceServers: [...STUN, ...cache.servers], relay: true });
+        // A fresh credential per request, valid for 1 hour — never shared between users
+        const r = await deps.fetchImpl(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(env.CF_TURN_KEY_ID)}/credentials/generate`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${env.CF_TURN_API_TOKEN}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ ttl: 3600 }),
+        });
+        if (!r.ok) throw new Error(`turn ${r.status}`);
+        const d = await r.json();
+        const servers = Array.isArray(d.iceServers) ? d.iceServers : d.iceServers ? [d.iceServers] : [];
+        return res.json({ iceServers: [...STUN, ...servers], relay: true });
       }
+      // Static credentials (any TURN provider). Prefer Cloudflare above: static ones can't be revoked per user.
       if (env.TURN_URLS && env.TURN_USERNAME && env.TURN_CREDENTIAL) {
         const urls = env.TURN_URLS.split(",").map((u) => u.trim()).filter(Boolean);
         return res.json({ iceServers: [...STUN, { urls, username: env.TURN_USERNAME, credential: env.TURN_CREDENTIAL }], relay: true });

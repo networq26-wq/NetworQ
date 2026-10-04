@@ -13,11 +13,19 @@ const EXT = { webm: "webm", ogg: "ogg", mp4: "m4a", mpeg: "mp3", mp3: "mp3", wav
 
 function createTranscribeRouter(deps) {
   const router = express.Router();
-  router.post("/transcribe", express.raw({ type: () => true, limit: MAX_BYTES }), async (req, res) => {
+  // Check who's asking BEFORE reading up to 8 MB of audio, then apply the daily cap
+  const authFirst = async (req, res, next) => {
     const token = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
     const user = token ? await deps.getUser(token).catch(() => null) : null;
     if (!user) return res.status(401).json({ error: "Please sign in again." });
     if (!deps.apiKey) return res.status(503).json({ error: "Voice typing isn't available right now. Please type instead." });
+    if (deps.checkLimit) {
+      const lim = await deps.checkLimit(token, user).catch(() => ({ ok: true }));
+      if (!lim.ok) return res.status(429).json({ error: lim.error || "You've reached today's voice limit. Please type instead, or try again tomorrow." });
+    }
+    next();
+  };
+  router.post("/transcribe", authFirst, express.raw({ type: () => true, limit: MAX_BYTES }), async (req, res) => {
 
     const type = String(req.headers["content-type"] || "");
     if (!TYPES.test(type)) return res.status(415).json({ error: "Unsupported audio format." });
@@ -72,6 +80,13 @@ function productionDeps() {
     async getUser(token) {
       const { data, error } = await client.auth.getUser(token);
       return error ? null : data.user;
+    },
+    // 60 transcriptions per user per day (increment_ai_usage, as the signed-in user)
+    async checkLimit(token, user) {
+      const asUser = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: `Bearer ${token}` } } });
+      const { data, error } = await asUser.rpc("increment_ai_usage", { p_user_id: user.id, p_action: "transcribe" });
+      if (error) return { ok: true }; // limit table unavailable: don't block voice
+      return data?.allowed === false ? { ok: false, error: `You've used today's ${data.limit} voice notes. Please type instead, or try again tomorrow.` } : { ok: true };
     },
   };
 }
