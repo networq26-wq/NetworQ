@@ -1,6 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight, CalendarClock, MapPin, MessageSquareText, Sparkles } from "lucide-react";
-import { NetworQLogo } from "./wordmark";
 
 export function Hero() {
   const reduced = useReducedMotion();
@@ -34,11 +33,11 @@ export function Hero() {
 
           <motion.h1
             {...rise(0.08)}
-            className="mt-8 text-[2.75rem] leading-[1.02] font-semibold tracking-[-0.04em] text-balance sm:text-6xl lg:text-[4.1rem]"
+            className="mt-8 text-[2.75rem] leading-[1.04] font-semibold tracking-[-0.04em] text-balance sm:text-6xl lg:text-[4.1rem]"
           >
             Meet people.
             <br />
-            Networ<NetworQLogo size={42} className="inline-block -mt-1 mx-0.5" />&nbsp;does&nbsp;the rest.
+            Networ<span className="text-[#8B5CF6]">Q</span> does the rest.
           </motion.h1>
 
           <motion.p
