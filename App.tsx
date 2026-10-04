@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import { I, SuccessCheck, Skeleton } from "./ui/icons";
 import { supabase } from "./supabase";
 import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
-import { SettingsScreen } from "./settings/SettingsScreen";
+import { SettingsScreen, type SettingsSection } from "./settings/SettingsScreen";
 import { apiBase, createAccountApi } from "./settings/accountApi";
 import { PasswordInput } from "./ui/PasswordInput";
 import { EventsHub } from "./events/EventsHub";
@@ -15,7 +15,9 @@ import { CameraCapture } from "./scanner/CameraCapture";
 import { ProspectComposer } from "./prospect/ProspectComposer";
 import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
-import { DigitalPass } from "./pass/DigitalPass";
+import { MeScreen } from "./me/MeScreen";
+import { CardSettings } from "./pass/CardPass";
+import { MessagesScreen } from "./messages/MessagesScreen";
 import { LiquidGlass } from "quick-liquid/react";
 import { parseContactQr } from "./pass/vcard";
 import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
@@ -1291,7 +1293,7 @@ function NetworQApp() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
-  const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add" | "settings">("contacts");
+  const [tab, setTab] = useState<"contacts" | "messages" | "events" | "scan" | "qr" | "radar" | "add" | "settings" | "me">("contacts");
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
@@ -1911,6 +1913,8 @@ VOICE & ASSISTANT DIRECTIVES:
     if (modal) return setModal(null), setPrepBrief(null), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
+    if (addSheetOpen) return setAddSheetOpen(false), true;
+    if (tab === "me" && meSection) return setMeSection(null), true;
     if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
     const prev = tabHistory.current.pop();
     if (screen === "app" && prev) {
@@ -2599,7 +2603,16 @@ Keep it punchy, sharp, and directly actionable.`;
   const accountApi = useMemo(() => createAccountApi(supabase, apiBase(AI_PROXY)), []);
   const prospectApi = useMemo(() => createProspectApi(supabase, apiBase(AI_PROXY)), []);
 
-  const openProfileModal = () => setTab("settings");
+  const [meSection, setMeSection] = useState<SettingsSection | null>(null);
+  const openProfileModal = () => {
+    setMeSection(null);
+    setTab("me");
+  };
+  // Old destinations now live inside Me (card + grouped settings)
+  useEffect(() => {
+    if (tab === "settings" || tab === "qr") setTab("me");
+  }, [tab]);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   const handleSignedOut = useCallback(
     (message?: string) => {
@@ -3807,6 +3820,14 @@ Keep it punchy, sharp, and directly actionable.`;
                     isActive: tab === "contacts" && selectedRole === "all",
                   },
                   {
+                    id: "messages",
+                    label: "Messages",
+                    icon: I.Mail,
+                    count: notif.items.filter((n) => n.type === "message" && !n.read_at).length || undefined,
+                    onClick: () => setTab("messages"),
+                    isActive: tab === "messages",
+                  },
+                  {
                     id: "roles",
                     label: "Roles & Taxonomy",
                     icon: Icons.Briefcase,
@@ -3911,11 +3932,11 @@ Keep it punchy, sharp, and directly actionable.`;
                     isActive: tab === "events",
                   },
                   {
-                    id: "qr",
-                    label: "Digital Pass",
-                    icon: Icons.QrCode,
-                    onClick: () => setTab("qr"),
-                    isActive: tab === "qr",
+                    id: "me",
+                    label: "Me",
+                    icon: I.User,
+                    onClick: () => { setMeSection(null); setTab("me"); },
+                    isActive: tab === "me",
                   },
                   {
                     id: "add",
@@ -5371,23 +5392,54 @@ Keep it punchy, sharp, and directly actionable.`;
           />
         )}
 
-        {/* ── SETTINGS TAB ── */}
-        {tab === "settings" && currentUser && (
-          <SettingsScreen
-            supabase={supabase}
-            account={accountApi}
-            currentUser={currentUser}
+        {/* ── ME: card + grouped settings ── */}
+        {tab === "me" && currentUser && (
+          <MeScreen
+            user={currentUser}
             isDark={isDark}
+            section={meSection}
+            onOpenSection={setMeSection}
             showToast={showToast}
-            onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
-            onSignedOut={handleSignedOut}
-            onExportContacts={exportCSV}
-            onToggleTheme={toggleTheme}
-            prospectApi={prospectApi}
-            apiBaseUrl={apiBase(AI_PROXY)}
-            onSignOut={async () => {
-              await supabase.auth.signOut();
-              handleSignedOut();
+            tools={[
+              { label: "AI Copilot", hint: "Advisors for intros, pitches and follow-ups", icon: I.Sparkles, onClick: () => setCopilotOpen(true) },
+              { label: "Networking day summary", hint: "Who you met today and what to do next", icon: I.Calendar, onClick: () => setDaySummaryOpen(true) },
+              { label: "Network map", hint: "See how your contacts connect", icon: I.Network, onClick: () => setNetworkMapOpen(true) },
+            ]}
+            renderSection={(section) => (
+              <SettingsScreen
+                section={section}
+                cardSettings={<CardSettings user={currentUser} isDark={isDark} onEditProfile={() => setMeSection("profile")} onWriteNfc={() => setNfcWriterOpen(true)} />}
+                supabase={supabase}
+                account={accountApi}
+                currentUser={currentUser}
+                isDark={isDark}
+                showToast={showToast}
+                onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
+                onSignedOut={handleSignedOut}
+                onExportContacts={exportCSV}
+                onToggleTheme={toggleTheme}
+                prospectApi={prospectApi}
+                apiBaseUrl={apiBase(AI_PROXY)}
+                onSignOut={async () => {
+                  await supabase.auth.signOut();
+                  handleSignedOut();
+                }}
+              />
+            )}
+          />
+        )}
+
+        {/* ── MESSAGES ── */}
+        {tab === "messages" && currentUser && (
+          <MessagesScreen
+            supabase={supabase}
+            userId={currentUser.id}
+            isDark={isDark}
+            onOpenRadar={() => setTab("radar")}
+            onOpenChat={(p) => {
+              setChatPartner(p);
+              setChatEvent(null);
+              setChatOpen(true);
             }}
           />
         )}
@@ -5787,15 +5839,6 @@ Keep it punchy, sharp, and directly actionable.`;
         )}
 
         {/* ── 3D MY QR PASS TAB ── */}
-        {tab === "qr" && (
-          <DigitalPass
-            user={currentUser}
-            isDark={isDark}
-            showToast={showToast}
-            onEditProfile={() => setTab("settings")}
-            onWriteNfc={() => setNfcWriterOpen(true)}
-          />
-        )}
 
         {/* ── ADD CONTACT TAB ── */}
         {tab === "add" && (
@@ -6521,12 +6564,11 @@ Keep it punchy, sharp, and directly actionable.`;
           >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "4px 8px", boxSizing: "border-box", width: "100%" }}>
           {[
-            { t: "contacts", icon: Icons.Users, label: "Contacts" },
-            { t: "events", icon: Icons.Calendar, label: "Events" },
+            { t: "contacts", icon: Icons.Users, label: "People" },
+            { t: "messages", icon: I.Mail, label: "Messages" },
             { t: "radar", icon: Icons.Radar, label: "Radar" },
-            { t: "scan", icon: Icons.Scan, label: "Scan" },
-            { t: "qr", icon: Icons.QrCode, label: "Pass" },
-            { t: "add", icon: Icons.Plus, label: "Add" },
+            { t: "events", icon: Icons.Calendar, label: "Events" },
+            { t: "me", icon: I.User, label: "Me" },
           ].map(({ t, icon: MobileIcon, label }) => {
             const active = tab === t;
             return (
@@ -6567,6 +6609,9 @@ Keep it punchy, sharp, and directly actionable.`;
                   <MobileIcon size={20} color="currentColor" />
                 </span>
                 <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
+                {t === "messages" && notif.items.some((n) => n.type === "message" && !n.read_at) && (
+                  <span aria-label="Unread messages" className="nq-badge" style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 9, height: 9, borderRadius: 5, background: "#FF3B30", boxShadow: "0 0 0 2px rgba(255,255,255,0.9)" }} />
+                )}
                 {t === "contacts" && dueReminders.length > 0 && (
                   <span
                     style={{
@@ -6594,6 +6639,54 @@ Keep it punchy, sharp, and directly actionable.`;
           </div>
           </LiquidGlass>
         </nav>
+      )}
+
+      {/* ── PEOPLE: one obvious way to add someone ── */}
+      {isMobile && screen === "app" && tab === "contacts" && (
+        <button
+          onClick={() => setAddSheetOpen(true)}
+          aria-label="Add a person"
+          className="nq-pop"
+          style={{ position: "fixed", right: "max(20px, calc(var(--safe-right, 0px) + 20px))", bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 92px)", width: 60, height: 60, borderRadius: 30, border: "none", background: "#7C3AED", color: "#FFF", zIndex: 190, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 28px rgba(124, 58, 237, 0.42)", cursor: "pointer" }}
+        >
+          <Icons.Plus size={28} color="#FFFFFF" />
+        </button>
+      )}
+      {addSheetOpen && (
+        <div className="nq-backdrop" onClick={() => setAddSheetOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add a person"
+            className="nq-sheet-up"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 520, background: isDark ? "#1C1C1E" : "#FFFFFF", color: themeStyles.text, borderRadius: "28px 28px 0 0", padding: "10px 16px calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 20px)" }}
+          >
+            <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "#48484A" : "#D1D1D6", margin: "0 auto 14px" }} />
+            <div style={{ fontSize: 20, fontWeight: 700, margin: "0 4px 4px" }}>Add a person</div>
+            <div style={{ fontSize: 14, color: themeStyles.textMuted, margin: "0 4px 14px" }}>Pick the easiest way.</div>
+            {[
+              { label: "Scan a business card", hint: "Point your camera at it", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
+              { label: "Upload a photo", hint: "A card or QR from your photos", icon: Icons.Upload, act: () => setTab("scan") },
+              { label: "Type it in", hint: "Name, company, email…", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+              { label: "Voice note", hint: "Say who you met — AI fills it in", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
+            ].map((o) => (
+              <button
+                key={o.label}
+                onClick={() => { setAddSheetOpen(false); o.act(); }}
+                style={{ all: "unset", boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "12px 12px", minHeight: 64, borderRadius: 16, cursor: "pointer", marginTop: 4, background: o.primary ? (isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.07)") : "transparent" }}
+              >
+                <span aria-hidden style={{ width: 44, height: 44, borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", background: o.primary ? "#7C3AED" : isDark ? "#2C2C2E" : "#F2F2F7", color: o.primary ? "#FFF" : isDark ? "#C4B5FD" : "#7C3AED", flexShrink: 0 }}>
+                  <o.icon size={22} />
+                </span>
+                <span style={{ flex: 1 }}>
+                  <span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{o.label}</span>
+                  <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2 }}>{o.hint}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ── 1-CLICK BULK AUTOMATED FOLLOW-UPS MODAL ── */}
