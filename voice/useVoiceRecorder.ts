@@ -81,9 +81,15 @@ export function useVoiceRecorder({ supabase, apiBaseUrl, onText }: { supabase: S
     try {
       if (!navigator.mediaDevices?.getUserMedia || !(window as any).MediaRecorder) throw new Error("This device can't record audio here. Please type instead.");
       if (!(await ensureDevicePermission(false))) throw new Error("Allow the microphone for NetworQ in your phone settings, then try again.");
+      if (cancelled.current) return setState("idle"); // closed while asking for permission
       const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }).catch((e) => {
         throw new Error(e?.name === "NotAllowedError" ? "Microphone is blocked. Allow it for NetworQ and try again." : e?.name === "NotFoundError" ? "No microphone found on this device." : "Couldn't start the microphone. Please try again.");
       });
+      if (cancelled.current) {
+        // closed while the mic was starting: release it immediately
+        s.getTracks().forEach((t) => t.stop());
+        return setState("idle");
+      }
       stream.current = s;
 
       // live level meter + "we can hear you" detection

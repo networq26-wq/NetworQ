@@ -32,12 +32,14 @@
 | Push | tokens registered via RPC; dead tokens pruned; call pushes expire after 60 s |
 
 ## Input & abuse controls
-- Rate limits (express-rate-limit) mounted before routes: global 600/15 min; AI 60/min; transcribe 20/min; email 20/min; events import 20/min; TTS 30/min; account/auth 30/min. Daily AI usage limits per user for costly actions.
+- Rate limits (express-rate-limit) mounted before routes: global 600/15 min (the secret-protected DB webhook is exempt); AI 60/min; transcribe 20/min; email 20/min; events import 20/min; TTS 30/min; calls 10/min; account/auth 30/min. Daily per-user caps (`increment_ai_usage`): drafts 40, card scans 10, sends 50, research 20, transcriptions 60.
 - `/api/transcribe`: audio types only, 1.2 KB–8 MB, friendly errors, no audio stored.
 - `/api/email`: `.ics` attachments validated (one VEVENT, ≤ 8000 chars, proper envelope).
 - Prospect research: public pages only, `robots.txt` respected, every claim checked against fetched evidence.
 - Meeting links must be `https://`; event imports must be real event pages/feeds.
-- Helmet headers; CSP per route; CORS allow-list (no wildcard).
+- Helmet headers; CSP per route; CORS exact allow-list (no wildcards; localhost only outside production).
+- Android shell: only NetworQ (and Supabase auth) load inside the app, which holds camera/mic permission; every other link opens in the phone's browser.
+- TURN: a fresh 1-hour credential per request, never shared.
 
 ## Privacy
 - Nearby never collects location; distance is approximate and optional ("Show distance"); "Show profile" can reduce what's shared.

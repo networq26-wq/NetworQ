@@ -26,7 +26,7 @@ test.describe("Events Hub (real events only)", () => {
   test("importing an event link adds a card with its source and official link", async ({ page, db }) => {
     await login(page, "asha@acme.test");
     await openEvents(page);
-    await page.getByRole("button", { name: "Add an event" }).click();
+    await page.getByRole("button", { name: "Add an event" }).first().click(); // header + empty-state both offer it
     await page.getByLabel("Event or calendar link").fill("https://lu.ma/ai-builders-hyd");
     await page.getByRole("button", { name: "Add event" }).click();
     await expect(page.getByText("Added 1 event.")).toBeVisible();
@@ -39,7 +39,7 @@ test.describe("Events Hub (real events only)", () => {
   test("links without event data are rejected with guidance", async ({ page }) => {
     await login(page, "asha@acme.test");
     await openEvents(page);
-    await page.getByRole("button", { name: "Add an event" }).click();
+    await page.getByRole("button", { name: "Add an event" }).first().click(); // header + empty-state both offer it
     await page.getByLabel("Event or calendar link").fill("https://blog.example.com/post");
     await page.getByRole("button", { name: "Add event" }).click();
     await expect(page.getByText("We couldn't find event details on that page.")).toBeVisible();
@@ -75,9 +75,9 @@ test.describe("Events Hub (real events only)", () => {
     // Any exact day from the calendar
     await page.getByRole("button", { name: "Pick a date" }).click();
     const in40 = new Date(Date.now() + 40 * day);
-    if (in40.getMonth() !== new Date().getMonth()) await page.getByRole("button", { name: "Next month" }).click();
-    if (in40.getMonth() !== new Date(Date.now() + 31 * day).getMonth() && in40.getMonth() !== new Date().getMonth()) await page.getByRole("button", { name: "Next month" }).click();
-    await page.getByRole("button", { name: new RegExp(`^${in40.toLocaleDateString("en-US", { weekday: "long" })}, .*has events`) }).click();
+    const dayButton = page.getByRole("button", { name: new RegExp(`^${in40.toLocaleDateString("en-US", { weekday: "long" })}, ${in40.toLocaleDateString("en-US", { month: "long" })} ${in40.getDate()}.*has events`) });
+    for (let i = 0; i < 3 && !(await dayButton.count()); i++) await page.getByRole("button", { name: "Next month" }).click();
+    await dayButton.click();
     await expect(list.getByRole("listitem")).toHaveCount(1);
     await expect(list.getByText("London AI Summit")).toBeVisible();
     await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "All", exact: true }).click();

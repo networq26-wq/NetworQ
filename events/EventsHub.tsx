@@ -80,8 +80,9 @@ function icsFor(ev: PublicEvent) {
     "BEGIN:VEVENT",
     `UID:${ev.id}@networq`,
     `DTSTAMP:${fmt(new Date().toISOString())}`,
-    `DTSTART:${fmt(ev.starts_at)}`,
-    `DTEND:${fmt(end)}`,
+    ...(isAllDay(ev.starts_at)
+      ? [`DTSTART;VALUE=DATE:${ev.starts_at.slice(0, 10).replace(/-/g, "")}`, `DTEND;VALUE=DATE:${new Date(new Date(ev.starts_at).getTime() + 86400000).toISOString().slice(0, 10).replace(/-/g, "")}`]
+      : [`DTSTART:${fmt(ev.starts_at)}`, `DTEND:${fmt(end)}`]),
     `SUMMARY:${esc(ev.title)}`,
     ev.venue ? `LOCATION:${esc(ev.venue)}` : "",
     `URL:${ev.url}`,
@@ -445,6 +446,17 @@ function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent;
   const time = isAllDay(ev.starts_at) ? "All day" : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   const round: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: t.raised, color: t.text, textDecoration: "none" };
   const addToCalendar = () => {
+    // Inside the Android app a file download can't open the calendar — use Google Calendar's add page instead
+    if (typeof window !== "undefined" && (window as any).ReactNativeWebView) {
+      const fmt = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+      const allDay = isAllDay(ev.starts_at);
+      const start = allDay ? ev.starts_at.slice(0, 10).replace(/-/g, "") : fmt(ev.starts_at);
+      const endIso = ev.ends_at || new Date(new Date(ev.starts_at).getTime() + (allDay ? 86400000 : 7200000)).toISOString();
+      const end = allDay ? endIso.slice(0, 10).replace(/-/g, "") : fmt(endIso);
+      const q = new URLSearchParams({ action: "TEMPLATE", text: ev.title, dates: `${start}/${end}`, details: ev.url, location: ev.venue || ev.city || "" });
+      window.location.href = `https://calendar.google.com/calendar/render?${q.toString()}`;
+      return;
+    }
     const blob = new Blob([icsFor(ev)], { type: "text/calendar" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -503,7 +515,7 @@ function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent;
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={() => onAttend(ev)} aria-label={`I'm attending ${ev.title} · Radar`} className="btn-press" style={{ flex: 1, minHeight: 44, borderRadius: 22, border: "none", background: PURPLE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+        <button onClick={() => onAttend(ev)} aria-label={`Going to ${ev.title} — opens its Radar`} className="btn-press" style={{ flex: 1, minHeight: 44, borderRadius: 22, border: "none", background: PURPLE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
           <I.Check size={17} strokeWidth={2.4} /> Going
         </button>
         <button onClick={addToCalendar} aria-label={`Add ${ev.title} to calendar`} title="Add to calendar" style={round}>

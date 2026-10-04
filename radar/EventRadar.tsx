@@ -575,7 +575,7 @@ function ConfirmLink({ t, label, confirmLabel, ariaLabel, onConfirm }: { t: Them
       onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
       onBlur={() => setArmed(false)}
       aria-label={armed ? `Confirm: ${ariaLabel}` : ariaLabel}
-      style={{ minHeight: 36, padding: "0 14px", borderRadius: 18, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 14, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
+      style={{ minHeight: 44, padding: "0 16px", borderRadius: 22, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 14, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
     >
       {armed ? confirmLabel : label}
     </button>

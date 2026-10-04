@@ -122,7 +122,11 @@ function Shell() {
 
   // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
-    if (/^(https?|about|data|blob):/i.test(request.url)) return true;
+    if (/^(about|data|blob):/i.test(request.url)) return true;
+    // Only NetworQ itself (and Supabase auth redirects) load inside the app, which has camera/mic access.
+    // Any other site — event pages, Google Calendar, Meet links — opens in the phone's browser/apps.
+    if (/^https:\/\/(([a-z0-9-]+\.)*networq\.co\.in|[a-z0-9-]+\.supabase\.co)(\/|$|\?|#)/i.test(request.url)) return true;
+    if (!request.isTopFrame) return true; // embedded frames (e.g. maps) stay as they are
     Linking.openURL(request.url).catch(() => {});
     return false;
   }, []);

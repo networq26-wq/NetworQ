@@ -158,6 +158,7 @@ export function MessagesScreen({
 // Pick who to write to. People on NetworQ can be messaged or called right away; everyone else gets an invite.
 function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { contacts: Contact[]; isDark: boolean; inviterName: string; onClose: () => void; onChat: (c: Contact) => void }) {
   const [q, setQ] = useState("");
+  const [copied, setCopied] = useState<string | null>(null);
   const t = isDark
     ? { sheet: "#1C1C1E", raised: "#2C2C2E", text: "#FFFFFF", muted: "#AEAEB2", line: "rgba(255,255,255,0.08)" }
     : { sheet: "#FFFFFF", raised: "#F2F2F7", text: "#1C1C1E", muted: "#6E6E73", line: "rgba(0,0,0,0.06)" };
@@ -175,9 +176,16 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
     } catch (e: any) {
       if (e?.name === "AbortError") return;
     }
-    if (c.phone) window.open(`https://wa.me/${c.phone.replace(/[^\d]/g, "")}?text=${encodeURIComponent(text)}`, "_blank");
-    else if (c.email) window.location.href = `mailto:${c.email}?subject=${encodeURIComponent("Let's connect on NetworQ")}&body=${encodeURIComponent(text)}`;
-    else navigator.clipboard?.writeText(text);
+    if (c.phone) {
+      let digits = c.phone.replace(/[^\d]/g, "").replace(/^0+/, "");
+      if (digits.length === 10) digits = `91${digits}`; // a local Indian number
+      window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank");
+    } else if (c.email) window.location.href = `mailto:${c.email}?subject=${encodeURIComponent("Let's connect on NetworQ")}&body=${encodeURIComponent(text)}`;
+    else {
+      await navigator.clipboard?.writeText(text).catch(() => {});
+      setCopied(c.id);
+      setTimeout(() => setCopied(null), 2500);
+    }
   };
 
   const avatar = (c: Contact) =>
@@ -254,7 +262,7 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
                     {sub(c) && <span style={{ display: "block", fontSize: 13, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
                   </span>
                   <button onClick={() => invite(c)} aria-label={`Invite ${c.name}`} style={{ flexShrink: 0, minHeight: 36, padding: "0 14px", borderRadius: 18, border: `1px solid ${isDark ? "rgba(167,139,250,0.4)" : "rgba(124,58,237,0.3)"}`, background: "transparent", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
-                    Invite
+                    {copied === c.id ? "Copied ✓" : "Invite"}
                   </button>
                 </li>
               ))}

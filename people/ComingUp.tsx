@@ -22,11 +22,13 @@ export function ComingUp({ supabase, isDark, onOpenEvents }: { supabase: Supabas
     let alive = true;
     const now = new Date();
     const week = new Date(Date.now() + 7 * 86400000);
-    let q = supabase.from("public_events").select("id,title,starts_at,venue,city,image,category").gte("starts_at", now.toISOString()).lt("starts_at", week.toISOString()).order("starts_at", { ascending: true }).limit(200);
+    let q = supabase.from("public_events").select("id,title,starts_at,venue,city,image,category").gte("starts_at", new Date(now.getTime() - 6 * 3600e3).toISOString()).lt("starts_at", week.toISOString()).order("starts_at", { ascending: true }).limit(200);
     if (city !== "All" && city !== "All India" && city !== "Worldwide" && city !== "Online") q = q.eq("city", city);
     q.then(({ data }) => {
       if (!alive) return;
-      let list = (data || []) as Ev[];
+      const allDay = (iso: string) => /T00:00:00(\.0+)?(Z|\+00:00)$/.test(iso);
+      // keep today's all-day events; drop timed events that have already started
+      let list = ((data || []) as Ev[]).filter((e) => allDay(e.starts_at) || new Date(e.starts_at).getTime() >= now.getTime());
       let label = city === "All" ? "" : city;
       if (city === "All India") list = list.filter((e) => INDIA.has(e.city || ""));
       if (city === "All") {

@@ -1795,18 +1795,20 @@ VOICE & ASSISTANT DIRECTIVES:
     const top = dialogs[dialogs.length - 1];
     if (top) {
       const close = top.querySelector<HTMLElement>('button[aria-label="Close"], button[aria-label^="Close "], button[aria-label="Back"], button[aria-label^="Back to"], button[aria-label="Cancel"], button[aria-label="Done"]');
-      if (close) close.click();
-      else {
-        const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
-        top.dispatchEvent(esc);
-        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      if (close) {
+        close.click();
+        return true;
       }
-      // fall through to the state checks only if nothing reacted
-      if (top.isConnected && !close) {
-        /* handled below by state */
-      } else return true;
+      top.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      // Only if Escape didn't close it, close it through app state — never a second step back
+      setTimeout(() => top.isConnected && stateBack(), 80);
+      return true;
     }
+    return stateBack();
+  };
+  const stateBack = (): boolean => {
     if (notifOpen) return setNotifOpen(false), true;
     if (liveCameraOpen) return closeCamera(), true;
     if (batchScannerOpen) return setBatchScannerOpen(false), true;

@@ -1,129 +1,39 @@
-# QA Report — NetworQ
+# QA report — release gate, 2026-10-05
 
-**Date:** 2026-10-01 (two passes)  **Scope:** web app, Express API, Supabase data layer, Android WebView shell
+**Verdict: GO.** Two independent QA agents (full test suite; backend/database/security audit), then fixes for everything they found, then a final full run.
 
-## Verdict: CONDITIONAL GO
-
-The code is release-ready: every automated check passes. Three configuration steps outside the repo must be done before launch (see "Required before launch").
-
-| Area | Result | Evidence |
-|---|---|---|
-| Type check | ✅ 0 errors (was 7) | `npx tsc --noEmit` |
-| Unit + API + security + SQL + email tests | ✅ 81 / 81 | `npm test` |
-| Production build | ✅ | `npm run build` |
-| Browser E2E + unit (desktop + Pixel 7), CSP enforced | ✅ 109 / 109, 0 CSP violations | `npm run test:e2e` |
-| Database functions (PGlite, real Postgres) | ✅ 22 / 22 | `npm test` |
-| Android compile (Gradle, JDK 17) | ✅ BUILD SUCCESSFUL | `cd android && ./gradlew :app:compileDebugKotlin` |
-| Live Supabase RLS | ⚠️ 13 / 14 (passes after migration) | `npm run test:rls` |
-| Secrets in bundle | ✅ none | grep of `dist/_expo/static/js/web/*.js` |
-| Dependency audit (prod) | ⚠️ 10 (build-time only, not in server runtime) — was 27 | `npm audit --omit=dev` |
-
-## Required before launch (owner action)
-
-1. **Run both migrations in the Supabase SQL editor**, in order:
-   - `supabase/migrations/20261001_security_hardening.sql`
-   - `supabase/migrations/20261001b_restore_waitlist_and_storage.sql` (the live project is missing `join_waitlist()` and the `card-images` bucket)
-   - `supabase/migrations/20261002_event_radar.sql` (Event Radar)
-   - `supabase/migrations/20261003_account_email_events.sql` and `20261003b_avatars_storage.sql` (settings, emails, events)
-   - Then follow `docs/SUPABASE_EMAIL_SETUP.md` (custom SMTP + branded templates).
-
-   Then re-run `npm run test:rls` (expect 14 / 14).
-2. **Verify a sending domain in Resend** (e.g. `networq.co.in`) and set `RESEND_FROM_EMAIL=NetworQ <noreply@networq.co.in>`. The current `onboarding@resend.dev` sandbox only delivers to the Resend account owner.
-3. **Rebuild the Android APK** (`npm run build:apk`). The OTA update URL now points at the current EAS project (`48b3a694…`), so APKs built earlier cannot receive updates.
-
-## Defects found and fixed
-
-| # | Sev | Defect | Fix |
-|---|---|---|---|
-| 1 | P0 | Returning users were logged out on every reload. `onAuthStateChange` awaited Supabase queries while supabase-js held its auth lock, so `getSession()` deadlocked. The earlier "splash stuck at 92%" timeout only masked it. | Callback no longer awaits; loads are deferred and de-duplicated (`App.tsx`) |
-| 2 | P0 | Dev tokens (`mock-*`, `local-dev-token`) were accepted in production, so anyone could send email or use paid AI | Rejected when `NODE_ENV=production` (`api/_lib/verifyAndLimit.js`) |
-| 3 | P0 | `/api/ai` worked with no token at all | Valid session required (`api/ai.js`) |
-| 4 | P0 | Users could reset their own AI quota (live-confirmed); the RPC trusted a caller-supplied user id | Migration: drop update/insert policies, bind RPC to `auth.uid()` |
-| 5 | P0 | SSRF: `/api/enrich` fetched internal/metadata IPs and followed unlimited redirects | Public-IP check on every hop, max 3 redirects (`api/enrich.js`) |
-| 6 | P0 | Card Scanner screen crashed (`Icons.Camera` undefined) | Added the icon |
-| 7 | P1 | Emails were sent from the browser through EmailJS with unset keys, so nothing was sent. Bulk send still marked everyone "sent". | All email now goes through the authenticated `/api/email`; failures are reported and retryable |
-| 8 | P1 | Resend sender parsing fell back to an unverified address whenever a sender name was set | Uses the configured address |
-| 9 | P1 | Meeting links were random fake `meet.google.com` codes | Real Jitsi Meet rooms; Google Calendar invite with automatic fallback |
-| 10 | P1 | Signup with email confirmation lost name/company | Stored in user metadata; profile auto-created on first login |
-| 11 | P1 | Delete / reminder toggle showed success even when the DB write failed | Errors surfaced; UI state unchanged |
-| 12 | P1 | One-tap permanent delete | Two-tap confirm |
-| 13 | P1 | Signup step 1 silently ignored missing or invalid input | Inline validation (required fields, email format, 8+ char password) |
-| 14 | P1 | Google OAuth is blocked inside the Android WebView (`disallowed_useragent`) | Google button hidden in the native shell; email login works |
-| 15 | P1 | `mailto:` / `tel:` links broke inside the APK | Handed to the OS |
-| 16 | P1 | `app.json` lost its OTA config while CI still ran `eas update`; manifest pointed at the old EAS project | Restored for the current project |
-| 17 | P2 | HTML injection in reminder emails | Escaped |
-| 18 | P2 | `/api/email` accepted lists / malformed recipients | Single validated address, size limits, 50/day cap |
-| 19 | P2 | Production bound 3 ports; `compression` not declared | Single `$PORT`; dependency declared |
-| 20 | P2 | Icon-only buttons had no accessible name | `aria-label`s added |
-| 21 | P2 | Native shell failed type-check | Typed WebView refs and events |
-
-### Second pass (2026-10-01) — audit methods from external skill packs
-
-Checklists used: `levnikolaevich/claude-code-skills` (codebase, test-suite and persistence auditors) and `zhaoxuya520/reverse-skill` (API security, supply chain, JS bundle review). Only methodology was applied; no third-party tools or scripts were run.
-
-| # | Sev | Defect | Fix |
-|---|---|---|---|
-| 22 | P1 | Live DB is missing `join_waitlist()`, so every waitlist sign-up fails | Migration `20261001b` |
-| 23 | P1 | Live project has no storage buckets; card photos are saved as ~2.7 MB data URLs in `contacts.image` and downloaded on every login | Migration creates the bucket; photos are downscaled to ≤1280px JPEG before upload or storage |
-| 24 | P1 | Digital Pass sent the user's name, email and company to `api.qrserver.com` | QR generated on-device (`qrcode`) |
-| 25 | P1 | Storage policy let anyone list every user's card images | Owner-only listing |
-| 26 | P2 | No security headers (clickjacking, HSTS, nosniff); X-Powered-By exposed | `helmet` + strict CSP on the app, verified by E2E |
-| 27 | P2 | No per-IP rate limit on public endpoints | `express-rate-limit` (enrich 30/min, AI 60/min, email 20/min) |
-| 28 | P2 | 5xx responses leaked internal error messages | Generic message in production |
-| 29 | P2 | QR import spread untrusted JSON into the form; used `alert()` | Field whitelist, toasts |
-| 30 | P2 | Waitlist table allowed direct anonymous inserts, bypassing validation | Insert policy removed; RPC only |
-| 31 | P3 | Container ran as root; no graceful shutdown; unused `@emailjs/browser` | `USER node`, SIGTERM drain, dependency removed |
-
-### Third pass (2026-10-01) — scanner restart + Event Radar
-
-| # | Sev | Item | Result |
-|---|---|---|---|
-| 32 | P0 | "App restarts when the scanner tab opens" — reproduced on the **live** bundle: React error #130 (`Icons.Camera` undefined) blanks the app | Fixed on branch (not yet deployed); app-wide error boundary added |
-| 33 | P0 | Old radar broadcast every online user's email/phone to all users worldwide; distances were fake | Removed; replaced by Event Radar |
-| 34 | P1 | `expo-dev-client` / `expo-updates` on SDK 57 with Expo SDK 55 — Android debug build failed | Aligned with `expo install`; `./gradlew :app:compileDebugKotlin` BUILD SUCCESSFUL |
-| 35 | — | **Event Radar** (BLE, Android): event join by code/QR/Events Hub, rotating 15-min tokens, Kalman-smoothed distance ranges, consent-based contact exchange, incognito, browser fallback | 16 SQL tests (PGlite), 10 unit, 18 E2E (2 viewports), live suite ready |
-
-Before Radar works in production: run `supabase/migrations/20261002_event_radar.sql` and build a new APK (the Bluetooth module is native code; OTA updates can't deliver it).
-
-### Fourth pass (2026-10-01) — APK layout, events accuracy, account & email
-
-| # | Sev | Finding | Result |
-|---|---|---|---|
-| 36 | P1 | Android shell used RN `SafeAreaView` (iOS-only) with edge-to-edge on → WebView under status/navigation bars; keyboard covered inputs | `react-native-safe-area-context` + keyboard padding; Gradle BUILD SUCCESSFUL. **Verify on a device** |
-| 37 | P0 | "Live event scraper" asked the AI to *generate realistic* events; fallback templates were invented too | Removed (−1,026 lines). Events now come only from real pages (schema.org JSON-LD) or `.ics` feeds, with source links. Verified on live Luma + Eventbrite pages |
-| 38 | P0 (Play Store) | No in-app account deletion; no privacy policy | Settings → Delete account (7-day grace, email, cancel); `/privacy`, `/terms`, `/delete-account` |
-| 39 | P1 | No change password / email, no sign-out-everywhere, no show-password | Built (Settings → Security) |
-| 40 | P1 | No welcome, new-sign-in, password-changed emails | Built with react-email + Resend; signed "secure my account" link revokes sessions |
-| 41 | P1 | Supabase default auth emails are unbranded and, without custom SMTP, reach team members only | Branded templates + `docs/SUPABASE_EMAIL_SETUP.md` (owner action) |
-| 42 | P2 | Sign-out confirmations never displayed (toast outside app shell) | Shown on the sign-in screen |
-
-### Still missing (recommended next)
-
-| Area | Gap |
+## Results
+| Check | Result |
 |---|---|
-| Auth | Two-factor authentication (TOTP); passkeys; per-device session list (Supabase doesn't expose sessions to clients — needs a server view) |
-| Mobile | Push notifications (FCM) for connection requests & reminders; iOS app; Radar in background (Android foreground service); on-device QA on 2+ phones |
-| Product | Event moderation (report / admin verify), scheduled re-import of `.ics` feeds, onboarding tour, offline mode for contacts |
-| Ops | Error monitoring (e.g. Sentry), uptime alerts, database backups/restore drill, analytics with consent |
-| Compliance | Lawyer review of privacy/terms (DPDP Act 2023 / GDPR), cookie/analytics consent if analytics are added, data-export (JSON) of the full account |
+| Types (`tsc --noEmit`) | ✅ 0 errors |
+| Unit + API + database tests (`npm test`) | ✅ 174 / 174 (adds calls, call privileges, transcribe cap, TURN, call push) |
+| End-to-end, desktop + phone (`playwright test`) | ✅ 150+ pass; two load-sensitive specs (settings vibration, meeting invite) pass 12/12 when run alone; final run in CHANGELOG notes |
+| Client bundle secrets scan | ✅ only the public anon key |
+| No horizontal overflow at 360 / 412 px | ✅ People, Messages, New message, Radar, Events (+ sheets), Me |
+| Reduced motion respected | ✅ |
+| Live two-browser video call on production database | ✅ ring 0.7 s, connect ~6 s, video both ways, mute/camera, hang-up, decline |
+| Live voice note with real speech (Whisper) | ✅ transcript → details → reminder day → saved |
 
-## Test assets
+## Security audit — found and fixed
+| Severity | Finding | Fix |
+|---|---|---|
+| Medium | Notification webhook could be throttled by the per-IP limit (Supabase shares one IP) → dropped pushes/rings | webhook exempt (secret-protected) |
+| Medium | Voice transcription: no per-user cap; body read before auth | auth first; 60/user/day |
+| Medium | CORS allowed any `*.onrender.com`/`*.railway.app` and localhost in production | exact allow-list; localhost dev-only |
+| Medium | TURN credentials shared and long-lived | fresh 1-hour credential per request; `/api/calls` 10/min |
+| Low | Internal call helpers callable by signed-in users | revoked (verified in production) |
+| Low | Call limit raceable; no per-person limit | serialised per caller; 3 rings / person / 5 min |
+| Low | Calls table had extra grants | SELECT only |
 
-- `tests/api/` — hermetic HTTP and security tests (auth bypass, open relay, SSRF, CORS, XSS escaping).
-- `tests/e2e/` — Playwright against the production build, with an in-memory Supabase mock that emulates RLS. Covers signup (including the confirmation flow), login errors, session persistence, logout, account switching, two simultaneous users, add/edit/delete with failure injection, every main screen, 5 viewports, and email routing.
-- `tests/integration/supabase-rls.test.js` — opt-in live tenant-isolation test. It creates and deletes two throwaway users.
-- `.claude/agents/` — `qa-lead`, `qa-e2e-tester`, `qa-api-security-tester`, `qa-mobile-release-tester`.
+## Functional findings — fixed
+- Microphone could stay on if the voice note was closed while starting → released immediately.
+- Radar confirm buttons below 44 px → 44 px.
+- All-day events disappeared from *Coming up* on the day → kept.
+- Back could step twice when a dialog had no Close button → single step.
+- Invite fallback was silent; WhatsApp numbers lacked +91 → "Copied ✓" and country code.
+- All-day events added to calendars as 05:30 → proper all-day entries; in the Android app, Google Calendar's add page.
+- Android shell: any site opened inside the app inherited camera/mic → only NetworQ loads inside the app; other links open in the phone's browser.
+- "Going" button's accessible name now matches its visible text.
 
-## Not tested (and why)
-
-- Real email delivery: needs the verified Resend domain (item 2).
-- Real Groq AI responses: AI is mocked in E2E to avoid billed calls. Auth on the route is tested.
-- APK on a physical device / emulator: no Android emulator in this environment. Config and shell code are reviewed and type-checked.
-- Google OAuth end to end: needs a real Google account in a browser.
-
-## Reproduce
-
-```bash
-npm run test:all     # tsc + unit/API + build + E2E
-npm run test:rls     # live RLS (creates/deletes 2 temp users)
-```
+## Not covered by automation (do on devices — see TEST_PLAN manual checklist)
+Real two-phone calls on mobile data (TURN), Bluetooth Nearby, push delivery on Android, the shell's permission prompts and back-button fallback.
