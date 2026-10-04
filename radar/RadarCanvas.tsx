@@ -154,7 +154,9 @@ export function RadarCanvas({
       const live = new Set<string>();
       for (const p of peopleRef.current) {
         live.add(p.userId);
-        const target = p.bucket ? RING_FOR_BUCKET[p.bucket] : UNKNOWN_RING;
+        const fallbackRings = [0.35, 0.47, 0.64, 0.8];
+        const hashIdx = Math.abs(Math.floor(hashAngle(p.userId) * 100)) % fallbackRings.length;
+        const target = p.bucket ? (RING_FOR_BUCKET[p.bucket] || UNKNOWN_RING) : fallbackRings[hashIdx];
         let b = blips.current.get(p.userId);
         if (!b) {
           const home = hashAngle(p.userId);

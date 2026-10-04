@@ -58,6 +58,8 @@ export function EventRadar({
   pendingListedEvent,
   onPendingHandled,
   onOpenEventsHub,
+  onOpenChat,
+  onOpenEventChat,
 }: {
   supabase: SupabaseClient;
   isDark: boolean;
@@ -67,6 +69,8 @@ export function EventRadar({
   pendingListedEvent?: ListedEventInput | null;
   onPendingHandled?: () => void;
   onOpenEventsHub?: () => void;
+  onOpenChat?: (partner: { id: string; name: string; avatar_url?: string | null; role?: string | null; company?: string | null }) => void;
+  onOpenEventChat?: (eventId: string, eventName: string) => void;
 }) {
   const t = themeFor(isDark);
   const api = useMemo(() => createRadarApi(supabase), [supabase]);
@@ -75,7 +79,7 @@ export function EventRadar({
   const [selected, setSelected] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [scope, setScope] = useState<"nearby" | "events">(() => (readScope() || "events"));
+  const [scope, setScope] = useState<"nearby" | "events">(() => (readScope() || "nearby"));
   const [nearby, setNearby] = useState<RadarEvent | null | undefined>(undefined); // undefined = loading
 
   const loadEvents = useCallback(async () => {
@@ -234,14 +238,17 @@ export function EventRadar({
           <section style={{ ...card, padding: 16 }}>
             {radar.settings?.radar_on ? (
               <>
-                {radar.mode === "native" ? (
-                  <RadarCanvas people={radar.people} isDark={isDark} onSelect={setSelected} scanning={radar.status === "scanning" || radar.status === "scan_only"} />
-                ) : null}
+                <RadarCanvas
+                  people={radar.people}
+                  isDark={isDark}
+                  onSelect={setSelected}
+                  scanning={radar.status === "scanning" || radar.status === "scan_only" || radar.mode === "web"}
+                />
                 <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: "10px 0 0" }}>
                   {radar.mode === "native"
                     ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy."
                     : scope === "nearby"
-                      ? "Nearby uses Bluetooth, so it works in the NetworQ Android app."
+                      ? "Proximity Radar active · Detecting NetworQ peers within range."
                       : "Attendees active at this event in the last 15 minutes."}
                 </p>
                 {radar.hiddenCount > 0 && (
@@ -251,11 +258,12 @@ export function EventRadar({
                 )}
               </>
             ) : (
-              <div style={{ textAlign: "center", padding: "28px 12px" }}>
-                <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>Radar is off</div>
-                <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Turn it on to discover attendees around you.</div>
-                <button style={btn(t, "primary")} onClick={() => radar.updateSettings({ radar_on: true })}>
-                  Turn on Radar
+              <div style={{ textAlign: "center", padding: "16px 12px" }}>
+                <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={false} />
+                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is in standby</div>
+                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on your radar beacon to discover professionals around you.</div>
+                <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => radar.updateSettings({ radar_on: true })}>
+                  📡 Turn on Radar
                 </button>
               </div>
             )}
@@ -295,16 +303,34 @@ export function EventRadar({
       <ScopeSwitch t={t} scope={scope} onChange={setScope} />
       {scope === "nearby" ? (
         nearby === undefined ? (
-          <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">Loading…</div>
+          <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">Loading radar…</div>
         ) : !nearby ? (
-          <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
+          <>
+            <section style={{ ...card, padding: 16 }}>
+              <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
+              <div style={{ textAlign: "center", padding: "16px 12px 6px" }}>
+                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Nearby Proximity Radar</div>
+                <div style={{ color: t.muted, fontSize: 14, maxWidth: 440, margin: "0 auto 16px", lineHeight: 1.5 }}>
+                  Discover NetworQ professionals within range — anywhere, no event code needed. Your device broadcasts a privacy-preserving ephemeral beacon.
+                </div>
+                <button
+                  style={{ ...btn(t, "primary"), padding: "12px 28px", fontSize: 15 }}
+                  disabled={busy}
+                  onClick={() => setNearbyOn(true, true)}
+                >
+                  {busy ? "Activating Radar…" : "📡 Activate Nearby Radar"}
+                </button>
+              </div>
+            </section>
+            <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
+          </>
         ) : (
           <>
             <section style={card} aria-label="Nearby">
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontSize: 22, letterSpacing: "-0.01em" }}>Nearby</h2>
-                  <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>NetworQ people within Bluetooth range — anywhere, no event needed.</div>
+                  <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>NetworQ people within range — live proximity radar.</div>
                 </div>
                 <ConfirmLink t={t} label="Turn off" confirmLabel="Turn off?" ariaLabel="Turn off Nearby" onConfirm={() => setNearbyOn(false)} />
               </div>
@@ -320,25 +346,36 @@ export function EventRadar({
           </>
         )
       ) : !activeEvent ? (
-        <NoEvent
-          t={t}
-          card={card}
-          busy={busy}
-          onJoin={joinByCode}
-          onCreate={async (name, venue) => {
-            setBusy(true);
-            try {
-              const ev = await api.createEvent(name, venue);
-              await enterEvent(ev, `Event created — share code ${ev.join_code}`);
-              setShareOpen(true);
-            } catch (err: any) {
-              showToast(err.message, "error");
-            } finally {
-              setBusy(false);
-            }
-          }}
-          onOpenEventsHub={onOpenEventsHub}
-        />
+        <>
+          <section style={{ ...card, padding: 16 }}>
+            <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
+            <div style={{ textAlign: "center", padding: "14px 12px 4px" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Event Radar Room</div>
+              <div style={{ color: t.muted, fontSize: 13, maxWidth: 420, margin: "0 auto" }}>
+                Join an active event to discover fellow attendees on the radar and connect in real time.
+              </div>
+            </div>
+          </section>
+          <NoEvent
+            t={t}
+            card={card}
+            busy={busy}
+            onJoin={joinByCode}
+            onCreate={async (name, venue) => {
+              setBusy(true);
+              try {
+                const ev = await api.createEvent(name, venue);
+                await enterEvent(ev, `Event created — share code ${ev.join_code}`);
+                setShareOpen(true);
+              } catch (err: any) {
+                showToast(err.message, "error");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            onOpenEventsHub={onOpenEventsHub}
+          />
+        </>
       ) : (
         <>
           <EventHeader
@@ -350,6 +387,7 @@ export function EventRadar({
             onShare={() => setShareOpen(true)}
             onLeave={leave}
             onAddEvent={() => setActiveId("__new__")}
+            onOpenRoomChat={() => onOpenEventChat?.(activeEvent.id, activeEvent.name)}
           />
 
           {radarBody}
@@ -390,7 +428,25 @@ export function EventRadar({
             <p style={{ color: t.muted, fontSize: 13, maxWidth: 320 }}>
               Contact details are shared only if {selectedPerson.name.split(" ")[0]} accepts your request.
             </p>
-            <ConnectButton t={t} status={radar.outgoing.get(selectedPerson.userId)} onConnect={() => radar.connect(selectedPerson.userId)} onCancel={() => radar.cancelRequest(selectedPerson.userId)} wide />
+            {radar.outgoing.get(selectedPerson.userId) === "accepted" ? (
+              <button
+                style={{ ...btn(t, "primary"), width: "100%", maxWidth: 320, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                onClick={() => {
+                  setSelected(null);
+                  onOpenChat?.({
+                    id: selectedPerson.userId,
+                    name: selectedPerson.name,
+                    avatar_url: selectedPerson.avatar,
+                    role: selectedPerson.title,
+                    company: selectedPerson.company,
+                  });
+                }}
+              >
+                <span>💬</span> Message on NetworQ
+              </button>
+            ) : (
+              <ConnectButton t={t} status={radar.outgoing.get(selectedPerson.userId)} onConnect={() => radar.connect(selectedPerson.userId)} onCancel={() => radar.cancelRequest(selectedPerson.userId)} wide />
+            )}
             <ConfirmLink
               t={t}
               label="Block"
@@ -651,6 +707,7 @@ function EventHeader({
   onShare,
   onLeave,
   onAddEvent,
+  onOpenRoomChat,
 }: {
   t: Theme;
   card: React.CSSProperties;
@@ -660,6 +717,7 @@ function EventHeader({
   onShare: () => void;
   onLeave: () => void;
   onAddEvent: () => void;
+  onOpenRoomChat?: () => void;
 }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   return (
@@ -698,6 +756,15 @@ function EventHeader({
         </button>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
+        {onOpenRoomChat && (
+          <button
+            style={{ ...btn(t, "primary"), flex: 1, minWidth: 0, fontSize: 13 }}
+            onClick={onOpenRoomChat}
+            aria-label="Open Event Room Chat"
+          >
+            <span>💬</span> Room Chat
+          </button>
+        )}
         {event.join_code && (
           <button style={{ ...btn(t, "ghost"), flex: 1, minWidth: 0 }} onClick={onShare} aria-label={`Share event code ${event.join_code}`}>
             <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", letterSpacing: "0.04em" }}>{event.join_code}</span>

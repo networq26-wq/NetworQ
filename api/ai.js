@@ -134,6 +134,41 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    if (action === "lazy_debrief") {
+      const userText = [...(messages || [])].reverse().find(m => m.role === "user")?.content || "";
+      // Smart extraction fallback
+      const words = userText.split(/\s+/);
+      const nameMatch = userText.match(/(?:met|with|spoke to|talked to|called)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+      const companyMatch = userText.match(/(?:at|from|of|with|for)\s+([A-Z][a-zA-Z0-9]+(?:\s+[A-Z][a-zA-Z0-9]+)?)/i);
+      const name = nameMatch ? nameMatch[1].trim() : (words[0] || "New Connection");
+      const company = companyMatch ? companyMatch[1].trim() : "";
+      
+      const fallbackResult = {
+        name,
+        role: "Professional",
+        company,
+        email: "",
+        phone: "",
+        tags: ["In-Person Meeting", "Follow-up"],
+        summary: userText,
+        commitment: "Follow up regarding discussion",
+        reminder_days: 3,
+        email_draft: {
+          subject: `Great meeting you${company ? ` at ${company}` : ""}!`,
+          body: `Hi ${name},\n\nIt was great speaking with you today. I really enjoyed our conversation about ${userText.slice(0, 80)}...\n\nLet's keep in touch and schedule 15 minutes to follow up.\n\nBest regards,\nNetworQ Member`
+        }
+      };
+
+      return res.status(200).json({
+        choices: [{
+          message: {
+            role: "assistant",
+            content: JSON.stringify(fallbackResult)
+          }
+        }]
+      });
+    }
+
     res.status(500).json({ error: e.message });
   }
   } catch (fatalErr) {
