@@ -16,6 +16,7 @@ import { ProspectComposer } from "./prospect/ProspectComposer";
 import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
 import { DigitalPass } from "./pass/DigitalPass";
+import { LiquidGlass } from "quick-liquid/react";
 import { parseContactQr } from "./pass/vcard";
 import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
@@ -6497,7 +6498,8 @@ Keep it punchy, sharp, and directly actionable.`;
 
       {/* ── IPHONE FLOATING CURVED GLASS DOCK ── */}
       {isMobile && (
-        <div
+        <nav
+          aria-label="Main navigation"
           style={{
             position: "fixed",
             bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)",
@@ -6506,22 +6508,18 @@ Keep it punchy, sharp, and directly actionable.`;
             maxWidth: 440,
             margin: "0 auto",
             height: 64,
-            background: isDark ? "rgba(18, 18, 24, 0.86)" : "rgba(255, 255, 255, 0.88)",
-            backdropFilter: "blur(28px) saturate(190%)",
-            WebkitBackdropFilter: "blur(28px) saturate(190%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
             zIndex: 200,
             borderRadius: 36,
-            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.16)" : "rgba(0, 0, 0, 0.08)"}`,
-            boxShadow: isDark
-              ? "0 16px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.12)"
-              : "0 16px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255,255,255,0.8)",
-            padding: "4px 8px",
-            boxSizing: "border-box",
+            boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.55)" : "0 16px 36px rgba(60, 30, 120, 0.16)",
           }}
         >
+          {/* Liquid glass is only the surface (HIG liquid-glass.md: floating control layer); NetworQ owns layout & layering */}
+          <LiquidGlass
+            // Tuned for legibility over busy content: heavy frost, thin refractive rim, no colour fringing
+            config={{ material: "thick", blur: 14, saturation: 1.6, tintOpacity: isDark ? 0.42 : 0.55, tint: isDark ? "28, 28, 34" : "255, 255, 255", refractionStrength: 9, bezelWidth: 16, chromaticAberration: 0, edgeHighlight: 0.7, specularStrength: 0.18, borderRadius: 36, quality: "medium", appearance: isDark ? "dark" : "light", elevation: 0 }}
+            style={{ width: "100%", height: "100%", borderRadius: 36 }}
+          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "4px 8px", boxSizing: "border-box", width: "100%" }}>
           {[
             { t: "contacts", icon: Icons.Users, label: "Contacts" },
             { t: "events", icon: Icons.Calendar, label: "Events" },
@@ -6593,7 +6591,9 @@ Keep it punchy, sharp, and directly actionable.`;
               </button>
             );
           })}
-        </div>
+          </div>
+          </LiquidGlass>
+        </nav>
       )}
 
       {/* ── 1-CLICK BULK AUTOMATED FOLLOW-UPS MODAL ── */}
