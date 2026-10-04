@@ -79,8 +79,8 @@ export function Waitlist() {
       <div className="relative mx-auto max-w-3xl px-6 py-28 text-center md:py-40">
         <Reveal>
           <h2 className="text-4xl leading-[1.14] font-semibold tracking-[-0.035em] text-balance sm:text-[3.25rem]">
-            You met <span className="font-serif italic text-primary">12</span> people at that event. You'll remember{" "}
-            <span className="font-serif italic text-primary">2</span> by Friday.
+            You met <span className="font-serif italic text-[#8B5CF6] font-semibold">12</span> people at that event. You'll remember{" "}
+            <span className="font-serif italic text-[#8B5CF6] font-semibold">2</span> by Friday.
           </h2>
         </Reveal>
         <Reveal delay={0.08}>
