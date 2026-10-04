@@ -37,7 +37,8 @@ const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
   (typeof window !== "undefined"
     ? window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      ? (window.location.port === "8081" ? "http://localhost:3001/api/ai" : "/api/ai")
+      ? // Expo dev servers (8081, 8082…, 19006) can't answer /api — the local API runs on 3001
+        (/^(80[89]\d|19006)$/.test(window.location.port) ? "http://localhost:3001/api/ai" : "/api/ai")
       : window.location.hostname.includes("networq.co.in") || window.location.hostname.includes("onrender.com")
         ? "/api/ai"
         : "https://www.networq.co.in/api/ai"
