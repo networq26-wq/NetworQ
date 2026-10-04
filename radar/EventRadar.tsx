@@ -1,6 +1,7 @@
 // Event Radar screen: join/create an event, live radar, nearby list,
 // consent-based connection requests and privacy controls.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { I, Skeleton } from "../ui/icons";
 import QRCode from "qrcode";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RadarCanvas } from "./RadarCanvas";
@@ -284,8 +285,14 @@ export function EventRadar({
 
   if (events === null) {
     return (
-      <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">
-        Loading your events…
+      <div role="status" aria-label="Loading Radar" style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Skeleton w="100%" h={40} r={12} style={{ maxWidth: 360, alignSelf: "center" }} />
+        <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <Skeleton w="50%" h={22} />
+          <Skeleton w="80%" h={13} />
+          <Skeleton w="100%" h={48} r={12} />
+          <Skeleton w="100%" h={48} r={12} />
+        </div>
       </div>
     );
   }
@@ -295,7 +302,12 @@ export function EventRadar({
       <ScopeSwitch t={t} scope={scope} onChange={setScope} />
       {scope === "nearby" ? (
         nearby === undefined ? (
-          <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">Loading…</div>
+          <div role="status" aria-label="Loading Nearby" style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <Skeleton w={72} h={72} r={36} />
+            <Skeleton w="55%" h={20} />
+            <Skeleton w="75%" h={13} />
+            <Skeleton w={220} h={48} r={12} />
+          </div>
         ) : !nearby ? (
           <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
         ) : (
@@ -507,7 +519,7 @@ function DistanceChip({ t, person }: { t: Theme; person: RadarPerson }) {
 function ConnectButton({ t, status, onConnect, onCancel, wide }: { t: Theme; status?: string; onConnect: () => void; onCancel?: () => void; wide?: boolean }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const style = { ...btn(t, status ? "ghost" : "primary"), ...(wide ? { width: "100%", maxWidth: 320 } : {}) };
-  if (status === "accepted") return <button style={style} disabled>Connected ✓</button>;
+  if (status === "accepted") return <button style={style} disabled className="nq-pop"><I.Check size={15} strokeWidth={2.4} style={{ marginRight: 4, verticalAlign: "-3px" }} />Connected</button>;
   if (status === "declined") return <button style={style} disabled>Not available</button>;
   if (status === "pending")
     return (
@@ -791,7 +803,7 @@ function NearbyList({
       ) : (
         <ul aria-label="Nearby attendees" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           {people.map((p) => (
-            <li key={p.userId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", opacity: p.faded ? 0.55 : 1 }}>
+            <li key={p.userId} className="nq-pop" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", opacity: p.faded ? 0.55 : 1, transition: "opacity 0.4s ease" }}>
               <button
                 onClick={() => onSelect(p.userId)}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, color: "inherit", cursor: "pointer", textAlign: "left" }}

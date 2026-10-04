@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 interface IntroductionsModalProps {
@@ -42,7 +43,7 @@ export function IntroductionsModal({
     try {
       await onSendIntroRequest(selectedConnectorId, targetName.trim(), targetCompany.trim(), contextNote.trim());
       haptic();
-      showToast("Introduction request sent! We'll notify you once accepted.", "success");
+      showToast("Your intro request is drafted in your email app — review it and send.", "success");
       onClose();
     } catch (err: any) {
       showToast(err.message || "Failed to send introduction request", "error");
@@ -86,7 +87,7 @@ export function IntroductionsModal({
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>🤝 Request an Introduction (Part 12)</h3>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>Request an introduction</h3>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: isDark ? "#94A3B8" : "#64748B" }}>
               Ask a trusted mutual connection to introduce you professionally.
             </p>
@@ -95,7 +96,7 @@ export function IntroductionsModal({
             onClick={onClose}
             style={{ background: "transparent", border: "none", color: isDark ? "#94A3B8" : "#64748B", fontSize: 20, cursor: "pointer" }}
           >
-            ✕
+            <I.X size={18} />
           </button>
         </div>
 

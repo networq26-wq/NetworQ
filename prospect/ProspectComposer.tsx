@@ -4,6 +4,7 @@
 //   3 Drafts A / B / C (copy, edit, regenerate, refine)
 //   4 Review → explicit send → logged on the contact's timeline
 import React, { useEffect, useMemo, useState } from "react";
+import { I, SuccessCheck } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   EMAIL_TYPES, OPTION_LABELS, REFINEMENTS, TONES, VALUE_OPTIONS, sourceLabel,
@@ -206,7 +207,7 @@ export function ProspectComposer({
         {/* Header */}
         <div style={{ padding: "calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${t.border}`, background: t.surface }}>
           <button onClick={back} aria-label={step === "prospect" || step === "sent" ? "Close" : "Back"} style={{ width: 40, height: 40, borderRadius: 20, border: "none", background: "transparent", color: PURPLE, fontSize: 22, cursor: "pointer" }}>
-            {step === "prospect" || step === "sent" ? "✕" : "‹"}
+            {step === "prospect" || step === "sent" ? <I.X size={20} /> : <I.ChevronLeft size={24} />}
           </button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 17, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Email {contact.name}</div>
@@ -318,7 +319,7 @@ export function ProspectComposer({
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ width: 26, height: 26, borderRadius: 13, background: PURPLE, color: "#FFF", fontWeight: 700, fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center" }}>{d.option}</span>
                       <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{OPTION_LABELS[d.option]}</span>
-                      <span style={{ fontSize: 12, color: d.checked ? "#34C759" : t.muted, fontWeight: 600 }}>{d.checked ? "✓ Fact-checked" : "Not fact-checked"}</span>
+                      <span style={{ fontSize: 12, color: d.checked ? "#34C759" : t.muted, fontWeight: 600 }}>{d.checked ? <><I.Check size={13} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: "-2px" }} />Fact-checked</> : "Not fact-checked"}</span>
                     </div>
 
                     <div style={{ fontSize: 12, color: t.muted, margin: "12px 0 6px", fontWeight: 600 }}>SUBJECT</div>
@@ -331,7 +332,7 @@ export function ProspectComposer({
                     </div>
 
                     <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.55, marginTop: 12 }}>{d.body}</div>
-                    <div style={{ fontSize: 12, color: t.muted, marginTop: 8 }}>{d.words} words{d.warnings.length ? ` · ⚠︎ ${d.warnings.join(" ")}` : ""}</div>
+                    <div style={{ fontSize: 12, color: t.muted, marginTop: 8 }}>{d.words} words{d.warnings.length ? <> · <I.Alert size={12} style={{ verticalAlign: "-2px" }} /> {d.warnings.join(" ")}</> : null}</div>
 
                     {d.used.length > 0 && (
                       <div style={{ marginTop: 10 }}>
@@ -401,7 +402,7 @@ export function ProspectComposer({
 
           {step === "sent" && review && (
             <div style={{ textAlign: "center", padding: "48px 12px" }}>
-              <div style={{ width: 64, height: 64, borderRadius: 32, background: "#34C759", color: "#FFF", fontSize: 32, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>✓</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}><SuccessCheck size={68} /></div>
               <div style={{ fontSize: 22, fontWeight: 700 }}>Email sent</div>
               <div style={{ color: t.muted, marginTop: 6, fontSize: 15 }}>To {review.to}. It's on {form.name || contact.name}'s timeline.</div>
               <button style={{ ...primary, marginTop: 24 }} onClick={onClose}>Done</button>
@@ -461,7 +462,7 @@ function ResearchPanel({ research, t, sectionTitle, card }: { research: Research
     return (
       <li style={{ display: "flex", gap: 10, padding: "8px 0", borderTop: `1px solid ${t.border}` }}>
         <span aria-label={ok ? "Verified" : "Not verified"} title={ok ? `Verified: “${f.evidence}”` : "Couldn't confirm this in the source — it won't be used as a fact"} style={{ flexShrink: 0, width: 20, height: 20, borderRadius: 10, fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", background: ok ? "rgba(52,199,89,0.15)" : t.raised, color: ok ? "#34C759" : t.muted, marginTop: 1 }}>
-          {ok ? "✓" : "?"}
+          {ok ? <I.Check size={12} strokeWidth={2.6} /> : "?"}
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, lineHeight: 1.4, color: ok ? t.text : t.muted }}>{f.text}</div>

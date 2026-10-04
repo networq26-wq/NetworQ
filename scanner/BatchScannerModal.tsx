@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { I } from "../ui/icons";
 import type { BatchScanItem, ScannedCardDetails } from "./scannerTypes";
 import { fileToDataUrl, downscaleImage, extractStructuredCard, findDuplicateContact } from "./extractEngine";
 import { haptic } from "../ui/haptics";
@@ -131,7 +132,7 @@ export function BatchScannerModal({
     }
   };
 
-  // Voice note speech recognition (Part 28)
+  // Voice note speech recognition
   const toggleVoiceNote = () => {
     if (isListeningVoice) {
       speechRecRef.current?.stop();
@@ -306,7 +307,7 @@ export function BatchScannerModal({
                 padding: "4px 8px",
               }}
             >
-              ✕
+              <I.X size={18} />
             </button>
           </div>
         </div>
@@ -407,7 +408,7 @@ export function BatchScannerModal({
               </div>
             ) : selectedItem.status === "processing" ? (
               <div style={{ textAlign: "center", padding: 60 }}>
-                <div style={{ fontSize: 36, marginBottom: 12 }}>⚡</div>
+                <div style={{ marginBottom: 12, display: "flex", justifyContent: "center" }}><I.Zap size={34} color="#7C3AED" /></div>
                 <div style={{ fontSize: 17, fontWeight: 700 }}>AI Extracting Business Card details…</div>
                 <div style={{ fontSize: 13, color: isDark ? "#94A3B8" : "#64748B", marginTop: 4 }}>
                   Segregating Person, Company, Social, and Address fields without hallucination.
@@ -415,7 +416,7 @@ export function BatchScannerModal({
               </div>
             ) : selectedItem.status === "failed" ? (
               <div style={{ textAlign: "center", padding: 40 }}>
-                <div style={{ fontSize: 32, marginBottom: 8, color: "#EF4444" }}>⚠️</div>
+                <div style={{ marginBottom: 8, display: "flex", justifyContent: "center" }}><I.Alert size={30} color="#EF4444" /></div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: "#EF4444" }}>{selectedItem.error}</div>
                 <button
                   onClick={() => processItem(selectedItem)}
@@ -451,7 +452,7 @@ export function BatchScannerModal({
                   >
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 800, color: "#D97706" }}>
-                        ⚠️ Duplicate Contact Detected
+                        <I.Alert size={15} style={{ marginRight: 6 }} />Possible duplicate contact
                       </div>
                       <div style={{ fontSize: 12, color: isDark ? "#FDE68A" : "#92400E", marginTop: 2 }}>
                         Matches existing contact: <b>{selectedItem.duplicateMatch.name}</b> ({selectedItem.duplicateMatch.company || "No company"})
@@ -504,7 +505,7 @@ export function BatchScannerModal({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", marginBottom: 12 }}>
-                      👤 Person
+                      <I.User size={15} style={{ marginRight: 6 }} />Person
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       <FieldInput
@@ -552,7 +553,7 @@ export function BatchScannerModal({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#06B6D4", textTransform: "uppercase", marginBottom: 12 }}>
-                      🏢 Company
+                      <I.Building size={15} style={{ marginRight: 6 }} />Company
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       <FieldInput
@@ -592,7 +593,7 @@ export function BatchScannerModal({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#10B981", textTransform: "uppercase", marginBottom: 12 }}>
-                      🌐 Social
+                      <I.Globe size={15} style={{ marginRight: 6 }} />Social
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       <FieldInput
@@ -626,7 +627,7 @@ export function BatchScannerModal({
                     }}
                   >
                     <div style={{ fontSize: 13, fontWeight: 800, color: "#F59E0B", textTransform: "uppercase", marginBottom: 12 }}>
-                      📍 Address
+                      <I.MapPin size={15} style={{ marginRight: 6 }} />Address
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       <FieldInput
@@ -651,7 +652,7 @@ export function BatchScannerModal({
                   </div>
                 </div>
 
-                {/* Voice Note & CRM Notes (Part 28) */}
+                {/* Voice Note & CRM Notes */}
                 <div
                   style={{
                     marginTop: 16,
@@ -663,7 +664,7 @@ export function BatchScannerModal({
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 800, color: "#A78BFA", textTransform: "uppercase" }}>
-                      🎙️ Notes & Voice Memos (Part 28)
+                      <I.Mic size={15} style={{ marginRight: 6 }} />Notes & voice memos
                     </span>
                     <button
                       onClick={toggleVoiceNote}
@@ -681,7 +682,7 @@ export function BatchScannerModal({
                         gap: 6,
                       }}
                     >
-                      {isListeningVoice ? "🔴 Listening…" : "🎤 Record Voice Memo"}
+                      {isListeningVoice ? <><I.Dot size={12} color="#EF4444" style={{ marginRight: 6 }} />Listening…</> : <><I.Mic size={15} style={{ marginRight: 6 }} />Record voice memo</>}
                     </button>
                   </div>
                   <textarea
@@ -719,7 +720,7 @@ export function BatchScannerModal({
                       boxShadow: "0 4px 14px rgba(124,58,237,0.35)",
                     }}
                   >
-                    ✓ Save Contact to CRM
+                    <I.Check size={16} style={{ marginRight: 6 }} />Save contact
                   </button>
                 </div>
               </div>
@@ -763,7 +764,7 @@ function FieldInput({
           {label}
         </label>
         {isAmbiguous && (
-          <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>⚠️ Needs Review</span>
+          <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}><I.Alert size={11} style={{ marginRight: 3, verticalAlign: "-1px" }} />Needs review</span>
         )}
       </div>
       <input

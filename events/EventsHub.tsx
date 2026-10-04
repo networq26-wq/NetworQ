@@ -1,5 +1,6 @@
 // Events Hub: real upcoming events imported from their source pages or calendar feeds.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { I, Skeleton } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const PURPLE = "#7C3AED";
@@ -106,6 +107,7 @@ export function EventsHub({
 }) {
   const t = theme(isDark);
   const [events, setEvents] = useState<PublicEvent[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [query, setQuery] = useState("");
   const saved = useMemo(readPrefs, []);
   const [city, setCity] = useState(saved.city || "All");
@@ -123,9 +125,12 @@ export function EventsHub({
     const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
     const { data, error } = await supabase.from("public_events").select("*").gte("starts_at", since).order("starts_at", { ascending: true }).limit(800);
     if (error) {
-      showToast("Couldn't load events. Pull to retry.", "error");
+      setLoadError(true);
       setEvents([]);
-    } else setEvents((data || []) as PublicEvent[]);
+    } else {
+      setLoadError(false);
+      setEvents((data || []) as PublicEvent[]);
+    }
   }, [supabase, showToast]);
 
   useEffect(() => {
@@ -299,11 +304,36 @@ export function EventsHub({
       )}
 
       {events === null ? (
-        <div style={{ ...card, color: t.muted, textAlign: "center" }} aria-busy="true">
-          Loading events…
+        <ul role="status" aria-label="Loading events" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+          {[0, 1, 2].map((i) => (
+            <li key={i} style={{ ...card, padding: 0, overflow: "hidden" }}>
+              <Skeleton h={140} r={0} />
+              <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                <Skeleton w="40%" h={12} />
+                <Skeleton w="85%" h={17} />
+                <Skeleton w="60%" h={12} />
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <Skeleton w={150} h={44} r={12} />
+                  <Skeleton w={110} h={44} r={12} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : loadError ? (
+        <div role="alert" className="nq-pop" style={{ ...card, textAlign: "center", padding: "32px 20px" }}>
+          <div style={{ width: 52, height: 52, borderRadius: 26, margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: t.raised, color: t.muted }}>
+            <I.Alert size={24} />
+          </div>
+          <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Couldn't load events</div>
+          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Check your connection and try again.</div>
+          <button style={btn(true)} onClick={() => { setEvents(null); load(); }}>Try again</button>
         </div>
       ) : visible.length === 0 ? (
-        <div style={{ ...card, textAlign: "center", padding: "36px 20px" }}>
+        <div className="nq-pop" style={{ ...card, textAlign: "center", padding: "36px 20px" }}>
+          <div style={{ width: 52, height: 52, borderRadius: 26, margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: t.raised, color: PURPLE }}>
+            {events.length ? <I.Search size={24} /> : <I.Calendar size={24} />}
+          </div>
           <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>{events.length ? "No events match your filters" : "No upcoming events yet"}</div>
           <div style={{ color: t.muted, fontSize: 14, maxWidth: 420, margin: "0 auto" }}>
             {events.length ? "Try another date, category or city." : "Paste a link to an event you're going to — everyone on NetworQ will see it, with a link to the official page."}
@@ -313,7 +343,7 @@ export function EventsHub({
         <ul aria-label="Upcoming events" className="nq-stagger" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
           {visible.map((ev) => (
             <li key={ev.id} style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              {ev.image && <img src={ev.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: t.raised }} />}
+              {ev.image && <EventImage src={ev.image} bg={t.raised} muted={t.muted} />}
               <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
                   <span style={{ color: PURPLE, fontWeight: 700 }}>{whenLabel(ev.starts_at)}</span>
@@ -353,6 +383,32 @@ export function EventsHub({
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+// Fixed-height frame: no layout jump while loading, a soft fade-in, and a calm placeholder if it fails
+function EventImage({ src, bg, muted }: { src: string; bg: string; muted: string }) {
+  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  return (
+    <div style={{ position: "relative", width: "100%", height: 140, background: bg, overflow: "hidden" }}>
+      {state === "loading" && <Skeleton h={140} r={0} style={{ position: "absolute", inset: 0 }} />}
+      {state === "failed" ? (
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: muted }}>
+          <I.Calendar size={28} />
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          className={`nq-fade${state === "loaded" ? " is-loaded" : ""}`}
+          onLoad={() => setState("loaded")}
+          onError={() => setState("failed")}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
       )}
     </div>
   );

@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface AppNotification {
   id: string;
-  type: "connection_request" | "connection_accepted" | "connection_declined" | "security" | "event" | "system";
+  type: "connection_request" | "connection_accepted" | "connection_declined" | "reminder" | "security" | "event" | "system";
   title: string;
   body: string | null;
   data: { request_id?: string; from_user?: string; event_id?: string; screen?: string };

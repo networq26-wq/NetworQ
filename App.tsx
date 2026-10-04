@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { I, SuccessCheck, Skeleton } from "./ui/icons";
 import { supabase } from "./supabase";
 import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
 import { SettingsScreen } from "./settings/SettingsScreen";
@@ -41,104 +42,25 @@ const GOOGLE_SIGNIN_AVAILABLE = !IS_NATIVE_WEBVIEW || NATIVE_GOOGLE_AUTH;
 const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
 installSignOutHook(supabase);
 
-// ── CONFETTI PARTICLE SYSTEM ──────────────────────────────────────────────────
-interface ConfettiParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  color: string;
-  rotation: number;
-  vRot: number;
-  alpha: number;
-  shape: "circle" | "rect" | "star";
+// ── SUCCESS FEEDBACK ──────────────────────────────────────────────────────────
+// Routine successes (saved, sent, downloaded) get a light haptic tick; the toast carries the ✓.
+// (Replaces a full-screen confetti burst that fired on every save.)
+function successFeedback() {
+  haptic(15);
 }
 
-let activeConfetti: ConfettiParticle[] = [];
-let confettiAnimId: number | null = null;
-
-function triggerConfetti(originX = window.innerWidth / 2, originY = window.innerHeight / 2) {
-  if (typeof window === "undefined") return;
-  const colors = ["#6366F1", "#8B5CF6", "#06B6D4", "#10B981", "#F59E0B", "#EC4899", "#3B82F6"];
-  const count = 65;
-  const shapes: ("circle" | "rect" | "star")[] = ["circle", "rect", "star"];
-
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
-    const speed = 4 + Math.random() * 8;
-    activeConfetti.push({
-      x: originX,
-      y: originY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 4,
-      size: 5 + Math.random() * 6,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      rotation: Math.random() * Math.PI * 2,
-      vRot: (Math.random() - 0.5) * 0.2,
-      alpha: 1,
-      shape: shapes[Math.floor(Math.random() * shapes.length)],
-    });
-  }
-
-  const canvas = document.getElementById("networq-confetti-canvas") as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
-
-  const loop = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = activeConfetti.length - 1; i >= 0; i--) {
-      const p = activeConfetti[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.22;
-      p.vx *= 0.98;
-      p.rotation += p.vRot;
-      p.alpha -= 0.015;
-
-      if (p.alpha <= 0 || p.y > canvas.height + 20) {
-        activeConfetti.splice(i, 1);
-        continue;
-      }
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.fillStyle = p.color;
-
-      if (p.shape === "circle") {
-        ctx.beginPath();
-        ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (p.shape === "rect") {
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-      } else {
-        ctx.beginPath();
-        for (let s = 0; s < 5; s++) {
-          ctx.lineTo(Math.cos(((18 + s * 72) * Math.PI) / 180) * p.size, -Math.sin(((18 + s * 72) * Math.PI) / 180) * p.size);
-          ctx.lineTo(Math.cos(((54 + s * 72) * Math.PI) / 180) * (p.size / 2), -Math.sin(((54 + s * 72) * Math.PI) / 180) * (p.size / 2));
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    if (activeConfetti.length > 0) {
-      confettiAnimId = requestAnimationFrame(loop);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      confettiAnimId = null;
-    }
-  };
-  confettiAnimId = requestAnimationFrame(loop);
+// "Today", "Yesterday", "In 3 days", "12 Sep" — for real dates on a contact
+function relativeDay(value: string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(new Date())) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === -1) return "Yesterday";
+  if (diff === 1) return "Tomorrow";
+  if (diff < 0 && diff > -7) return `${-diff} days ago`;
+  if (diff > 0 && diff < 7) return `In ${diff} days`;
+  return d.toLocaleDateString([], { day: "numeric", month: "short", year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
 }
 
 // ── VCARD (.VCF) GENERATOR ───────────────────────────────────────────────────
@@ -177,7 +99,7 @@ function downloadVCard(contact: {
   a.download = `${(contact.name || "contact").toLowerCase().replace(/\s+/g, "_")}.vcf`;
   a.click();
   URL.revokeObjectURL(url);
-  triggerConfetti();
+  successFeedback();
 }
 
 // ── APPLE CALENDAR (.ICS) GENERATOR ───────────────────────────────────────────
@@ -335,7 +257,7 @@ const Icons = {
     );
   },
   FileText: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" />
@@ -344,7 +266,7 @@ const Icons = {
     </svg>
   ),
   User: ({ size = 18, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
@@ -459,7 +381,7 @@ const Icons = {
     </svg>
   ),
   Plus: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
@@ -614,13 +536,13 @@ const Icons = {
     </svg>
   ),
   ArrowRight: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="5" y1="12" x2="19" y2="12" />
       <polyline points="12 5 19 12 12 19" />
     </svg>
   ),
   ChevronRight: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <polyline points="9 18 15 12 9 6" />
     </svg>
   ),
@@ -631,12 +553,12 @@ const Icons = {
     </svg>
   ),
   Check: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
   Close: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
@@ -1257,7 +1179,7 @@ function CommandPalette({
               outline: "none",
               fontSize: 15,
               color: isDark ? "#ffffff" : "#0f172a",
-              fontFamily: "'DM Sans', sans-serif",
+              
             }}
           />
           <span style={{ fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
@@ -1729,6 +1651,9 @@ VOICE & ASSISTANT DIRECTIVES:
     async (userId: string, userEmail?: string) => {
       loadedUserRef.current = userId;
       reattachPush(supabase, apiBase(AI_PROXY)); // this device had push on → attach it to this account
+      // Signed in from the login screen: show the loading screen instead of a frozen login form
+      setScreen((cur) => (cur === "login" || cur === "check_email" ? "splash" : cur));
+      setSplashProgress((p) => Math.max(p, 92));
       setContactsLoading(true);
       try {
         const [profileRes, contactsRes] = await Promise.all([
@@ -1788,7 +1713,8 @@ VOICE & ASSISTANT DIRECTIVES:
       } catch (err: any) {
         loadedUserRef.current = null;
         console.error("Failed to load user data:", err);
-        showToast(err.message || "Failed to load profile", "error");
+        setScreen((cur) => (cur === "splash" ? "login" : cur)); // never strand the user on the loading screen
+        showToast("Couldn't load your account. Check your connection and try again.", "error");
       } finally {
         setContactsLoading(false);
       }
@@ -2085,7 +2011,7 @@ VOICE & ASSISTANT DIRECTIVES:
         const { error: profileErr } = await supabase.from("profiles").upsert({ id: data.user.id, ...profileFields });
         if (profileErr) throw profileErr;
 
-        triggerConfetti();
+        successFeedback();
         await loadUserData(data.user.id, form.email);
       }
     } catch (err: any) {
@@ -2113,7 +2039,7 @@ VOICE & ASSISTANT DIRECTIVES:
         bio: form.bio,
       });
       if (error) throw error;
-      triggerConfetti();
+      successFeedback();
       await loadUserData(currentUser.id, currentUser.email);
     } catch (err: any) {
       setAuthMsg({ text: err.message || "Failed to save profile.", type: "error" });
@@ -2197,7 +2123,7 @@ VOICE & ASSISTANT DIRECTIVES:
           // A NetworQ profile QR fills the form instantly, with no AI call
           const qr = await readProfileQr(e.target.result);
           if (qr) {
-            triggerConfetti();
+            successFeedback();
             setAddForm((f) => ({ ...f, ...qr }));
             setAddStep("preview");
             setTab("add");
@@ -2237,7 +2163,7 @@ VOICE & ASSISTANT DIRECTIVES:
           }
 
           if (cardData) {
-            triggerConfetti();
+            successFeedback();
             setAddForm((f) => ({
               ...f,
               name: cardData.name || "",
@@ -2315,7 +2241,7 @@ VOICE & ASSISTANT DIRECTIVES:
       setAddStep("form");
       setTab("contacts");
       setModal(newContact);
-      triggerConfetti();
+      successFeedback();
       showToast("Contact saved successfully!", "success");
     } catch (err: any) {
       console.error("saveContact exception:", err);
@@ -2417,16 +2343,16 @@ VOICE & ASSISTANT DIRECTIVES:
     try {
       const prompt = `Prepare a concise executive networking dossier on ${contact.name} (${contact.title || ""} at ${contact.company || ""}) for ${currentUser?.name} (${currentUser?.role} at ${currentUser?.company}).
 Include:
-1. 🎯 Strategic Talking Points (2 bullets)
-2. 💡 Potential Synergy / Collaboration Angle
-3. ☕ High-impact conversation starter questions.
+1. Strategic Talking Points (2 bullets)
+2. Potential Synergy / Collaboration Angle
+3. High-impact conversation starter questions.
 Keep it punchy, sharp, and directly actionable.`;
       const brief = await callAI([{ role: "user", content: prompt }], "You are a top-tier executive networking strategist.", {
         max_tokens: 500,
         action: "chat",
       });
       setPrepBrief(brief);
-      triggerConfetti();
+      successFeedback();
     } catch (err: any) {
       showToast(err.message || "Failed to generate briefing.", "error");
     } finally {
@@ -2535,7 +2461,7 @@ Keep it punchy, sharp, and directly actionable.`;
       await supabase.from("contacts").update({ meet_link: link, meet_date: meetDateStr }).eq("id", meetModal.id);
       setContacts((prev) => prev.map((c) => (c.id === meetModal.id ? { ...c, meetLink: link, meetDate: meetDateStr } : c)));
       setMeetSent(true);
-      triggerConfetti();
+      successFeedback();
       showToast(calendarInviteSent ? `Calendar invite sent to ${meetModal.email}` : `Meeting invite sent to ${meetModal.email}`, "success");
       setTimeout(() => {
         setMeetModal(null);
@@ -2562,7 +2488,7 @@ Keep it punchy, sharp, and directly actionable.`;
     const updated = contacts.map((c) => (c.id === id ? { ...c, reminderDone: newVal } : c));
     setContacts(updated);
     if (modal?.id === id) setModal(updated.find((c) => c.id === id));
-    if (newVal) triggerConfetti();
+    if (newVal) successFeedback();
   };
 
   const deleteContact = async (id: string) => {
@@ -2623,7 +2549,7 @@ Keep it punchy, sharp, and directly actionable.`;
     a.download = `networq-contacts-${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    triggerConfetti();
+    successFeedback();
   };
 
   const accountApi = useMemo(() => createAccountApi(supabase, apiBase(AI_PROXY)), []);
@@ -2724,7 +2650,7 @@ Keep it punchy, sharp, and directly actionable.`;
       }
     }
     setBulkSending(false);
-    if (sentCount > 0) triggerConfetti();
+    if (sentCount > 0) successFeedback();
     if (failedCount === 0) {
       showToast(`Sent ${sentCount} follow-up email${sentCount === 1 ? "" : "s"}.`, "success");
     } else {
@@ -2741,10 +2667,10 @@ Keep it punchy, sharp, and directly actionable.`;
 
   const greetingText = useMemo(() => {
     const hr = new Date().getHours();
-    if (hr < 12) return "Good morning,";
-    if (hr < 18) return "Good afternoon,";
-    return "Good evening,";
-  }, []);
+    const first = (currentUser?.name || "").trim().split(/\s+/)[0];
+    const part = hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+    return first ? `${part}, ${first}` : part;
+  }, [currentUser?.name]);
 
   const selectedContact = useMemo(() => {
     return effectiveContacts.find((c) => c.id === selectedContactId) || effectiveContacts[0] || null;
@@ -2901,7 +2827,11 @@ Keep it punchy, sharp, and directly actionable.`;
     }
     
     button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
-    button:not(:disabled):active, [role="button"]:active { opacity: 0.6; transform: scale(0.98); transition: opacity 0.08s, transform 0.08s; }
+    /* Press feedback: a slight physical "give", not a fade (100 ms in, 180 ms out) */
+    button, [role="button"] { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease; }
+    button:not(:disabled):active, [role="button"]:active { transform: scale(0.97); opacity: 0.88; transition-duration: 0.1s; }
+    button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid #7C3AED; outline-offset: 2px; }
+    input, textarea, select { transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease; }
     button:disabled { cursor: default; }
 
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -2909,25 +2839,35 @@ Keep it punchy, sharp, and directly actionable.`;
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── Motion system (iOS-like springs; all off with "Reduce motion") ── */
-    @keyframes nqScreenIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes nqScreenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
     @keyframes nqSheetUp { from { transform: translateY(100%); } to { transform: none; } }
     @keyframes nqSheetRight { from { transform: translateX(100%); } to { transform: none; } }
     @keyframes nqPop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
     @keyframes nqToastIn { from { opacity: 0; transform: translate(-50%, 12px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
-    @keyframes nqTabBounce { 0% { transform: scale(1); } 35% { transform: scale(1.22) translateY(-1px); } 70% { transform: scale(0.96); } 100% { transform: scale(1); } }
     @keyframes nqShimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
-    .nq-screen { animation: nqScreenIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    @keyframes nqFade { from { opacity: 0.55; } to { opacity: 1; } }
+    /* Tab switches are frequent (HIG motion.md): a 180 ms opacity settle, no movement. Opacity only, so fixed overlays inside stay full-screen. */
+    .nq-screen { animation: nqFade 0.18s ease-out backwards; }
     .nq-backdrop { animation: fadeIn 0.2s ease both; }
-    .nq-sheet-up { animation: nqSheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1) both; }
-    .nq-sheet-right { animation: nqSheetRight 0.34s cubic-bezier(0.32, 0.72, 0, 1) both; }
-    .nq-pop { animation: nqPop 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-sheet-up { animation: nqSheetUp 0.34s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+    .nq-sheet-right { animation: nqSheetRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+    .nq-pop { animation: nqPop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
     .nq-tab-icon { display: inline-flex; }
-    .nq-tab-icon.is-active { animation: nqTabBounce 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
-    .nq-stagger > * { animation: nqScreenIn 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-    .nq-stagger > *:nth-child(2) { animation-delay: 30ms; } .nq-stagger > *:nth-child(3) { animation-delay: 60ms; }
-    .nq-stagger > *:nth-child(4) { animation-delay: 90ms; } .nq-stagger > *:nth-child(5) { animation-delay: 120ms; }
-    .nq-stagger > *:nth-child(6) { animation-delay: 150ms; } .nq-stagger > *:nth-child(n+7) { animation-delay: 180ms; }
+    .nq-tab-icon { transition: transform 0.18s ease-out; } .nq-tab-icon.is-active { transform: translateY(-1px); }
+    .nq-stagger > * { animation: nqScreenIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    .nq-stagger > *:nth-child(2) { animation-delay: 25ms; } .nq-stagger > *:nth-child(3) { animation-delay: 50ms; }
+    .nq-stagger > *:nth-child(n+4) { animation-delay: 75ms; }
     .nq-skeleton { background: linear-gradient(90deg, ${isDark ? "#1C1C1E 25%, #2C2C2E 50%, #1C1C1E 75%" : "#ECECF0 25%, #F7F7FA 50%, #ECECF0 75%"}); background-size: 200% 100%; animation: nqShimmer 1.4s linear infinite; border-radius: 12px; }
+    @keyframes nqDraw { to { stroke-dashoffset: 0; } }
+    .nq-success-disc { transform-origin: 32px 32px; animation: nqPop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-success-tick { stroke-dasharray: 44; stroke-dashoffset: 44; animation: nqDraw 0.36s 0.16s ease-out forwards; }
+    .nq-badge { animation: nqPop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    @keyframes nqScan { 0% { transform: translateY(6%); } 50% { transform: translateY(92%); } 100% { transform: translateY(6%); } }
+    .nq-scanline { position: absolute; left: 5%; right: 5%; top: 0; height: 100%; pointer-events: none; animation: nqScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .nq-scanline::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #C4B5FD, transparent); box-shadow: 0 0 14px 2px rgba(167, 139, 250, 0.55); }
+    @keyframes nqSpinOnce { to { transform: rotate(360deg); } }
+    .nq-spin { animation: nqSpinOnce 0.9s linear infinite; }
+    img.nq-fade { opacity: 0; transition: opacity 0.3s ease; } img.nq-fade.is-loaded { opacity: 1; }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
     }
@@ -2981,7 +2921,7 @@ Keep it punchy, sharp, and directly actionable.`;
         boxSizing: "border-box" as const,
         background: themeStyles.bg,
         color: themeStyles.text,
-        fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif",
         position: "relative" as const,
         overflowX: "hidden" as const,
       },
@@ -3146,7 +3086,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(124, 58, 237, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
               <Icons.Mail size={26} color="#8B5CF6" />
             </div>
-            <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
+            <h2 style={{ fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
               A confirmation link was sent to <strong style={{ color: themeStyles.text }}>{form.email}</strong>. Open the link to activate your workspace.
             </p>
@@ -3167,7 +3107,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 480, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Complete Profile</div>
+            <div style={{ fontSize: 28 }}>Complete Profile</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>
               Set up your professional card details
             </div>
@@ -3282,7 +3222,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Create New Password</div>
+            <div style={{ fontSize: 28 }}>Create New Password</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>Enter your updated password</div>
           </div>
           <div style={S.card}>
@@ -3325,7 +3265,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Account Recovery</div>
+            <div style={{ fontSize: 28 }}>Account Recovery</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>We'll send a password recovery email</div>
           </div>
           <div style={S.card}>
@@ -3731,11 +3671,6 @@ Keep it punchy, sharp, and directly actionable.`;
       <style>{CSS}</style>
       {renderBackgroundOrbs()}
 
-      {/* Confetti Overlay Canvas */}
-      <canvas
-        id="networq-confetti-canvas"
-        style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}
-      />
 
       {/* Cmd + K Command Palette */}
       <CommandPalette
@@ -3920,7 +3855,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     icon: Icons.Radar,
                     onClick: () => {
                       setTab("radar");
-                      triggerConfetti();
+                      successFeedback();
                     },
                     isActive: tab === "radar",
                   },
@@ -4153,7 +4088,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>🕸️</span>
+                  <I.Network size={18} />
                 </button>
               )}
 
@@ -4177,7 +4112,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <Icons.Bell size={isMobile ? 18 : 16} />
                 {notif.unread > 0 ? (
-                  <span aria-hidden="true" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                  <span aria-hidden="true" key={notif.unread} className="nq-badge" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
                     {notif.unread > 9 ? "9+" : notif.unread}
                   </span>
                 ) : (
@@ -4376,19 +4311,19 @@ Keep it punchy, sharp, and directly actionable.`;
                   style={{
                     ...themeStyles.glassCard,
                     borderRadius: 16,
-                    padding: isMobile ? "14px" : "16px 20px",
+                    padding: isMobile ? "14px 12px" : "16px 20px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    gap: 10,
+                    gap: isMobile ? 8 : 10,
                     minWidth: 0,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "'Poppins', sans-serif", color: themeStyles.text, lineHeight: 1.1 }}>
-                      {m.count}
+                    <div style={{ fontSize: 26, fontWeight: 800, color: themeStyles.text, lineHeight: 1.1, minHeight: 29, display: "flex", alignItems: "center" }}>
+                      {contactsLoading ? <Skeleton w={30} h={24} r={6} /> : m.count}
                     </div>
-                    <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontSize: isMobile ? "clamp(11px, 3.3vw, 13px)" : 13, letterSpacing: "-0.01em", color: themeStyles.textMuted, marginTop: 4, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {m.label}
                     </div>
                   </div>
@@ -4476,8 +4411,9 @@ Keep it punchy, sharp, and directly actionable.`;
                     </div>
                   </div>
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
-                <div style={{ position: "relative", flex: isMobile ? "1 1 100%" : "none" }}>
+              {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
+                <div style={{ position: "relative", flex: "1 1 220px", minWidth: 0 }}>
                   <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
                     <Icons.Search size={15} />
                   </span>
@@ -4485,7 +4421,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     placeholder="Search by name, company, role…"
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
-                    style={{ ...S.input, width: isMobile ? "100%" : 240, paddingLeft: 38, fontSize: 13 }}
+                    style={{ ...S.input, width: "100%", minHeight: isMobile ? 44 : 40, paddingLeft: 38, fontSize: isMobile ? 15 : 13 }}
                   />
                   {searchQ && (
                     <span
@@ -4512,6 +4448,8 @@ Keep it punchy, sharp, and directly actionable.`;
                       background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
                       borderRadius: 10,
                       padding: 3,
+                      height: 40,
+                      boxSizing: "border-box",
                     }}
                   >
                     {[
@@ -4545,38 +4483,28 @@ Keep it punchy, sharp, and directly actionable.`;
                   style={{
                     ...S.btn,
                     fontSize: 13,
-                    padding: "9px 15px",
+                    padding: "0 16px",
+                    minHeight: isMobile ? 44 : 40,
                     background: isDark ? "#A78BFA" : "#7C3AED",
                   }}
                   onClick={openBulkFollowUpModal}
                   title="Generate & Dispatch Automated Follow-ups"
                 >
                   <Icons.Mail size={14} />
-                  <span>{isMobile ? "Follow-ups" : "⚡ 1-Click Follow-ups"}</span>
+                  <span>{isMobile ? "Follow-ups" : "1-Click Follow-ups"}</span>
                 </button>
 
                 {!contactsLoading && contacts.length > 0 && (
                   <button
-                    style={{ ...S.btnOutline, fontSize: 13, padding: "9px 14px" }}
+                    style={{ ...S.btnOutline, fontSize: 13, padding: 0, width: isMobile ? 44 : 40, minHeight: isMobile ? 44 : 40 }}
                     onClick={exportCSV}
+                    aria-label={`Export ${filtered.length} contacts`}
                     title={`Export ${filtered.length} contacts`}
                   >
-                    <Icons.Download size={14} />
-                    {!isMobile && <span>Export ({filtered.length})</span>}
+                    <Icons.Download size={16} />
                   </button>
                 )}
 
-                <button
-                  style={{ ...S.btn, fontSize: 13, padding: "9px 16px" }}
-                  onClick={() => {
-                    setTab("add");
-                    setAddStep("form");
-                    setScanPreview(null);
-                  }}
-                >
-                  <Icons.Plus size={15} />
-                  <span>{isMobile ? "Add" : "Add Contact"}</span>
-                </button>
               </div>
             </div>
 
@@ -4758,9 +4686,17 @@ Keep it punchy, sharp, and directly actionable.`;
 
             {/* Contacts Table / Cards */}
             {contactsLoading ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`, borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
-                <div style={{ color: themeStyles.textMuted, fontSize: 13 }}>Loading relationships…</div>
+              <div role="status" aria-label="Loading contacts" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} style={{ ...S.card, padding: 16, display: "flex", alignItems: "center", gap: 14 }}>
+                    <Skeleton w={44} h={44} r={22} />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <Skeleton w={`${55 - i * 6}%`} h={14} />
+                      <Skeleton w={`${38 + i * 5}%`} h={11} />
+                    </div>
+                    <Skeleton w={56} h={24} r={12} />
+                  </div>
+                ))}
               </div>
             ) : filtered.length === 0 ? (
               <div style={{ ...S.card, textAlign: "center", padding: "50px 20px" }}>
@@ -4875,7 +4811,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 </div>
                               </div>
                             </td>
-                            <td style={{ padding: "12px 16px", fontWeight: 500 }}>
+                            <td style={{ padding: "12px 16px", fontWeight: 500, whiteSpace: "nowrap" }}>
                               {c.company || <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
@@ -4891,7 +4827,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>
                               )}
                             </td>
-                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 12 }}>
+                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 12, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                               {c.phone || <span style={{ opacity: 0.4 }}>—</span>}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
@@ -5092,7 +5028,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Poppins', sans-serif", color: themeStyles.text }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: themeStyles.text }}>
                       {selectedContact.name}
                     </div>
                     <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, fontWeight: 500 }}>
@@ -5183,16 +5119,16 @@ Keep it punchy, sharp, and directly actionable.`;
               {activeDetailTab === "overview" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <p style={{ fontSize: 13, color: themeStyles.textMuted, lineHeight: 1.5, margin: 0 }}>
-                    {selectedContact.bio || selectedContact.notes || "Designing intuitive experiences that bring people and ideas closer."}
+                    {selectedContact.bio || [selectedContact.title, selectedContact.company].filter(Boolean).join(" at ") || "No details yet."}
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius: 12, padding: "10px 12px" }}>
                       <div style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-                        <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Last connected
+                        <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Added
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
-                        {selectedContact.lastConnected || "3 days ago"}
+                        {selectedContact.addedAt ? relativeDay(selectedContact.addedAt) : "—"}
                       </div>
                     </div>
 
@@ -5201,17 +5137,18 @@ Keep it punchy, sharp, and directly actionable.`;
                         <Icons.Calendar size={12} color="#10B981" /> Next follow-up
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
-                        {selectedContact.followUpDue || "In 2 days"}
+                        {selectedContact.reminderDate && !selectedContact.reminderDone ? relativeDay(selectedContact.reminderDate) : <span style={{ color: themeStyles.textMuted, fontWeight: 500 }}>Not set</span>}
                       </div>
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                      Shared Interests
+                      Tags
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {(selectedContact.sharedInterests || selectedContact.tags || ["Product", "Design", "Startups"]).map((tag: string) => (
+                      {(selectedContact.tags || []).length === 0 && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>No tags yet</span>}
+                      {(selectedContact.tags || []).map((tag: string) => (
                         <span
                           key={tag}
                           style={{
@@ -5235,7 +5172,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       Notes
                     </div>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 12, color: themeStyles.text, lineHeight: 1.5 }}>
-                      {selectedContact.notes || "Great conversation about the future of collaborative tools."}
+                      {selectedContact.reference || selectedContact.notes || <span style={{ color: themeStyles.textMuted }}>No notes yet. Add them from Edit contact.</span>}
                     </div>
                   </div>
                 </div>
@@ -5247,22 +5184,29 @@ Keep it punchy, sharp, and directly actionable.`;
                     <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                       Relationship Stages
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, textAlign: "center" }}>
-                      <div style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ✓ MEET
-                      </div>
-                      <div style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ✓ REMEMBER
-                      </div>
-                      <div style={{ background: isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.12)", color: isDark ? "#A78BFA" : "#7C3AED", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ➔ RECONNECT
-                      </div>
-                    </div>
+                    {(() => {
+                      // Real stages from the contact record: met (saved), remembered (has notes/tags), reconnected (follow-up sent)
+                      const stages = [
+                        { label: "Met", done: true },
+                        { label: "Remembered", done: !!(selectedContact.reference || selectedContact.notes || (selectedContact.tags || []).length) },
+                        { label: "Reconnected", done: !!selectedContact.emailSent },
+                      ];
+                      return (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, textAlign: "center" }}>
+                          {stages.map((st) => (
+                            <div key={st.label} style={{ background: st.done ? "rgba(52, 199, 89, 0.15)" : isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: st.done ? "#34C759" : themeStyles.textMuted, borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
+                              {st.done && <I.Check size={12} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: "-2px" }} />}
+                              {st.label}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }}>
-                    <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Connection Health</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED" }}>{selectedContact.momentum || 88}/100 · High Engagement</span>
+                    <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Follow-up email</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: selectedContact.emailSent ? "#34C759" : themeStyles.textMuted }}>{selectedContact.emailSent ? "Sent" : "Not sent yet"}</span>
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -5286,33 +5230,40 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {activeDetailTab === "notes" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <textarea
-                    defaultValue={selectedContact.notes || ""}
-                    placeholder="Log conversation context or key takeaways…"
-                    style={{ ...S.input, minHeight: 90, fontSize: 12, resize: "vertical" }}
-                  />
-                  <button
-                    onClick={() => openEmail(selectedContact)}
-                    style={{ ...S.btnSm, background: "linear-gradient(135deg, #7C43F8, #6D35F5)", color: "#fff", padding: "8px 14px" }}
-                  >
-                    <Icons.Sparkles size={13} />
-                    <span>AI Follow-Up Assistant</span>
-                  </button>
+                  <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.5, minHeight: 64, color: selectedContact.reference || selectedContact.notes ? themeStyles.text : themeStyles.textMuted }}>
+                    {selectedContact.reference || selectedContact.notes || "No notes yet."}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => openEdit(selectedContact)} style={{ ...S.btnSmOut, padding: "8px 14px" }}>
+                      <Icons.Edit size={13} />
+                      <span>Edit notes</span>
+                    </button>
+                    <button onClick={() => openEmail(selectedContact)} style={{ ...S.btnSm, padding: "8px 14px" }}>
+                      <Icons.Sparkles size={13} />
+                      <span>Write follow-up</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {activeDetailTab === "opportunities" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}` }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text }}>Product Design Advisory</div>
-                    <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 3 }}>Potential advisory alignment for collaborative software tool stack.</div>
+              {activeDetailTab === "opportunities" && (() => {
+                const opps = (selectedContact.tags || []).filter((t: string) => /opportunity|client|deal|investor|partner|lead/i.test(t));
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {opps.length ? (
+                      opps.map((t: string) => (
+                        <div key={t} style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}`, fontSize: 13, fontWeight: 600 }}>
+                          {t}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "18px 8px", color: themeStyles.textMuted, fontSize: 13, lineHeight: 1.5 }}>
+                        No opportunities yet. Tag this contact "opportunity", "client", "deal" or "partner" to track it here.
+                      </div>
+                    )}
                   </div>
-                  <div style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}` }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text }}>Tech & Design Meetup Host</div>
-                    <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 3 }}>Co-hosting community session during next tech week.</div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
@@ -5412,8 +5363,8 @@ Keep it punchy, sharp, and directly actionable.`;
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {([
-                { key: "scan", label: "SCAN NOW", sub: "Use camera directly", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
-                { key: "upload", label: "UPLOAD", sub: "Single or multi-card", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
+                { key: "scan", label: "Scan", sub: "Use camera", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
+                { key: "upload", label: "Upload", sub: "From photos", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
               ] as const).map((b) => (
                 <button
                   key={b.key}
@@ -5480,19 +5431,22 @@ Keep it punchy, sharp, and directly actionable.`;
                   padding: "6px 12px",
                 }}
               >
-                ⚡ Open Batch Multi-Card Queue (Process up to 25 cards) →
+                <I.Zap size={14} style={{ marginRight: 4, verticalAlign: "-2px" }} />Batch scan up to 25 cards
               </button>
             </div>
 
             {(scanning || scanPreview || scanErr) && (
               <div style={{ ...S.card, marginTop: 16, textAlign: "center" }}>
                 {scanPreview && (
-                  <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, borderRadius: 12, maxWidth: "100%", marginBottom: scanning || scanErr ? 14 : 0 }} />
+                  <div className="nq-pop" style={{ position: "relative", display: "inline-block", maxWidth: "100%", borderRadius: 12, overflow: "hidden", marginBottom: scanning || scanErr ? 14 : 0 }}>
+                    <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, maxWidth: "100%", display: "block", filter: scanning ? "saturate(0.85) brightness(0.92)" : "none", transition: "filter 0.3s ease" }} />
+                    {scanning && <span className="nq-scanline" aria-hidden />}
+                  </div>
                 )}
                 {scanning && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
-                    <span style={{ width: 18, height: 18, border: "2px solid rgba(124,58,237,0.25)", borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                    Reading card…
+                  <div role="status" style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
+                    Reading the card…
+                    <div style={{ color: themeStyles.textMuted, fontWeight: 400, fontSize: 12, marginTop: 4 }}>Usually takes a few seconds</div>
                   </div>
                 )}
                 {scanErr && (
@@ -5538,7 +5492,7 @@ Keep it punchy, sharp, and directly actionable.`;
         {/* ── ADD CONTACT TAB ── */}
         {tab === "add" && (
           <div style={{ maxWidth: 620, margin: "0 auto" }}>
-            <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28, marginBottom: 4 }}>
+            <h2 style={{ fontSize: 28, marginBottom: 4 }}>
               {editingContact ? "Edit Contact" : addStep === "form" ? "New Contact" : "Review Extracted Info"}
             </h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
@@ -5650,7 +5604,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         padding: 0,
                       }}
                     >
-                      ⚡ Enrich Intel
+                      <I.Sparkles size={12} style={{ marginRight: 3, verticalAlign: "-2px" }} />Enrich
                     </button>
                   </div>
                   <input
@@ -5867,7 +5821,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <ContactAvatar contact={modal} size={50} radius={14} isDark={isDark} />
                 <div>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 24 }}>{modal.name}</div>
+                  <div style={{ fontSize: 24 }}>{modal.name}</div>
                   <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 1 }}>
                     {[modal.title, modal.company].filter(Boolean).join(" · ")}
                   </div>
@@ -5913,7 +5867,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     cursor: "pointer",
                   }}
                 >
-                  {prepLoading ? "Analyzing…" : prepBrief ? "Re-generate" : "Generate Brief ⚡"}
+                  {prepLoading ? "Analyzing…" : prepBrief ? "Re-generate" : "Generate brief"}
                 </button>
               </div>
 
@@ -6093,7 +6047,7 @@ Keep it punchy, sharp, and directly actionable.`;
           onSent={(id) => {
             setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, emailSent: true } : c)));
             setOutreachKey((k) => k + 1);
-            triggerConfetti();
+            successFeedback();
           }}
         />
       )}
@@ -6119,7 +6073,7 @@ Keep it punchy, sharp, and directly actionable.`;
         >
           <div style={{ ...S.card, maxWidth: 460, width: "100%", maxHeight: "min(90dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Schedule Meeting</div>
+              <div style={{ fontSize: 22 }}>Schedule Meeting</div>
               <button aria-label="Close" onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
@@ -6128,7 +6082,7 @@ Keep it punchy, sharp, and directly actionable.`;
             {meetSent ? (
               <div style={{ textAlign: "center", padding: "32px 0" }}>
                 <Icons.CheckCircle size={44} style={{ margin: "0 auto 10px" }} />
-                <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Invite Sent</div>
+                <div style={{ fontSize: 22 }}>Invite Sent</div>
                 <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Meeting invite delivered to {meetModal.email}</div>
               </div>
             ) : (
@@ -6453,8 +6407,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   {bulkSending
                     ? "Dispatching Follow-ups…"
                     : bulkDrafts.every((d) => d.status === "sent")
-                    ? "All Follow-ups Sent ✓"
-                    : `⚡ Send All via Email (1-Click · ${bulkDrafts.filter((d) => d.status !== "sent").length})`}
+                    ? "All follow-ups sent"
+                    : `Send all by email (${bulkDrafts.filter((d) => d.status !== "sent").length})`}
                 </span>
               </button>
             </div>
@@ -6631,7 +6585,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   fontWeight: 600,
                 }}
               >
-                ✕
+                <I.X size={18} />
               </button>
             </div>
           </div>
@@ -6997,17 +6951,19 @@ Keep it punchy, sharp, and directly actionable.`;
           contacts={contacts}
           isDark={isDark}
           onSendIntroRequest={async (connectorId, targetName, targetCompany, note) => {
-            await supabase.from("connection_requests").insert({
-              from_user: currentUser?.id,
-              to_user: connectorId,
-              status: "pending",
-            });
+            // A real ask: a drafted email to your mutual contact, opened in your mail app to review and send
+            const connector = contacts.find((c) => c.id === connectorId);
+            if (!connector?.email) throw new Error(`${connector?.name || "This contact"} has no email address. Add one to ask for an intro.`);
+            const first = (connector.name || "").split(" ")[0] || "there";
+            const target = targetCompany ? `${targetName} at ${targetCompany}` : targetName;
+            const body = `Hi ${first},\n\nWould you be open to introducing me to ${target}?${note ? `\n\n${note}` : ""}\n\nHappy to send a short blurb you can forward. Thanks!\n\n${currentUser?.name || ""}`;
+            window.location.href = `mailto:${encodeURIComponent(connector.email)}?subject=${encodeURIComponent(`Intro to ${targetName}?`)}&body=${encodeURIComponent(body)}`;
           }}
           showToast={showToast}
         />
       )}
 
-      {/* ── NETWORKING DAY SUMMARY (Part 40) ── */}
+      {/* ── NETWORKING DAY SUMMARY ── */}
       {daySummaryOpen && (
         <NetworkingDaySummaryModal
           open={daySummaryOpen}
@@ -7016,12 +6972,10 @@ Keep it punchy, sharp, and directly actionable.`;
           isDark={isDark}
           callAI={callAI}
           onScheduleReminder={async (cId, d, n) => {
-            await supabase.from("reminders").insert({
-              user_id: currentUser?.id,
-              contact_id: cId,
-              due_date: d,
-              note: n,
-            });
+            // Sets the contact's follow-up reminder (emailed + pushed by the reminder engine when due)
+            const { error } = await supabase.from("contacts").update({ reminder: n || "Follow up", reminder_date: d, reminder_done: false }).eq("id", cId);
+            if (error) throw new Error("Couldn't save the reminder. Please try again.");
+            setContacts((prev) => prev.map((c) => (c.id === cId ? { ...c, reminder: n || "Follow up", reminderDate: d, reminderDone: false } : c)));
           }}
           onDraftEmail={(c) => {
             setDaySummaryOpen(false);
@@ -7031,7 +6985,7 @@ Keep it punchy, sharp, and directly actionable.`;
         />
       )}
 
-      {/* ── GLOBAL PROFESSIONAL SEARCH (Part 60) ── */}
+      {/* ── GLOBAL SEARCH ── */}
       {globalSearchOpen && (
         <GlobalSearchModal
           open={globalSearchOpen}

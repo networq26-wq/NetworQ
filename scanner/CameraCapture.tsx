@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 // Full-screen, iOS-style card camera: live viewfinder, card-shaped guide with corner
@@ -101,7 +102,7 @@ export function CameraCapture({
           aria-label="Close camera"
           style={{ width: 36, height: 36, borderRadius: 18, border: "none", background: "rgba(255,255,255,0.16)", color: "#FFF", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
-          ✕
+          <I.X size={18} />
         </button>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Scan card</div>
         <div style={{ width: 36 }} />
@@ -132,6 +133,7 @@ export function CameraCapture({
                 {corner({ top: 0, right: 0 }, { borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 16 })}
                 {corner({ bottom: 0, left: 0 }, { borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 16 })}
                 {corner({ bottom: 0, right: 0 }, { borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 16 })}
+                {ready && <span className="nq-scanline" aria-hidden />}
               </div>
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 20, textAlign: "center", pointerEvents: "none" }}>

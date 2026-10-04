@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 interface NetworkMapModalProps {
@@ -101,7 +102,7 @@ export function NetworkMapModal({
         >
           <div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
-              🕸️ Professional Network Map (Part 11)
+              Your network map
             </h3>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: isDark ? "#94A3B8" : "#64748B" }}>
               Visualizing Me → Direct Connections ({contacts.length}) → Companies & Shared Touchpoints
@@ -133,7 +134,7 @@ export function NetworkMapModal({
                 cursor: "pointer",
               }}
             >
-              ✕
+              <I.X size={18} />
             </button>
           </div>
         </div>
@@ -254,13 +255,13 @@ export function NetworkMapModal({
                   onClick={() => setSelectedNode(null)}
                   style={{ background: "transparent", border: "none", color: "#94A3B8", cursor: "pointer" }}
                 >
-                  ✕
+                  <I.X size={18} />
                 </button>
               </div>
 
               {selectedNode.email && (
                 <div style={{ fontSize: 11, color: isDark ? "#94A3B8" : "#64748B", marginTop: 8 }}>
-                  ✉️ {selectedNode.email}
+                  <I.Mail size={14} style={{ marginRight: 6 }} />{selectedNode.email}
                 </div>
               )}
 
@@ -280,7 +281,7 @@ export function NetworkMapModal({
                       cursor: "pointer",
                     }}
                   >
-                    🤝 Request Intro
+                    <I.UserPlus size={15} style={{ marginRight: 6 }} />Request intro
                   </button>
                 )}
                 {onOpenContact && (
@@ -321,7 +322,7 @@ export function NetworkMapModal({
               border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
             }}
           >
-            <span>🏢 Top Companies:</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><I.Building size={14} />Top companies:</span>
             {companyClusters.slice(0, 3).map(([comp, list]) => (
               <span key={comp} style={{ color: "#7C3AED" }}>
                 {comp} ({list.length})

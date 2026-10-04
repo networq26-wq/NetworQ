@@ -1,5 +1,6 @@
 // Settings sections: blocked people, recent devices, help & support, about.
 import React, { useEffect, useState } from "react";
+import { Skeleton } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { disablePush, enablePush, pushStatus, type PushStatus } from "../notifications/pushClient";
 
@@ -28,7 +29,10 @@ export function BlockedUsers({ supabase, t, card, showToast }: { supabase: Supab
       <h3 id="settings-blocked" style={{ margin: "0 0 4px", fontSize: 18 }}>Blocked people</h3>
       <div style={{ color: t.muted, fontSize: 13, marginBottom: 6 }}>Blocked people can't see you on Radar or send you requests, and you won't see them.</div>
       {rows === null ? (
-        <div style={{ color: t.muted, fontSize: 14, padding: "10px 0" }}>Loading…</div>
+        <div role="status" aria-label="Loading blocked people" style={{ display: "flex", flexDirection: "column", gap: 10, padding: "10px 0" }}>
+          <Skeleton w="60%" h={14} />
+          <Skeleton w="40%" h={11} />
+        </div>
       ) : rows.length === 0 ? (
         <div style={{ color: t.muted, fontSize: 14, padding: "10px 0" }}>You haven't blocked anyone.</div>
       ) : (

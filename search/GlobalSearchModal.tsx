@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 interface GlobalSearchModalProps {
@@ -22,8 +23,6 @@ export function GlobalSearchModal({
 }: GlobalSearchModalProps) {
   const [query, setQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | "skills" | "company" | "location">("all");
-  const [remoteResults, setRemoteResults] = useState<any[]>([]);
-  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
 
   // Local contacts matches
   const localMatches = useMemo(() => {
@@ -46,26 +45,6 @@ export function GlobalSearchModal({
 
   if (!open) return null;
 
-  const handleRemoteSearch = async () => {
-    if (!query.trim() || query.length < 2) return;
-    setIsSearchingRemote(true);
-    try {
-      // Query discoverable profiles through Supabase respecting RLS and privacy flags
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name, company, role, avatar_url, location, skills")
-        .or(`name.ilike.%${query}%,company.ilike.%${query}%,role.ilike.%${query}%`)
-        .limit(10);
-
-      if (!error && data) {
-        setRemoteResults(data);
-      }
-    } catch {
-      // Graceful fallback
-    } finally {
-      setIsSearchingRemote(false);
-    }
-  };
 
   return (
     <div
@@ -109,7 +88,7 @@ export function GlobalSearchModal({
             gap: 12,
           }}
         >
-          <span style={{ fontSize: 18 }}>🔍</span>
+          <I.Search size={20} style={{ opacity: 0.55 }} />
           <input
             type="text"
             autoFocus
@@ -117,7 +96,7 @@ export function GlobalSearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleRemoteSearch();
+              if (e.key === "Escape") onClose();
             }}
             style={{
               flex: 1,
@@ -138,7 +117,7 @@ export function GlobalSearchModal({
               cursor: "pointer",
             }}
           >
-            ✕
+            <I.X size={18} />
           </button>
         </div>
 
@@ -176,14 +155,14 @@ export function GlobalSearchModal({
         <div style={{ flex: 1, overflowY: "auto", padding: "16px 24px" }}>
           {query.trim().length === 0 ? (
             <div style={{ textAlign: "center", padding: 48, color: isDark ? "#64748B" : "#94A3B8", fontSize: 14 }}>
-              Type a keyword to search your contacts or discover verified professionals.
+              Search your contacts by name, company, role or tag.
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Local Contacts Section */}
               <div>
                 <div style={{ fontSize: 12, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase", marginBottom: 8 }}>
-                  📇 My Contacts ({localMatches.length})
+                  <I.Contact size={15} style={{ marginRight: 6 }} />My Contacts ({localMatches.length})
                 </div>
                 {localMatches.length === 0 ? (
                   <div style={{ fontSize: 13, color: isDark ? "#64748B" : "#94A3B8", fontStyle: "italic" }}>
@@ -223,57 +202,6 @@ export function GlobalSearchModal({
                 )}
               </div>
 
-              {/* Discoverable Network Section */}
-              {remoteResults.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: "#06B6D4", textTransform: "uppercase", marginBottom: 8 }}>
-                    🌐 Discoverable Professionals
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {remoteResults.map((p) => (
-                      <div
-                        key={p.id}
-                        style={{
-                          padding: "10px 14px",
-                          borderRadius: 14,
-                          background: isDark ? "rgba(255,255,255,0.03)" : "#F8FAFC",
-                          border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E2E8F0"}`,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 700 }}>{p.name}</div>
-                          <div style={{ fontSize: 12, color: isDark ? "#94A3B8" : "#64748B" }}>
-                            {[p.role, p.company].filter(Boolean).join(" · ")}
-                          </div>
-                        </div>
-                        {onRequestConnect && (
-                          <button
-                            onClick={() => {
-                              onRequestConnect(p);
-                              haptic();
-                            }}
-                            style={{
-                              padding: "6px 12px",
-                              borderRadius: 8,
-                              border: "none",
-                              background: "#06B6D4",
-                              color: "#FFF",
-                              fontSize: 11,
-                              fontWeight: 700,
-                              cursor: "pointer",
-                            }}
-                          >
-                            + Connect
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
