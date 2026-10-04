@@ -1,7 +1,8 @@
 import { test, expect, login, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
 
-const DESKTOP_SCREENS = ["All Contacts", "Roles & Taxonomy", "1-Click Follow-ups", "Card Scanner", "Proximity Radar", "Events Hub", "Digital Pass", "Add Contact"];
-const MOBILE_SCREENS = ["Contacts", "Events", "Radar", "Scan", "Pass", "Add"];
+const DESKTOP_SCREENS = ["All Contacts", "Roles & Taxonomy", "1-Click Follow-ups", "Card Scanner", "Proximity Radar", "Events Hub", "Me", "Add Contact"];
+// Phone: bottom bar (People · Messages · Radar · Events) plus the home quick actions
+const MOBILE_SCREENS = ["Events", "Radar", "Messages", "People", "Type it in", "People", "My QR"];
 
 async function noHorizontalScroll(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -144,7 +145,7 @@ test("Digital Pass QR is generated on-device (no profile data sent to third part
   });
   await login(page, "asha@acme.test");
   const nav = isMobileProject() ? page.locator("body") : page.getByRole("complementary");
-  await nav.getByRole("button", { name: isMobileProject() ? /^Pass$/ : /^Digital Pass/ }).last().click();
+  await nav.getByRole("button", { name: isMobileProject() ? /^My QR$/ : /^Me$/ }).last().click();
   const qr = page.getByRole("img", { name: "QR Code" });
   await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);
   expect(external.filter((u) => u.includes("qrserver"))).toEqual([]);

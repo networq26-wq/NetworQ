@@ -16,7 +16,7 @@ test("new structure", async ({ page }) => {
   await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Messages", exact: true }).click();
   await page.waitForTimeout(1500);
   await page.screenshot({ path: "qa-logs/ia-3-messages.png" });
-  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Me", exact: true }).click();
+  await page.getByRole("button", { name: "Profile & Settings" }).first().click();
   await page.waitForTimeout(1200);
   await page.screenshot({ path: "qa-logs/ia-4-me.png" });
   await page.screenshot({ path: "qa-logs/ia-4b-me-full.png", fullPage: true });

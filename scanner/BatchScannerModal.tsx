@@ -378,6 +378,7 @@ export function BatchScannerModal({
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
                       <span
                         style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                           fontSize: 10,
                           fontWeight: 700,
                           padding: "2px 6px",

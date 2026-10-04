@@ -283,7 +283,7 @@ export function LazyVoiceDebriefModal({
               <I.Mic size={22} />
             </span>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 800 }}>Lazy Voice Debrief</div>
+              <div style={{ fontSize: 16, fontWeight: 800 }}>Voice note</div>
               <div style={{ fontSize: 11, color: textMuted }}>Speak for 10s · AI saves contact, sets reminder & drafts email</div>
             </div>
           </div>
@@ -450,6 +450,7 @@ export function LazyVoiceDebriefModal({
                       <span
                         key={idx}
                         style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                           fontSize: 11,
                           fontWeight: 600,
                           padding: "2px 8px",

@@ -24,6 +24,7 @@ import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
+import { WhoNext, GroupMessageSheet } from "./people/PeopleExtras";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
@@ -158,111 +159,20 @@ interface IconProps {
 }
 
 const Icons = {
+  // The official Q mark (your artwork, not a redraw) with the scan beam moving inside the Q's opening.
+  // White artwork is used when asked for a white mark (on purple/dark buttons).
   Logo: ({
     size = 28,
     style,
     color,
-    gradient = false,
     scanning = true,
   }: IconProps & { color?: string; gradient?: boolean; scanning?: boolean }) => {
-    const brandColor = color || "#7C3AED";
+    const white = !!color && /^#?f{3,6}$/i.test(color.replace("#", ""));
     return (
-      <svg
-        width={size}
-        height={Math.round((size * 551) / 548)}
-        viewBox="0 0 548 551"
-        fill="none"
-        style={{ overflow: "visible", display: "inline-block", verticalAlign: "middle", ...style }}
-      >
-        <defs>
-          <linearGradient id="qPurpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8B5CF6" />
-            <stop offset="100%" stopColor="#6D28D9" />
-          </linearGradient>
-
-          <linearGradient id="qLaserGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(192, 132, 252, 0)" />
-            <stop offset="25%" stopColor="#C084FC" />
-            <stop offset="50%" stopColor="#FFFFFF" />
-            <stop offset="75%" stopColor="#38BDF8" />
-            <stop offset="100%" stopColor="rgba(56, 189, 248, 0)" />
-          </linearGradient>
-
-          <linearGradient id="qBeamWash" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
-            <stop offset="60%" stopColor="rgba(168, 85, 247, 0.2)" />
-            <stop offset="100%" stopColor="rgba(56, 189, 248, 0.4)" />
-          </linearGradient>
-
-          <filter id="qLaserGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
-          <clipPath id="qInnerCavityClip">
-            <rect x="115" y="115" width="284" height="88" rx="8" />
-            <rect x="115" y="284" width="264" height="88" rx="8" />
-          </clipPath>
-        </defs>
-
-        {/* Left bracket (Capture) - exact PDF vector */}
-        <path
-          d="M 115.08 352.76 C 115.08 363.63, 123.89 372.44, 134.76 372.44 L 216 372.44 L 216 487.53 L 107.59 487.53 C 48.17 487.53, 0 439.36, 0 379.94 L 0 107.57 C 0 48.17, 48.17 0, 107.59 0 L 216 0 L 216 115.08 L 134.76 115.08 C 123.89 115.08, 115.08 123.87, 115.08 134.74 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#361DD9")}
-        />
-        {/* Right bracket with Q tail (Continuity) - exact PDF vector */}
-        <path
-          d="M 468.55 467.77 L 548.05 550.87 L 426.92 550.87 L 365.37 487.53 L 298.01 413.36 L 260.86 372.44 L 379.27 372.44 C 390.12 372.44, 398.93 363.63, 398.93 352.76 L 398.93 134.74 C 398.93 123.87, 390.12 115.08, 379.27 115.08 L 298.01 115.08 L 298.01 0 L 406.43 0 C 465.85 0, 514.01 48.17, 514.01 107.57 L 514.01 379.94 C 514.01 416.22, 496.05 448.31, 468.55 467.77 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#5E35F5")}
-        />
-        {/* Center connector bar (Connection) - exact PDF vector */}
-        <rect
-          x="115.08"
-          y="202.75"
-          width="283.85"
-          height="82.01"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#715DFC")}
-        />
-
-        {/* ── SCANNER BEAM INSIDE THE Q CAVITY ── */}
-        {scanning && (
-          <g clipPath="url(#qInnerCavityClip)">
-            {/* Trailing beam wash */}
-            <rect x="110" y="115" width="290" height="34" fill="url(#qBeamWash)">
-              <animate attributeName="y" values="115;338;115" dur="2.2s" repeatCount="indefinite" />
-            </rect>
-
-            {/* Glowing laser scanning bar */}
-            <line
-              x1="115"
-              y1="118"
-              x2="399"
-              y2="118"
-              stroke="url(#qLaserGrad)"
-              strokeWidth="7"
-              strokeLinecap="round"
-              filter="url(#qLaserGlow)"
-            >
-              <animate attributeName="y1" values="118;366;118" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="y2" values="118;366;118" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.75;1;0.75" dur="2.2s" repeatCount="indefinite" />
-            </line>
-
-            {/* Radar scanner ripple blips inside Q apertures */}
-            <circle cx="257" cy="159" r="6" fill="#C084FC" opacity="0.6">
-              <animate attributeName="r" values="3;34;3" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.8;0;0.8" dur="2.2s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="247" cy="328" r="6" fill="#38BDF8" opacity="0.5">
-              <animate attributeName="r" values="3;30;3" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.7;0;0.7" dur="2.2s" repeatCount="indefinite" />
-            </circle>
-          </g>
-        )}
-      </svg>
+      <span style={{ position: "relative", display: "inline-block", width: size, height: Math.round((size * 258) / 256), verticalAlign: "middle", flexShrink: 0, ...style }}>
+        <img src={white ? "/brand/networq-q-white.png" : "/brand/networq-q.png"} alt="" aria-hidden draggable={false} style={{ width: "100%", height: "100%", display: "block" }} />
+        {scanning && <span className="nq-qscan" aria-hidden style={{ left: "21.6%", width: "49.8%", top: "21.9%", height: "44.6%" }}><i /></span>}
+      </span>
     );
   },
   FileText: ({ size = 16, color = "currentColor", style }: IconProps) => (
@@ -302,27 +212,14 @@ const Icons = {
       <line x1="17" y1="9" x2="23" y2="15" />
     </svg>
   ),
+  // The official NetworQ wordmark (your artwork). Dark mode uses the white version. The beam scans inside the Q.
   Wordmark: ({ size = 26, isDark = false, style, scanning = true }: { size?: number; isDark?: boolean; style?: React.CSSProperties; scanning?: boolean }) => {
-    const textColor = isDark ? "#F5F5F7" : "#1D1D1F";
+    const h = Math.round(size * 1.05);
     return (
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: Math.max(2, Math.round(size * 0.05)),
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
-          fontWeight: 700,
-          fontSize: size,
-          letterSpacing: "-0.03em",
-          color: textColor,
-          userSelect: "none",
-          lineHeight: 1,
-          ...style,
-        }}
-      >
-        <span>Networ</span>
-        <Icons.Logo size={Math.round(size * 0.94)} scanning={scanning} />
-      </div>
+      <span role="img" aria-label="NetworQ" style={{ position: "relative", display: "inline-block", height: h, width: Math.round((h * 957) / 192), flexShrink: 0, userSelect: "none", lineHeight: 0, ...style }}>
+        <img src={isDark ? "/brand/networq-wordmark-white.png" : "/brand/networq-wordmark.png"} alt="" aria-hidden draggable={false} style={{ height: "100%", width: "100%", display: "block" }} />
+        {scanning && <span className="nq-qscan" aria-hidden style={{ left: "84.4%", width: "9.9%", top: "21.9%", height: "44.6%" }}><i /></span>}
+      </span>
     );
   },
   Home: ({ size = 16, color = "currentColor", style }: IconProps) => (
@@ -869,14 +766,15 @@ function generateExecutiveFollowUp(fromUser: any, toContact: any, customAngle?: 
   const firstName = (toContact?.name || "there").split(" ")[0];
   const myName = fromUser?.name || "Me";
   const myCompany = fromUser?.company ? ` at ${fromUser.company}` : "";
-  const event = toContact?.event ? ` at ${toContact.event}` : "";
+  const evName = toContact?.event && !/^nearby$/i.test(String(toContact.event).trim()) ? toContact.event : "";
+  const event = evName ? ` at ${evName}` : "";
   const notes = toContact?.reference ? ` I really enjoyed our discussion regarding ${toContact.reference}.` : "";
   const angle = customAngle ? ` Specifically, I wanted to follow up on ${customAngle}.` : "";
 
   const subject = `Great connecting with you${event}`;
   const body = `Hi ${firstName},
 
-It was a pleasure meeting you${event ? ` at ${toContact.event}` : " recently"}.${notes}${angle}
+It was a pleasure meeting you${event || " recently"}.${notes}${angle}
 
 I wanted to follow up and see how things are progressing with ${toContact?.company || "your team's priorities"}. I would love to find time for a brief 15-minute conversation to explore mutual collaboration.
 
@@ -1175,7 +1073,7 @@ function CommandPalette({
               
             }}
           />
-          <span style={{ fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
             ESC
           </span>
         </div>
@@ -1372,6 +1270,13 @@ function NetworQApp() {
   const [outreachKey, setOutreachKey] = useState(0);
   const [meetModal, setMeetModal] = useState<any>(null);
   const [bulkEmailModalOpen, setBulkEmailModalOpen] = useState(false);
+  // Select several people, then email or message them all at once
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [groupMessageOpen, setGroupMessageOpen] = useState(false);
+  useEffect(() => {
+    if (tab !== "contacts") { setSelectMode(false); setSelectedIds(new Set()); }
+  }, [tab]);
   const [bulkDrafts, setBulkDrafts] = useState<any[]>([]);
   const [bulkSending, setBulkSending] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
@@ -1914,6 +1819,8 @@ VOICE & ASSISTANT DIRECTIVES:
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
     if (tab === "me" && meSection) return setMeSection(null), true;
+    if (groupMessageOpen) return setGroupMessageOpen(false), true;
+    if (selectMode) return setSelectMode(false), setSelectedIds(new Set()), true;
     if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
     const prev = tabHistory.current.pop();
     if (screen === "app" && prev) {
@@ -2649,14 +2556,14 @@ Keep it punchy, sharp, and directly actionable.`;
     return "Other";
   }, []);
 
-  const openBulkFollowUpModal = () => {
-    const withEmail = effectiveContacts.filter((c) => c.email);
+  const openBulkFollowUpModal = (picked?: any[]) => {
+    const withEmail = (picked || effectiveContacts).filter((c) => c.email);
     if (!withEmail.length) {
-      showToast("No contacts with email addresses available.", "error");
+      showToast(picked ? "None of the people you picked have an email address." : "No contacts with email addresses available.", "error");
       return;
     }
     const unemailed = withEmail.filter((c) => !c.emailSent);
-    const targets = unemailed.length > 0 ? unemailed : withEmail;
+    const targets = picked ? withEmail : unemailed.length > 0 ? unemailed : withEmail;
 
     const drafts = targets.map((c) => {
       const draft = generateExecutiveFollowUp(currentUser, c);
@@ -2920,6 +2827,11 @@ Keep it punchy, sharp, and directly actionable.`;
     @keyframes nqScan { 0% { transform: translateY(6%); } 50% { transform: translateY(92%); } 100% { transform: translateY(6%); } }
     .nq-scanline { position: absolute; left: 5%; right: 5%; top: 0; height: 100%; pointer-events: none; animation: nqScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
     .nq-scanline::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #C4B5FD, transparent); box-shadow: 0 0 14px 2px rgba(167, 139, 250, 0.55); }
+    .nq-qscan { position: absolute; overflow: hidden; pointer-events: none; border-radius: 2px; }
+    .nq-qscan > i { position: absolute; left: 0; right: 0; top: 0; height: 100%; animation: nqQScan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .nq-qscan > i::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 60%; background: linear-gradient(180deg, rgba(113, 93, 252, 0), rgba(113, 93, 252, 0.28)); }
+    .nq-qscan > i::after { content: ""; position: absolute; left: -10%; right: -10%; top: 0; height: max(1.5px, 8%); border-radius: 2px; background: linear-gradient(90deg, rgba(94, 53, 245, 0), #715DFC 25%, #E9E4FF 50%, #715DFC 75%, rgba(94, 53, 245, 0)); box-shadow: 0 0 6px 1px rgba(94, 53, 245, 0.55); }
+    @keyframes nqQScan { 0% { transform: translateY(0); } 50% { transform: translateY(100%); } 100% { transform: translateY(0); } }
     @keyframes nqSpinOnce { to { transform: rotate(360deg); } }
     .nq-spin { animation: nqSpinOnce 0.9s linear infinite; }
     img.nq-fade { opacity: 0; transition: opacity 0.3s ease; } img.nq-fade.is-loaded { opacity: 1; }
@@ -3068,21 +2980,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ textAlign: "center", zIndex: 1, animation: "fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)", padding: 24 }}>
-          {/* Prominent Signature Purple Logo with Laser Scanner inside Q */}
-          <div
-            style={{
-              margin: "0 auto 24px",
-              display: "inline-flex",
-              padding: 22,
-              borderRadius: 32,
-              background: isDark ? "rgba(124, 58, 237, 0.1)" : "rgba(124, 58, 237, 0.06)",
-              border: isDark ? "1px solid rgba(124, 58, 237, 0.25)" : "1px solid rgba(124, 58, 237, 0.18)",
-              boxShadow: "0 24px 48px rgba(124, 58, 237, 0.16)",
-            }}
-          >
-            <Icons.Logo size={88} color="#7C3AED" scanning={true} />
-          </div>
-
+          {/* Splash: the official wordmark alone, with the beam scanning inside the Q */}
           <div style={{ margin: "0 auto 10px" }}>
             <Icons.Wordmark size={44} isDark={isDark} scanning={true} />
           </div>
@@ -3785,6 +3683,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Wordmark size={24} isDark={isDark} />
                 <span
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     fontSize: 10,
                     fontWeight: 700,
                     color: isDark ? "#A78BFA" : "#7C3AED",
@@ -3879,6 +3778,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     {item.count !== undefined && (
                       <span
                         style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                           fontSize: 11,
                           fontWeight: 600,
                           padding: "1px 6px",
@@ -4093,6 +3993,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <button
                   onClick={() => setCommandOpen(true)}
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     position: "absolute",
                     right: 8,
                     top: "50%",
@@ -4312,136 +4213,99 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {tab === "contacts" && (
           <div>
-            {/* ── BRAND DASHBOARD BANNER (Brand Identity Guideline Page 12) ── */}
-            <div
-              style={{
-                ...themeStyles.glassCard,
-                borderRadius: 20,
-                padding: isMobile ? "18px 20px" : "24px 30px",
-                marginBottom: 20,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                position: "relative",
-                overflow: "hidden",
-                border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA"}`,
-                background: isDark ? "#161617" : "#FFFFFF",
-              }}
-            >
-              <div>
-                <h1 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: isMobile ? 22 : 30, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.02em" }}>
-                  {greetingText}
-                </h1>
-                <p style={{ color: themeStyles.textMuted, fontSize: isMobile ? 13 : 14, marginTop: 4, fontWeight: 500, margin: "6px 0 0" }}>
-                  Stronger relationships build brighter opportunities.
-                </p>
-              </div>
-              {!isMobile && (
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: isDark ? "#A78BFA" : "#7C3AED", textTransform: "uppercase" }}>
-                    PEOPLE · POSSIBILITIES · PROGRESS
-                  </div>
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4 }}>
-                    Meaningful connections for a brighter tomorrow
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* ── GREETING: plain text, no box; one live line says what needs you today ── */}
+            <header style={{ margin: isMobile ? "4px 2px 16px" : "4px 2px 20px" }}>
+              <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.025em", lineHeight: 1.15 }}>
+                {greetingText}
+              </h1>
+              <p style={{ color: themeStyles.textMuted, fontSize: 15, margin: "6px 0 0", fontWeight: 400 }}>
+                {contactsLoading
+                  ? "Loading your people…"
+                  : dueReminders.length
+                    ? `${dueReminders.length} follow-up${dueReminders.length === 1 ? "" : "s"} due today`
+                    : effectiveContacts.length
+                      ? "You're all caught up."
+                      : "Scan your first card to get started."}
+              </p>
+            </header>
 
-            {/* ── KPI METRICS CARDS (Brand Identity Guideline Page 12) ── */}
+            {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
             <div
+              role="group"
+              aria-label="At a glance"
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
-                gap: 14,
-                marginBottom: 24,
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                background: isDark ? "#1C1C1E" : "#FFFFFF",
+                border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                borderRadius: 18,
+                padding: "14px 0",
+                marginBottom: 20,
               }}
             >
               {[
-                { count: effectiveContacts.length, label: "People", icon: Icons.Users, color: isDark ? "#A78BFA" : "#7C3AED", bg: isDark ? "rgba(167, 139, 250, 0.12)" : "#EBF5FF" },
-                { count: dueReminders.length, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
-              ].map((m) => (
-                <div
-                  key={m.label}
-                  style={{
-                    ...themeStyles.glassCard,
-                    borderRadius: 16,
-                    padding: isMobile ? "14px 12px" : "16px 20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: isMobile ? 8 : 10,
-                    minWidth: 0,
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 26, fontWeight: 800, color: themeStyles.text, lineHeight: 1.1, minHeight: 29, display: "flex", alignItems: "center" }}>
-                      {contactsLoading ? <Skeleton w={30} h={24} r={6} /> : m.count}
-                    </div>
-                    <div style={{ fontSize: isMobile ? "clamp(11px, 3.3vw, 13px)" : 13, letterSpacing: "-0.01em", color: themeStyles.textMuted, marginTop: 4, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {m.label}
-                    </div>
+                { count: effectiveContacts.length, label: "People" },
+                { count: dueReminders.length, label: "Follow-ups", accent: dueReminders.length > 0 },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
+              ].map((m, i) => (
+                <div key={m.label} style={{ textAlign: "center", minWidth: 0, padding: "0 4px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
+                    {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
                   </div>
-                  <div
-                    style={{
-                      width: isMobile ? 36 : 42,
-                      height: isMobile ? 36 : 42,
-                      borderRadius: 12,
-                      background: m.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <m.icon size={20} color={m.color} />
-                  </div>
+                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
                 </div>
               ))}
             </div>
 
-            {/* ── QUICK ACTIONS: the app's main jobs, one tap each (scrolls sideways on phones) ── */}
-            <section aria-label="Quick actions" style={{ marginBottom: 24 }}>
-              <div className="nq-chips" style={{ display: "flex", gap: 10, overflowX: "auto", scrollSnapType: "x mandatory", scrollPaddingLeft: isMobile ? 16 : 2, scrollPaddingRight: isMobile ? 16 : 2, scrollbarWidth: "none", padding: "2px 2px 6px", margin: isMobile ? "0 -16px" : 0, paddingLeft: isMobile ? 16 : 2, paddingRight: isMobile ? 16 : 2 } as React.CSSProperties}>
-                {[
-                  { label: "Scan a card", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
-                  { label: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
-                  { label: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
-                  { label: "Find nearby", icon: Icons.Radar, act: () => setTab("radar") },
-                  { label: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
-                  { label: "Follow-ups", icon: I.Mail, act: () => openBulkFollowUpModal() },
-                ].map((q) => (
-                  <button
-                    key={q.label}
-                    onClick={q.act}
+            {/* ── QUICK ACTIONS: round icons with short labels — all five fit in one row (Radar lives in the bottom bar) ── */}
+            <section aria-label="Quick actions" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, marginBottom: 28, maxWidth: isMobile ? undefined : 480 }}>
+              {[
+                { label: "Scan", full: "Scan a card", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
+                { label: "Type", full: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+                { label: "Voice", full: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
+                { label: "My QR", full: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
+                { label: "Follow up", full: "Follow-ups", icon: I.Mail, act: () => openBulkFollowUpModal() },
+              ].map((q) => (
+                <button
+                  key={q.label}
+                  onClick={q.act}
+                  aria-label={q.full}
+                  className="btn-press"
+                  style={{ border: "none", background: "none", padding: "4px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: themeStyles.text, minWidth: 0 }}
+                >
+                  <span
+                    aria-hidden
                     style={{
-                      flex: "0 0 auto",
-                      scrollSnapAlign: "start",
-                      width: 96,
-                      minHeight: 96,
-                      borderRadius: 20,
-                      border: q.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-                      background: q.primary ? "#7C3AED" : isDark ? "#1C1C1E" : "#FFFFFF",
-                      color: q.primary ? "#FFFFFF" : themeStyles.text,
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
                       display: "flex",
-                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      gap: 10,
-                      cursor: "pointer",
-                      padding: "12px 6px",
+                      background: q.primary ? "#7C3AED" : isDark ? "#1C1C1E" : "#FFFFFF",
+                      color: q.primary ? "#FFFFFF" : isDark ? "#C4B5FD" : "#7C3AED",
+                      border: q.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                      boxShadow: q.primary ? "0 6px 16px -6px rgba(124,58,237,0.55)" : "none",
                     }}
                   >
-                    <span aria-hidden style={{ width: 40, height: 40, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", background: q.primary ? "rgba(255,255,255,0.18)" : isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: q.primary ? "#FFFFFF" : isDark ? "#C4B5FD" : "#7C3AED" }}>
-                      <q.icon size={20} color="currentColor" />
-                    </span>
-                    <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, textAlign: "center" }}>{q.label}</span>
-                  </button>
-                ))}
-              </div>
+                    <q.icon size={22} color="currentColor" />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2, whiteSpace: "nowrap" }}>{q.label}</span>
+                </button>
+              ))}
             </section>
+
+            {!contactsLoading && (
+              <WhoNext
+                people={effectiveContacts}
+                today={today}
+                isDark={isDark}
+                onOpen={(c) => setModal(c)}
+                onEmail={(c) => openEmail(c)}
+                onMessage={(c) => { setChatPartner({ id: c.linkedUserId, name: c.name, avatar_url: c.photo || null }); setChatEvent(null); setChatOpen(true); }}
+              />
+            )}
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
@@ -4457,13 +4321,22 @@ Keep it punchy, sharp, and directly actionable.`;
                   }}
                 >
                   <div>
-                    <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                      Recent People
+                    <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+                      Your people
                     </h2>
-                    <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4 }}>
+                    <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 2 }}>
                       {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
                     </div>
                   </div>
+                  {!contactsLoading && filtered.length > 0 && (
+                    <button
+                      onClick={() => { setSelectMode((m) => !m); setSelectedIds(new Set()); }}
+                      aria-pressed={selectMode}
+                      style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 16, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "0 4px", alignSelf: "center" }}
+                    >
+                      {selectMode ? "Cancel" : "Select"}
+                    </button>
+                  )}
 
               {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
@@ -4543,7 +4416,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     flex: isMobile ? "1 1 auto" : undefined,
                     background: isDark ? "#A78BFA" : "#7C3AED",
                   }}
-                  onClick={openBulkFollowUpModal}
+                  onClick={() => openBulkFollowUpModal()}
                   title="Generate & Dispatch Automated Follow-ups"
                 >
                   <Icons.Mail size={14} />
@@ -4565,53 +4438,66 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             </div>
 
-            {/* Apple Segmented Roles Filter Chips */}
-            <div style={{ marginBottom: 16, overflowX: "auto", paddingBottom: 2 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
-                  borderRadius: 10,
-                  padding: 3,
-                  gap: 3,
-                }}
-              >
-                {[
-                  { id: "all", label: "All Roles" },
-                  { id: "founders", label: "Founders" },
-                  { id: "investors", label: "Investors" },
-                  { id: "executives", label: "Executives" },
-                  { id: "engineers", label: "Engineers" },
-                  { id: "designers", label: "Designers" },
-                  { id: "consultants", label: "Consultants" },
-                ].map(({ id, label }) => {
-                  const active = selectedRole.toLowerCase() === id.toLowerCase();
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => setSelectedRole(id)}
-                      style={{
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "6px 14px",
-                        fontSize: 12,
-                        fontWeight: active ? 600 : 500,
-                        cursor: "pointer",
-                        background: active ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent",
-                        color: active
-                          ? isDark ? "#FFFFFF" : "#1D1D1F"
-                          : isDark ? "#86868B" : "#6E6E73",
-                        boxShadow: active ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                        transition: "all 0.15s ease",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* One filter row: who they are (roles), then your own tags — scrolls sideways */}
+            {(() => {
+              const chipStyle = (active: boolean) => ({
+                    flex: "0 0 auto",
+                    scrollSnapAlign: "start",
+                    minHeight: 34,
+                    padding: "0 14px",
+                    borderRadius: 17,
+                    border: active ? "1px solid transparent" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+                    background: active ? (isDark ? "#FFFFFF" : "#1C1C1E") : isDark ? "#1C1C1E" : "#FFFFFF",
+                    color: active ? (isDark ? "#1C1C1E" : "#FFFFFF") : themeStyles.text,
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap" as const,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    transition: "background 0.15s ease, color 0.15s ease",
+                  });
+              return (
+                <div
+                  role="group"
+                  aria-label="Filter people"
+                  className="nq-chips"
+                  style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none", marginBottom: 16, padding: "2px 0", margin: isMobile ? "0 -16px 16px" : "0 0 16px", paddingLeft: isMobile ? 16 : 0, paddingRight: isMobile ? 16 : 0, scrollPaddingLeft: isMobile ? 16 : 0, scrollSnapType: "x proximity" } as React.CSSProperties}
+                >
+                  {[
+                    { id: "all", label: "All" },
+                    { id: "founders", label: "Founders" },
+                    { id: "investors", label: "Investors" },
+                    { id: "executives", label: "Executives" },
+                    { id: "engineers", label: "Engineers" },
+                    { id: "designers", label: "Designers" },
+                    { id: "consultants", label: "Consultants" },
+                  ].map(({ id, label }) => {
+                    const active = selectedRole.toLowerCase() === id;
+                    return (
+                      <button key={id} aria-pressed={active} onClick={() => setSelectedRole(id)} style={chipStyle(active)}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {!contactsLoading && allTags.length > 0 && (
+                    <span aria-hidden style={{ flex: "0 0 1px", alignSelf: "stretch", margin: "6px 2px", background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)" }} />
+                  )}
+                  {!contactsLoading &&
+                    allTags.map((tag) => {
+                      const active = selectedTag === tag;
+                      return (
+                        <button key={`tag-${tag}`} aria-pressed={active} aria-label={`Tag ${tag}`} onClick={() => setSelectedTag(active ? null : tag)} style={chipStyle(active)}>
+                          <span style={{ opacity: 0.55 }}>#</span>
+                          {tag}
+                          {active && <Icons.Close size={12} />}
+                        </button>
+                      );
+                    })}
+                </div>
+              );
+            })()}
 
             {/* Reminders Banner */}
             {!contactsLoading && dueReminders.length > 0 && (
@@ -4671,6 +4557,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           </div>
                           <span
                             style={{
+                              display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                               background: overdue ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
                               color: overdue ? "#ef4444" : "#f59e0b",
                               borderRadius: 6,
@@ -4702,42 +4589,6 @@ Keep it punchy, sharp, and directly actionable.`;
                     })}
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* Tag Filter Pills */}
-            {!contactsLoading && allTags.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 4 }}>
-                  Filter:
-                </span>
-                {allTags.map((tag) => {
-                  const tc = tagColor(tag, isDark);
-                  const active = selectedTag === tag;
-                  return (
-                    <span
-                      key={tag}
-                      onClick={() => setSelectedTag(active ? null : tag)}
-                      style={{
-                        background: active ? (isDark ? "#A78BFA" : "#7C3AED") : tc.bg,
-                        color: active ? "#ffffff" : tc.color,
-                        border: `1px solid ${active ? "transparent" : tc.border}`,
-                        borderRadius: 14,
-                        padding: "4px 12px",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <span>{tag}</span>
-                      {active && <Icons.Close size={12} />}
-                    </span>
-                  );
-                })}
               </div>
             )}
 
@@ -4853,6 +4704,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                     {c.title && <span style={{ fontSize: 11, color: themeStyles.textMuted }}>{c.title}</span>}
                                     <span
                                       style={{
+                                        display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                         fontSize: 10,
                                         fontWeight: 500,
                                         padding: "2px 7px",
@@ -4891,13 +4743,13 @@ Keep it punchy, sharp, and directly actionable.`;
                               {c.event && (
                                 <span
                                   style={{
+                                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                     background: isDark ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.1)",
                                     color: "#818cf8",
                                     borderRadius: 6,
                                     padding: "2px 8px",
                                     fontSize: 11,
                                     fontWeight: 600,
-                                    display: "inline-block",
                                     marginBottom: 3,
                                   }}
                                 >
@@ -4912,6 +4764,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                       <span
                                         key={t}
                                         style={{
+                                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                           background: tc.bg,
                                           color: tc.color,
                                           borderRadius: 6,
@@ -4966,8 +4819,51 @@ Keep it punchy, sharp, and directly actionable.`;
                   </table>
                 </div>
               </div>
+            ) : isMobile || selectMode ? (
+              /* Phone (and select mode everywhere): one grouped list — photo, name, what they do; email & meet one tap away. Edit lives inside the contact. */
+              <ul aria-label="People" className="nq-stagger" style={{ listStyle: "none", margin: selectMode ? "0 0 170px" : isMobile ? "0 0 72px" : 0, padding: 0, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, overflow: "hidden" }}>
+                {filtered.map((c, i) => {
+                  const due = c.reminder && c.reminderDate && !c.reminderDone && c.reminderDate <= today;
+                  const sub = [c.title, c.company].filter(Boolean).join(" · ") || getContactRoleCategory(c);
+                  const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                  return (
+                    <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none", background: selectMode && selectedIds.has(c.id) ? (isDark ? "rgba(167,139,250,0.10)" : "rgba(124,58,237,0.05)") : "transparent" }}>
+                      <button
+                        onClick={() => selectMode ? setSelectedIds((prev) => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; }) : setModal(c)}
+                        aria-label={selectMode ? `Select ${c.name}` : `Open ${c.name}`}
+                        aria-pressed={selectMode ? selectedIds.has(c.id) : undefined}
+                        style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+                      >
+                        {selectMode && (
+                          <span aria-hidden style={{ width: 24, height: 24, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selectedIds.has(c.id) ? "#7C3AED" : "transparent", border: selectedIds.has(c.id) ? "none" : `1.5px solid ${isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)"}`, color: "#FFF", transition: "background 0.15s ease" }}>
+                            {selectedIds.has(c.id) && <I.Check size={15} strokeWidth={2.6} />}
+                          </span>
+                        )}
+                        <ContactAvatar contact={c} size={44} radius={22} isDark={isDark} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: themeStyles.text }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
+                            {due && <span title={c.reminderDate < today ? "Follow-up overdue" : "Follow-up due today"} style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: c.reminderDate < today ? "#FF3B30" : "#FF9F0A" }} />}
+                          </span>
+                          <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+                        </span>
+                      </button>
+                      {!selectMode && (
+                        <>
+                          <button onClick={() => openEmail(c)} aria-label={`Email ${c.name}`} className="btn-press" style={iconBtn}>
+                            <Icons.Mail size={18} />
+                          </button>
+                          <button onClick={() => { setMeetModal(c); setMeetSent(false); }} aria-label={`Meet ${c.name}`} className="btn-press" style={iconBtn}>
+                            <Icons.Calendar size={18} />
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
                 {filtered.map((c) => {
                   const av = avatar(c.name);
                   return (
@@ -4995,6 +4891,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             </span>
                             <span
                               style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                 fontSize: 10,
                                 fontWeight: 500,
                                 padding: "2px 7px",
@@ -5209,6 +5106,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         <span
                           key={tag}
                           style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                             background: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
                             color: isDark ? "#AEAEB2" : "#6E6E73",
                             border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"}`,
@@ -5472,84 +5370,18 @@ Keep it punchy, sharp, and directly actionable.`;
               onFallback={() => cameraFileRef.current?.click()}
             />
 
-            {/* ── LAZY VOICE DEBRIEF HERO BANNER (Instant Voice Debrief) ── */}
-            <div
-              onClick={() => setVoiceDebriefOpen(true)}
-              style={{
-                borderRadius: 20,
-                padding: "20px 22px",
-                background: isDark
-                  ? "linear-gradient(135deg, rgba(124, 58, 237, 0.22) 0%, rgba(99, 102, 241, 0.15) 100%)"
-                  : "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(167, 139, 250, 0.12) 100%)",
-                border: `1.5px solid ${isDark ? "rgba(167, 139, 250, 0.35)" : "rgba(124, 58, 237, 0.25)"}`,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                boxShadow: isDark
-                  ? "0 4px 20px rgba(0, 0, 0, 0.3)"
-                  : "0 4px 18px rgba(124, 58, 237, 0.08)",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 27,
-                  background: "linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)",
-                  fontSize: 24,
-                }}
-              >
-                <I.Mic size={24} color="#FFFFFF" />
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
-                    Lazy Voice Debrief
-                  </span>
-                  <span
-                    style={{
-                      background: "rgba(124, 58, 237, 0.15)",
-                      color: isDark ? "#C4B5FD" : "#7C3AED",
-                      fontSize: 10,
-                      fontWeight: 800,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    AI auto-CRM
-                  </span>
+            {/* ── SCAN TIPS: three things that make the AI read a card right first time ── */}
+            <div role="note" aria-label="Scan tips" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 18, padding: "14px 0" }}>
+              {[
+                { icon: Icons.Sparkles, text: "Good light" },
+                { icon: Icons.Scan, text: "Fill the frame" },
+                { icon: Icons.Camera, text: "Hold still" },
+              ].map((x, i) => (
+                <div key={x.text} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "0 6px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                  <x.icon size={20} color={isDark ? "#C4B5FD" : "#7C3AED"} />
+                  <span style={{ fontSize: 13, color: themeStyles.textMuted, textAlign: "center" }}>{x.text}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45 }}>
-                  Speak for 10s after meeting someone. AI extracts details, sets your follow-up reminder, and pre-drafts the email!
-                </p>
-              </div>
-              <button
-                type="button"
-                style={{
-                  background: "#7C3AED",
-                  color: "#FFF",
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "8px 14px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  cursor: "pointer",
-                }}
-              >
-                Tap to Speak
-              </button>
+              ))}
             </div>
 
             {/* ── SCANNER TILES GRID ── */}
@@ -5647,164 +5479,65 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             )}
 
-            {/* ── RECENT SCANS & QUICK CRM ACTIONS TRAY ── */}
-            <div style={{ ...S.card, display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
-                    Recent Scans & Captured
-                  </h3>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: isDark ? "rgba(255,255,255,0.08)" : "#E5E5EA", color: themeStyles.textMuted }}>
-                    {contacts.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setExportContactsOpen(true)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: isDark ? "#A78BFA" : "#7C3AED",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "4px 8px",
-                  }}
-                >
-                  <I.ArrowRight size={13} style={{ transform: "rotate(90deg)" }} /> Export
-                </button>
+            {/* ── RECENTLY ADDED: same grouped list as People, so it reads the same everywhere ── */}
+            <section aria-label="Recently added">
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, margin: "8px 4px 10px" }}>
+                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: themeStyles.text }}>
+                  Recently added
+                  {contacts.length > 0 && <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 500, color: themeStyles.textMuted }}>{contacts.length}</span>}
+                </h3>
+                {contacts.length > 0 && (
+                  <button onClick={() => setExportContactsOpen(true)} style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, minHeight: 32 }}>
+                    Export
+                  </button>
+                )}
               </div>
 
               {contacts.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 12px", color: themeStyles.textMuted }}>
-                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}><I.Contact size={30} /></div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, marginBottom: 4 }}>
-                    No scanned cards yet
+                <div style={{ background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, textAlign: "center", padding: "28px 20px", color: themeStyles.textMuted }}>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}><I.Contact size={30} /></div>
+                  <div style={{ fontWeight: 600, fontSize: 16, color: themeStyles.text, marginBottom: 4 }}>No cards yet</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.45, maxWidth: 300, margin: "0 auto 16px" }}>
+                    Scan a card with your camera, or record a short voice note after meeting someone.
                   </div>
-                  <div style={{ fontSize: 12, maxWidth: 320, margin: "0 auto 14px" }}>
-                    Scan a card with your camera or try our 10-second Lazy Voice Debrief after meeting someone.
-                  </div>
-                  <button
-                    onClick={() => setVoiceDebriefOpen(true)}
-                    style={{
-                      background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
-                      border: `1px solid ${isDark ? "rgba(167, 139, 250, 0.3)" : "rgba(124, 58, 237, 0.3)"}`,
-                      color: isDark ? "#C4B5FD" : "#7C3AED",
-                      padding: "8px 16px",
-                      borderRadius: 10,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <I.Mic size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />Try Voice Debrief
+                  <button onClick={() => setVoiceDebriefOpen(true)} style={{ minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <I.Mic size={18} /> Record a voice note
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {contacts.slice(0, 5).map((c) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: 10,
-                        borderRadius: 14,
-                        background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
-                        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E5E5EA"}`,
-                      }}
-                    >
-                      <div
-                        onClick={() => setModal(c)}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          background: "#7C3AED",
-                          color: "#FFF",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 700,
-                          fontSize: 14,
-                          flexShrink: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {(c.name || "U")[0].toUpperCase()}
-                      </div>
-                      <div onClick={() => setModal(c)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {c.name || "Unnamed"}
-                        </div>
-                        <div style={{ fontSize: 12, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {[c.role, c.company].filter(Boolean).join(" · ") || "Scanned Contact"}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button
-                          onClick={() => openEmail(c, "Networking follow-up")}
-                          title="Draft AI Follow-up Email"
-                          aria-label={`Draft follow-up email to ${c.name}`}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
-                            color: themeStyles.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          <I.Mail size={13} /> Follow-up
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, overflow: "hidden" }}>
+                  {contacts.slice(0, 5).map((c, i) => {
+                    const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                    return (
+                      <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                        <button onClick={() => setModal(c)} aria-label={`Open ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                          <ContactAvatar contact={c} size={44} radius={22} isDark={isDark} />
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: 16, fontWeight: 600, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
+                            <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {[c.title || c.role, c.company].filter(Boolean).join(" · ") || "Added from a card"}
+                            </span>
+                          </span>
                         </button>
-                        <button
-                          onClick={() => setMeetModal(c)}
-                          title="Schedule Follow-up Reminder"
-                          aria-label={`Schedule reminder for ${c.name}`}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
-                            color: themeStyles.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          <I.Calendar size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} />Meet
+                        <button onClick={() => openEmail(c, "Networking follow-up")} aria-label={`Email ${c.name}`} className="btn-press" style={iconBtn}>
+                          <I.Mail size={18} />
                         </button>
-                      </div>
-                    </div>
-                  ))}
+                        <button onClick={() => { setMeetModal(c); setMeetSent(false); }} aria-label={`Meet ${c.name}`} className="btn-press" style={iconBtn}>
+                          <I.Calendar size={18} />
+                        </button>
+                      </li>
+                    );
+                  })}
                   {contacts.length > 5 && (
-                    <button
-                      onClick={() => setTab("contacts")}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: isDark ? "#A78BFA" : "#7C3AED",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        padding: "6px 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      View all {contacts.length} contacts in CRM →
-                    </button>
+                    <li style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}>
+                      <button onClick={() => setTab("contacts")} style={{ all: "unset", boxSizing: "border-box", width: "100%", minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                        See all {contacts.length}
+                      </button>
+                    </li>
                   )}
-                </div>
+                </ul>
               )}
-            </div>
+            </section>
 
             {/* Fallback inputs */}
             <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
@@ -6271,7 +6004,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   {(modal.tags || []).map((t: string) => {
                     const tc = tagColor(t, isDark);
                     return (
-                      <span key={t} style={{ background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>
+                      <span key={t} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>
                         {t}
                       </span>
                     );
@@ -6632,7 +6365,7 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* ── AI: a quiet floating button; the assistant slides up as a bottom sheet ── */}
-      {isMobile && screen === "app" && !aiOpen && (tab === "contacts" || tab === "events" || tab === "messages") && (
+      {isMobile && screen === "app" && !aiOpen && !(tab === "contacts" && selectMode) && (tab === "contacts" || tab === "events" || tab === "messages") && (
         <button
           onClick={() => setAiOpen(true)}
           aria-label="AI Assistant"
@@ -6660,6 +6393,55 @@ Keep it punchy, sharp, and directly actionable.`;
         >
           <Icons.Sparkles size={22} color={isDark ? "#C4B5FD" : "#7C3AED"} />
         </button>
+      )}
+
+      {/* ── SELECT MODE BAR: act on everyone you ticked ── */}
+      {tab === "contacts" && selectMode && (() => {
+        const picked = filtered.filter((c) => selectedIds.has(c.id));
+        const allOn = filtered.length > 0 && picked.length === filtered.length;
+        const withEmail = picked.filter((c) => c.email).length;
+        const onApp = picked.filter((c) => c.linkedUserId).length;
+        const barBtn = (enabled: boolean, primary = false): React.CSSProperties => ({ flex: 1, minWidth: 0, minHeight: 48, borderRadius: 14, border: "none", background: primary ? "#7C3AED" : isDark ? "#2C2C2E" : "#F2F2F7", color: primary ? "#FFFFFF" : themeStyles.text, fontSize: 15, fontWeight: 600, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.45, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, whiteSpace: "nowrap" });
+        return (
+          <div role="toolbar" aria-label="Selected people" className="nq-sheet-up" style={{ position: "fixed", left: 12, right: 12, bottom: isMobile ? "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 88px)" : 24, maxWidth: 560, margin: "0 auto", zIndex: 210, background: isDark ? "rgba(28,28,30,0.96)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`, borderRadius: 22, padding: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px 10px" }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{picked.length ? `${picked.length} selected` : "Tap people to select"}</span>
+              <button onClick={() => setSelectedIds(allOn ? new Set() : new Set(filtered.map((c) => c.id)))} style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", minHeight: 32, padding: 0 }}>
+                {allOn ? "Clear" : `Select all ${filtered.length}`}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button disabled={!withEmail} onClick={() => openBulkFollowUpModal(picked)} style={barBtn(!!withEmail, true)}>
+                <Icons.Mail size={16} /> Email{withEmail ? ` ${withEmail}` : ""}
+              </button>
+              <button disabled={!onApp} onClick={() => setGroupMessageOpen(true)} style={barBtn(!!onApp)}>
+                <I.Mail size={16} /> Message{onApp ? ` ${onApp}` : ""}
+              </button>
+            </div>
+            {picked.length > 0 && (picked.length > withEmail || picked.length > onApp) && (
+              <div style={{ fontSize: 12, color: themeStyles.textMuted, padding: "8px 4px 0", lineHeight: 1.4 }}>
+                {picked.length > withEmail && `${picked.length - withEmail} without email. `}
+                {picked.length > onApp && `${picked.length - onApp} not on NetworQ, so they can't get messages.`}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {groupMessageOpen && (
+        <GroupMessageSheet
+          supabase={supabase}
+          people={filtered.filter((c) => selectedIds.has(c.id))}
+          isDark={isDark}
+          onClose={() => setGroupMessageOpen(false)}
+          onDone={(sent, failed) => {
+            setGroupMessageOpen(false);
+            setSelectMode(false);
+            setSelectedIds(new Set());
+            successFeedback();
+            showToast(failed ? `Sent to ${sent}. ${failed} couldn't be sent.` : `Sent to ${sent} ${sent === 1 ? "person" : "people"}.`, failed ? "error" : "success");
+          }}
+        />
       )}
 
       {/* ── 1-CLICK BULK AUTOMATED FOLLOW-UPS MODAL ── */}
@@ -6694,41 +6476,18 @@ Keep it punchy, sharp, and directly actionable.`;
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <img
-                  src="/illustrations/Bulk-Action/Bulk-Action-1.svg"
-                  alt="Bulk Action"
-                  style={{
-                    width: 75,
-                    height: 38,
-                    objectFit: "contain",
-                    filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
-                  }}
-                />
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <h3 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                      Automated Follow-ups
-                    </h3>
-                    <span
-                      style={{
-                        background: isDark ? "rgba(167, 139, 250, 0.15)" : "#EBF5FF",
-                        color: isDark ? "#A78BFA" : "#7C3AED",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                      }}
-                    >
-                      {bulkDrafts.length} ready
-                    </span>
-                  </div>
-                  <p style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4, margin: 0 }}>
-                    Personalized follow-up drafts generated for all eligible contacts. Send all in 1-click or customize individually.
-                  </p>
+            {/* Header: title + count on one baseline, short plain description */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Follow-up emails</h3>
+                  <span style={{ display: "inline-flex", alignItems: "center", height: 22, padding: "0 9px", borderRadius: 11, background: isDark ? "rgba(167,139,250,0.15)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 12, fontWeight: 600, lineHeight: 1 }}>
+                    {bulkDrafts.filter((d) => d.status !== "sent").length} to send
+                  </span>
                 </div>
+                <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.4, margin: "6px 0 0" }}>
+                  A personal draft for each person. Edit any, then send them all.
+                </p>
               </div>
 
               <button aria-label="Close"
@@ -6752,17 +6511,15 @@ Keep it punchy, sharp, and directly actionable.`;
                     padding: 14,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text }}>
-                        {d.contact.name}
-                        <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 400, marginLeft: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.name}</div>
+                      {(d.contact.title || d.contact.company) && (
+                        <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {[d.contact.title, d.contact.company].filter(Boolean).join(" · ")}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2 }}>
-                        {d.contact.email}
-                      </div>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 13, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.email}</div>
                     </div>
 
                     <div>
@@ -6780,6 +6537,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           target="_blank"
                           rel="noreferrer"
                           style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                             fontSize: 11,
                             color: themeStyles.textMuted,
                             textDecoration: "none",
@@ -6788,7 +6546,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
                           }}
                         >
-                          Mail App ↗
+                          Mail app ↗
                         </a>
                       )}
                     </div>
@@ -6838,10 +6596,10 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Send size={14} />
                 <span>
                   {bulkSending
-                    ? "Dispatching Follow-ups…"
+                    ? "Sending…"
                     : bulkDrafts.every((d) => d.status === "sent")
-                    ? "All follow-ups sent"
-                    : `Send all by email (${bulkDrafts.filter((d) => d.status !== "sent").length})`}
+                    ? "All sent"
+                    : (() => { const n = bulkDrafts.filter((d) => d.status !== "sent").length; return `Send ${n} email${n === 1 ? "" : "s"}`; })()}
                 </span>
               </button>
             </div>
@@ -6954,6 +6712,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <span style={{ fontSize: 14, fontWeight: 700, color: themeStyles.text }}>NetworQ Assistant</span>
                   <span
                     style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                       fontSize: 10,
                       fontWeight: 700,
                       color: isDark ? "#A78BFA" : "#7C3AED",

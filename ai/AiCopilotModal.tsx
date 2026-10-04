@@ -210,6 +210,7 @@ export function AiCopilotModal({
                 </span>
                 <span
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     background: "rgba(124, 58, 237, 0.15)",
                     color: isDark ? "#C4B5FD" : "#7C3AED",
                     fontSize: 10,
