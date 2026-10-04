@@ -59,6 +59,7 @@ export function NetworkMapModal({
 
   return (
     <div
+      className="nq-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -73,6 +74,7 @@ export function NetworkMapModal({
       }}
     >
       <div
+        className="nq-pop"
         style={{
           width: "100%",
           maxWidth: 960,

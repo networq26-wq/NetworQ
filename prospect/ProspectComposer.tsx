@@ -201,8 +201,8 @@ export function ProspectComposer({
   const stepIndex = STEPS.findIndex((s) => s.key === (step === "sent" ? "review" : step));
 
   return (
-    <div role="dialog" aria-label={`Write email to ${contact.name}`} style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "stretch" }}>
-      <div style={{ width: "100%", maxWidth: 720, background: t.bg, display: "flex", flexDirection: "column", color: t.text, height: "100%" }}>
+    <div role="dialog" aria-label={`Write email to ${contact.name}`} className="nq-backdrop" style={{ position: "fixed", inset: 0, zIndex: 400, background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center", alignItems: "stretch" }}>
+      <div className="nq-sheet-up" style={{ width: "100%", maxWidth: 720, background: t.bg, display: "flex", flexDirection: "column", color: t.text, height: "100%" }}>
         {/* Header */}
         <div style={{ padding: "calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${t.border}`, background: t.surface }}>
           <button onClick={back} aria-label={step === "prospect" || step === "sent" ? "Close" : "Back"} style={{ width: 40, height: 40, borderRadius: 20, border: "none", background: "transparent", color: PURPLE, fontSize: 22, cursor: "pointer" }}>
@@ -411,7 +411,7 @@ export function ProspectComposer({
       </div>
 
       {orgOpen && (
-        <div role="dialog" aria-label="Your organization" style={{ position: "fixed", inset: 0, zIndex: 410, background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center" }}>
+        <div role="dialog" aria-label="Your organization" className="nq-backdrop" style={{ position: "fixed", inset: 0, zIndex: 410, background: "rgba(0,0,0,0.45)", display: "flex", justifyContent: "center" }}>
           <div style={{ width: "100%", maxWidth: 720, background: t.bg, color: t.text, overflowY: "auto", padding: "calc(env(safe-area-inset-top, 0px) + 12px) 16px 32px" }}>
             <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}>
               <div style={{ flex: 1, fontSize: 20, fontWeight: 700 }}>Your organization</div>

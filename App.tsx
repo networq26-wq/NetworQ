@@ -1244,7 +1244,7 @@ function CommandPalette({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, gap: 10 }}>
-          <Icons.Search size={18} color="#6366F1" />
+          <Icons.Search size={18} color="#8B5CF6" />
           <input
             autoFocus
             placeholder="Type a command or search contacts… (Esc to exit)"
@@ -1288,13 +1288,13 @@ function CommandPalette({
                   padding: "10px 14px",
                   borderRadius: 10,
                   cursor: "pointer",
-                  background: isSel ? (isDark ? "#4F46E5" : "#6366F1") : "transparent",
+                  background: isSel ? (isDark ? "#6D28D9" : "#8B5CF6") : "transparent",
                   color: isSel ? "#ffffff" : isDark ? "#f8fafc" : "#0f172a",
                   fontSize: 13,
                   fontWeight: 600,
                 }}
               >
-                <ActIcon size={16} color={isSel ? "#ffffff" : "#6366F1"} />
+                <ActIcon size={16} color={isSel ? "#ffffff" : "#8B5CF6"} />
                 <span>{a.label}</span>
               </div>
             );
@@ -2908,6 +2908,30 @@ Keep it punchy, sharp, and directly actionable.`;
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Motion system (iOS-like springs; all off with "Reduce motion") ── */
+    @keyframes nqScreenIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @keyframes nqSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+    @keyframes nqSheetRight { from { transform: translateX(100%); } to { transform: none; } }
+    @keyframes nqPop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+    @keyframes nqToastIn { from { opacity: 0; transform: translate(-50%, 12px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+    @keyframes nqTabBounce { 0% { transform: scale(1); } 35% { transform: scale(1.22) translateY(-1px); } 70% { transform: scale(0.96); } 100% { transform: scale(1); } }
+    @keyframes nqShimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+    .nq-screen { animation: nqScreenIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-backdrop { animation: fadeIn 0.2s ease both; }
+    .nq-sheet-up { animation: nqSheetUp 0.38s cubic-bezier(0.32, 0.72, 0, 1) both; }
+    .nq-sheet-right { animation: nqSheetRight 0.34s cubic-bezier(0.32, 0.72, 0, 1) both; }
+    .nq-pop { animation: nqPop 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-tab-icon { display: inline-flex; }
+    .nq-tab-icon.is-active { animation: nqTabBounce 0.42s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .nq-stagger > * { animation: nqScreenIn 0.36s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-stagger > *:nth-child(2) { animation-delay: 30ms; } .nq-stagger > *:nth-child(3) { animation-delay: 60ms; }
+    .nq-stagger > *:nth-child(4) { animation-delay: 90ms; } .nq-stagger > *:nth-child(5) { animation-delay: 120ms; }
+    .nq-stagger > *:nth-child(6) { animation-delay: 150ms; } .nq-stagger > *:nth-child(n+7) { animation-delay: 180ms; }
+    .nq-skeleton { background: linear-gradient(90deg, ${isDark ? "#1C1C1E 25%, #2C2C2E 50%, #1C1C1E 75%" : "#ECECF0 25%, #F7F7FA 50%, #ECECF0 75%"}); background-size: 200% 100%; animation: nqShimmer 1.4s linear infinite; border-radius: 12px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+    }
+
     input:focus, textarea:focus, select:focus {
       border-color: #7C3AED !important;
       box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22) !important;
@@ -3085,7 +3109,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   height: "100%",
                   width: `${splashProgress}%`,
                   borderRadius: 980,
-                  background: "linear-gradient(90deg, #7C3AED, #6366F1, #A78BFA)",
+                  background: "linear-gradient(90deg, #7C3AED, #8B5CF6, #A78BFA)",
                   transition: "width 0.25s ease-out",
                   boxShadow: "0 0 12px rgba(124, 58, 237, 0.6)",
                 }}
@@ -3119,8 +3143,8 @@ Keep it punchy, sharp, and directly actionable.`;
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 440, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ ...S.card, textAlign: "center", padding: 36 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(99, 102, 241, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-              <Icons.Mail size={26} color="#6366F1" />
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(124, 58, 237, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+              <Icons.Mail size={26} color="#8B5CF6" />
             </div>
             <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
@@ -4252,8 +4276,10 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
           </header>
 
-          {/* MAIN CONTENT CONTAINER */}
+          {/* MAIN CONTENT CONTAINER — re-keyed per tab so each screen animates in */}
           <div
+            key={tab}
+            className="nq-screen"
             style={{
               flex: 1,
               paddingTop: isMobile ? 16 : 28,
@@ -4872,7 +4898,7 @@ Keep it punchy, sharp, and directly actionable.`;
                               {c.event && (
                                 <span
                                   style={{
-                                    background: isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)",
+                                    background: isDark ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.1)",
                                     color: "#818cf8",
                                     borderRadius: 6,
                                     padding: "2px 8px",
@@ -5720,7 +5746,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       ...S.btnSmOut,
                       fontSize: 11,
                       color: isRecordingVoice ? "#ef4444" : "#6366f1",
-                      borderColor: isRecordingVoice ? "#ef4444" : "rgba(99, 102, 241, 0.3)",
+                      borderColor: isRecordingVoice ? "#ef4444" : "rgba(124, 58, 237, 0.3)",
                       background: isRecordingVoice ? "rgba(239, 68, 68, 0.1)" : "transparent",
                     }}
                   >
@@ -5936,7 +5962,7 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
 
             {modal.event && (
-              <div style={{ background: "rgba(99, 102, 241, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+              <div style={{ background: "rgba(124, 58, 237, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#818cf8", letterSpacing: "0.06em", textTransform: "uppercase" }}>EVENT</span>
                 <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2 }}>{modal.event}</div>
               </div>
@@ -6129,7 +6155,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     placeholder="Key discussion topics…"
                   />
                 </div>
-                <div style={{ background: "rgba(99, 102, 241, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12 }}>
+                <div style={{ background: "rgba(124, 58, 237, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12 }}>
                   <span style={{ color: "#818cf8", fontWeight: 700 }}>Video meeting link attached automatically</span>
                 </div>
                 <button
@@ -6208,17 +6234,19 @@ Keep it punchy, sharp, and directly actionable.`;
                   gap: 3,
                   border: "none",
                   background: active
-                    ? (isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.12)")
+                    ? (isDark ? "rgba(167, 139, 250, 0.18)" : "rgba(124, 58, 237, 0.1)")
                     : "transparent",
                   borderRadius: 22,
                   height: 52,
                   cursor: "pointer",
-                  color: active ? (isDark ? "#818CF8" : "#4F46E5") : themeStyles.textMuted,
+                  color: active ? (isDark ? "#C4B5FD" : "#7C3AED") : themeStyles.textMuted,
                   position: "relative",
                   transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
               >
-                <MobileIcon size={18} color="currentColor" />
+                <span className={`nq-tab-icon${active ? " is-active" : ""}`}>
+                  <MobileIcon size={20} color="currentColor" />
+                </span>
                 <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
                 {t === "contacts" && dueReminders.length > 0 && (
                   <span
@@ -6454,7 +6482,7 @@ Keep it punchy, sharp, and directly actionable.`;
               gap: 9,
               padding: "10px 18px",
               borderRadius: 980,
-              background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+              background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
               color: "#FFFFFF",
               border: "1px solid rgba(255, 255, 255, 0.25)",
               boxShadow: "0 10px 28px rgba(124, 58, 237, 0.35)",
@@ -6613,7 +6641,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <div
               style={{
                 padding: "6px 16px",
-                background: "linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(99, 102, 241, 0.15))",
+                background: "linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.15))",
                 borderBottom: "1px solid rgba(124, 58, 237, 0.2)",
                 display: "flex",
                 alignItems: "center",
@@ -6710,7 +6738,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     padding: "10px 14px",
                     borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                     background: m.role === "user"
-                      ? "linear-gradient(135deg, #7C3AED, #6366F1)"
+                      ? "linear-gradient(135deg, #7C3AED, #8B5CF6)"
                       : isDark
                       ? "#242426"
                       : "#F0F0F2",
@@ -6895,7 +6923,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
                 color: "#FFFFFF",
                 opacity: !aiInput.trim() || aiLoading ? 0.45 : 1,
                 boxShadow: !aiInput.trim() || aiLoading ? "none" : "0 4px 14px rgba(124, 58, 237, 0.3)",
@@ -7037,9 +7065,11 @@ Keep it punchy, sharp, and directly actionable.`;
             fontSize: 13,
             fontWeight: 700,
             zIndex: 600,
-            animation: "fadeUp 0.25s ease",
+            animation: "nqToastIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both",
             boxShadow: "0 8px 25px rgba(0,0,0,0.25)",
-            whiteSpace: "nowrap",
+            maxWidth: "calc(100vw - 32px)",
+            width: "max-content",
+            lineHeight: 1.35,
             display: "flex",
             alignItems: "center",
             gap: 8,

@@ -93,7 +93,7 @@ export function CameraCapture({
   );
 
   return (
-    <div role="dialog" aria-label="Card camera" style={{ position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", flexDirection: "column", color: "#FFF" }}>
+    <div role="dialog" aria-label="Card camera" className="nq-pop" style={{ position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", flexDirection: "column", color: "#FFF" }}>
       {/* Top bar */}
       <div style={{ padding: "calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
         <button

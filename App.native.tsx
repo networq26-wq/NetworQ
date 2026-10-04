@@ -153,7 +153,7 @@ function Shell() {
           cacheEnabled={true}
           renderLoading={() => (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366F1" />
+              <ActivityIndicator size="large" color="#7C3AED" />
               <Text style={styles.loadingText}>Loading NetworQ…</Text>
             </View>
           )}
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   retryButton: {
-    backgroundColor: "#6366F1",
+    backgroundColor: "#7C3AED",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,

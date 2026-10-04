@@ -862,13 +862,14 @@ function Sheet({ t, title, onClose, children }: { t: Theme; title: string; onClo
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "max(16px, calc(var(--safe-top, 0px) + 12px)) max(16px, calc(var(--safe-right, 0px) + 12px)) max(16px, calc(var(--safe-bottom, 0px) + 12px)) max(16px, calc(var(--safe-left, 0px) + 12px))", boxSizing: "border-box" }}>
+    <div onClick={onClose} className="nq-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "max(16px, calc(var(--safe-top, 0px) + 12px)) max(16px, calc(var(--safe-right, 0px) + 12px)) max(16px, calc(var(--safe-bottom, 0px) + 12px)) max(16px, calc(var(--safe-left, 0px) + 12px))", boxSizing: "border-box" }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        className="nq-sheet-up"
         onClick={(e) => e.stopPropagation()}
-        style={{ background: t.surface, color: t.text, borderRadius: 24, padding: 20, width: "100%", maxWidth: 440, maxHeight: "min(85dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", marginBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)", animation: "fadeUp 0.25s ease" }}
+        style={{ background: t.surface, color: t.text, borderRadius: 24, padding: 20, width: "100%", maxWidth: 440, maxHeight: "min(85dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", marginBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)" }}
       >
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button aria-label="Close" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: t.raised, color: t.text, fontSize: 20, cursor: "pointer" }}>

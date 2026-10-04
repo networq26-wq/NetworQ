@@ -86,6 +86,7 @@ Keep it clear, actionable, and under 150 words.`;
 
   return (
     <div
+      className="nq-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -100,6 +101,7 @@ Keep it clear, actionable, and under 150 words.`;
       }}
     >
       <div
+        className="nq-pop"
         style={{
           width: "100%",
           maxWidth: 620,

@@ -310,7 +310,7 @@ export function EventsHub({
           </div>
         </div>
       ) : (
-        <ul aria-label="Upcoming events" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+        <ul aria-label="Upcoming events" className="nq-stagger" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
           {visible.map((ev) => (
             <li key={ev.id} style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
               {ev.image && <img src={ev.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")} style={{ width: "100%", height: 140, objectFit: "cover", display: "block", background: t.raised }} />}

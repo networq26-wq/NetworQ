@@ -55,6 +55,7 @@ export function IntroductionsModal({
 
   return (
     <div
+      className="nq-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -69,6 +70,7 @@ export function IntroductionsModal({
       }}
     >
       <div
+        className="nq-pop"
         style={{
           width: "100%",
           maxWidth: 480,

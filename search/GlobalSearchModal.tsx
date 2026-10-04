@@ -69,6 +69,7 @@ export function GlobalSearchModal({
 
   return (
     <div
+      className="nq-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -83,6 +84,7 @@ export function GlobalSearchModal({
       }}
     >
       <div
+        className="nq-pop"
         style={{
           width: "100%",
           maxWidth: 680,

@@ -51,13 +51,14 @@ export function NotificationCenter({
   const unread = items.filter((n) => !n.read_at).length;
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
+    <div onClick={onClose} className="nq-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
+        className="nq-sheet-right"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 420, height: "100%", background: t.surface, color: t.text, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)", animation: "fadeIn 0.2s ease" }}
+        style={{ width: "100%", maxWidth: 420, height: "100%", background: t.surface, color: t.text, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 8px" }}>
           <h2 style={{ margin: 0, fontSize: 22, flex: 1 }}>Notifications</h2>
@@ -88,7 +89,7 @@ export function NotificationCenter({
               You're all caught up. Connection requests and updates appear here.
             </div>
           ) : (
-            <ul aria-label="Notification list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <ul aria-label="Notification list" className="nq-stagger" style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {items.map((n) => (
                 <li key={n.id}>
                   <button
