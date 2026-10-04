@@ -12,9 +12,9 @@ export function Wordmark({ className = "", size = 26 }: { className?: string; si
       >
         <defs>
           <linearGradient id="landingQPurpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8B5CF6" />
-            <stop offset="50%" stopColor="#7C3AED" />
-            <stop offset="100%" stopColor="#6D28D9" />
+            <stop offset="0%" stopColor="#38BDF8" />
+            <stop offset="50%" stopColor="#2563EB" />
+            <stop offset="100%" stopColor="#1D4ED8" />
           </linearGradient>
           <filter id="landingQGlow" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="8" result="blur" />
