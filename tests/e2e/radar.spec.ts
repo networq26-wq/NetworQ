@@ -79,6 +79,8 @@ async function joinEvent(page: Page, code: string) {
 }
 
 test.describe("Event Radar", () => {
+  // Each test drives two browsers; running them one at a time keeps BLE timing stable on small machines
+  test.describe.configure({ mode: "serial" });
   test("two attendees discover each other over BLE and exchange contacts by consent", async ({ browser, db }) => {
     seed(db);
     const asha = await newPage(browser, db);
