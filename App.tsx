@@ -4413,7 +4413,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
-                <div style={{ position: "relative", flex: "1 1 220px", minWidth: 0 }}>
+                <div style={{ position: "relative", flex: isMobile ? "1 1 100%" : "1 1 220px", minWidth: 0 }}>
                   <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
                     <Icons.Search size={15} />
                   </span>
@@ -4485,6 +4485,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     fontSize: 13,
                     padding: "0 16px",
                     minHeight: isMobile ? 44 : 40,
+                    flex: isMobile ? "1 1 auto" : undefined,
                     background: isDark ? "#A78BFA" : "#7C3AED",
                   }}
                   onClick={openBulkFollowUpModal}

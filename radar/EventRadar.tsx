@@ -608,9 +608,10 @@ function NoEvent({
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           autoCapitalize="characters"
-          style={{ ...input, flex: "1 1 200px", letterSpacing: "0.06em" }}
+          style={{ ...input, flex: "100 1 200px", letterSpacing: "0.06em" }}
         />
-        <button type="submit" style={btn(t, "primary")} disabled={busy || !code.trim()}>
+        {/* Grows to full width when it wraps under the field on narrow phones */}
+        <button type="submit" style={{ ...btn(t, "primary"), flex: "1 0 120px" }} disabled={busy || !code.trim()}>
           {busy ? "Joining…" : "Join event"}
         </button>
       </form>
