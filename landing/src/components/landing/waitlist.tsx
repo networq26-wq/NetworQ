@@ -126,7 +126,7 @@ export function Waitlist() {
           ) : (
             <form
               onSubmit={onSubmit}
-              className="mx-auto mt-8 sm:mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row"
+              className="mx-auto mt-8 sm:mt-10 flex w-full max-w-lg flex-col gap-3 sm:flex-row sm:items-center"
             >
               <label htmlFor="waitlist-email" className="sr-only">
                 Email address
@@ -139,12 +139,12 @@ export function Waitlist() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email address"
                 disabled={status === "loading"}
-                className="h-12 flex-1 rounded-xl border border-input bg-card px-4 text-base sm:text-[15px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:opacity-50"
+                className="h-[52px] sm:h-12 w-full flex-1 rounded-xl border border-input/90 bg-card px-4 sm:px-4.5 text-base sm:text-[15px] outline-none transition-all placeholder:text-muted-foreground/75 focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-50 shadow-sm"
               />
               <button
                 type="submit"
                 disabled={status === "loading"}
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition-transform duration-200 hover:-translate-y-px disabled:opacity-50"
+                className="group inline-flex h-[52px] sm:h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base sm:text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 transition-all duration-200 hover:-translate-y-px active:scale-[0.99] disabled:opacity-50 shrink-0 whitespace-nowrap"
               >
                 {status === "loading" ? (
                   <>
