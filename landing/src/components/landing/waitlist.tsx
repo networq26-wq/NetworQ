@@ -171,7 +171,7 @@ export function Waitlist() {
         <Reveal delay={0.2}>
           <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="h-4 w-4 text-violet-400" />
-            <span>First 100 users get 3 months free. No credit card required.</span>
+            <span>First 100 users get 3 months free.</span>
           </div>
         </Reveal>
       </div>
