@@ -22,7 +22,7 @@ export interface PublicEvent {
 }
 
 const INDIA_CITIES = new Set(["Hyderabad", "Bengaluru", "Mumbai", "Delhi", "Pune", "Chennai", "Kolkata", "Ahmedabad", "Gurugram", "Noida", "Kochi", "Jaipur"]);
-const DATE_FILTERS = ["Any time", "Today", "This weekend", "This week", "This month"] as const;
+const DATE_FILTERS = ["Any time", "Today", "This weekend", "This week", "This month", "Pick"] as const;
 type DateFilter = (typeof DATE_FILTERS)[number];
 
 // [start, end) for a date filter, in the viewer's local time
@@ -111,7 +111,7 @@ export function EventsHub({
   const [query, setQuery] = useState("");
   const saved = useMemo(readPrefs, []);
   const [city, setCity] = useState(saved.city || "All");
-  const [dateFilter, setDateFilter] = useState<DateFilter>(saved.date && DATE_FILTERS.includes(saved.date) ? saved.date : "Any time");
+  const [dateFilter, setDateFilter] = useState<DateFilter>(saved.date && DATE_FILTERS.includes(saved.date) && saved.date !== "Pick" ? saved.date : "Any time");
   const [category, setCategory] = useState(saved.category || "All");
   useEffect(() => {
     try {
@@ -120,6 +120,10 @@ export function EventsHub({
   }, [city, dateFilter, category]);
   const [link, setLink] = useState("");
   const [importing, setImporting] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const [calOpen, setCalOpen] = useState(false);
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const since = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
@@ -151,6 +155,7 @@ export function EventsHub({
       if (!res.ok) throw new Error(json.error || "Couldn't import that link.");
       showToast(`Added ${json.events.length} event${json.events.length === 1 ? "" : "s"}.`, "success");
       setLink("");
+      setAddOpen(false);
       await load();
     } catch (err: any) {
       showToast(err.message, "error");
@@ -181,7 +186,10 @@ export function EventsHub({
   // Everything except the category filter — used for the category counts
   const base = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const range = dateRange(dateFilter);
+    const range =
+      dateFilter === "Pick" && pickedDay
+        ? ([new Date(pickedDay + "T00:00:00").getTime(), new Date(pickedDay + "T00:00:00").getTime() + 86400000] as [number, number])
+        : dateRange(dateFilter);
     return (events || []).filter((e) => {
       if (!cityMatch(e)) return false;
       if (range) {
@@ -190,7 +198,29 @@ export function EventsHub({
       }
       return !q || [e.title, e.venue, e.organizer, e.city, e.category].some((v) => v?.toLowerCase().includes(q));
     });
-  }, [events, query, dateFilter, cityMatch]);
+  }, [events, query, dateFilter, pickedDay, cityMatch]);
+
+  // Counts for the location sheet and dots for the calendar
+  const cityCount = useCallback(
+    (v: string) =>
+      (events || []).filter((e) => {
+        const c = e.venue === "Online" ? "Online" : e.city || "";
+        if (v === "All") return true;
+        if (v === "All India") return INDIA_CITIES.has(c);
+        if (v === "Worldwide") return !!c && !INDIA_CITIES.has(c) && c !== "Online";
+        return c === v;
+      }).length,
+    [events]
+  );
+  const busyDays = useMemo(() => {
+    const set = new Set<string>();
+    (events || []).forEach((e) => {
+      if (!cityMatch(e)) return;
+      const d = new Date(e.starts_at);
+      set.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    });
+    return set;
+  }, [events, cityMatch]);
 
   const categories = useMemo(() => {
     const counts = new Map<string, number>();
@@ -203,99 +233,91 @@ export function EventsHub({
 
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
   const input: React.CSSProperties = { minHeight: 44, padding: "10px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.raised, color: t.text, fontSize: 16, boxSizing: "border-box" };
-  const chipRow: React.CSSProperties = { display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" } as React.CSSProperties;
-  const chip = (on: boolean): React.CSSProperties => ({ flexShrink: 0, minHeight: 34, padding: "6px 12px", borderRadius: 999, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", border: `1px solid ${on ? PURPLE : t.border}`, background: on ? PURPLE : t.surface, color: on ? "#FFFFFF" : t.text });
-  const btn = (primary = false): React.CSSProperties => ({
-    minHeight: 44,
-    padding: "10px 14px",
-    borderRadius: 12,
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: "pointer",
-    border: primary ? "none" : `1px solid ${t.border}`,
-    background: primary ? PURPLE : t.raised,
-    color: primary ? "#FFFFFF" : t.text,
-    textDecoration: "none",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  });
+  const btn = (primary = false): React.CSSProperties => ({ minHeight: 44, padding: "10px 16px", borderRadius: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", border: "none", background: primary ? PURPLE : t.raised, color: primary ? "#FFFFFF" : t.text, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 });
+  const cityLabel = city === "All" ? "All cities" : city;
+  const dateLabel = dateFilter === "Pick" && pickedDay ? new Date(pickedDay + "T00:00:00").toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }) : dateFilter === "Any time" ? "" : dateFilter;
+
+  // Results grouped by day: "Today", "Tomorrow", "Sat, 10 Oct"
+  const groups = useMemo(() => {
+    const out: { key: string; label: string; items: PublicEvent[] }[] = [];
+    visible.forEach((ev) => {
+      const d = new Date(ev.starts_at);
+      const key = d.toDateString();
+      let g = out[out.length - 1];
+      if (!g || g.key !== key) {
+        const days = Math.round((new Date(key).getTime() - new Date(new Date().toDateString()).getTime()) / 86400000);
+        const label = days < 0 ? "Started recently" : days === 0 ? "Today" : days === 1 ? "Tomorrow" : d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "short" });
+        g = { key, label, items: [] };
+        out.push(g);
+      }
+      g.items.push(ev);
+    });
+    return out;
+  }, [visible]);
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
-      <div>
-        <h2 style={{ margin: 0, fontSize: 28, letterSpacing: "-0.02em" }}>Events</h2>
-        <p style={{ color: t.muted, margin: "4px 0 0", fontSize: 14 }}>Real upcoming events, each linked to its official page.</p>
-      </div>
-
-      <section style={card} aria-label="Add an event">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            importLink();
-          }}
-          style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
-        >
-          <input
-            style={{ ...input, flex: "1 1 260px" }}
-            aria-label="Event or calendar link"
-            placeholder="Paste an event link (Luma, Eventbrite, Meetup…) or calendar .ics"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            inputMode="url"
-          />
-          <button type="submit" style={btn(true)} disabled={importing || !link.trim()}>
-            {importing ? "Importing…" : "Add event"}
-          </button>
-        </form>
-        <p style={{ color: t.muted, fontSize: 12, margin: "8px 0 0" }}>
-          We read the event's published details (name, date, venue) from its page. Hosting your own? Create it in Radar to get a join code.
-        </p>
-      </section>
+    <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14, color: t.text }}>
+      <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Events</h2>
+          <p style={{ color: t.muted, margin: "4px 0 0", fontSize: 15 }}>Real events near you, each linked to its official page.</p>
+        </div>
+        <button onClick={() => setAddOpen(true)} aria-label="Add an event" className="btn-press" style={{ ...btn(true), minHeight: 40, padding: "0 16px", borderRadius: 20, flexShrink: 0 }}>
+          <span aria-hidden style={{ fontSize: 20, lineHeight: 1, marginTop: -2 }}>+</span> Add
+        </button>
+      </header>
 
       {events && events.length > 0 && (
         <section aria-label="Filters" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input style={{ ...input, flex: 1, minWidth: 0 }} aria-label="Search events" placeholder="Search events, venues, organisers" value={query} onChange={(e) => setQuery(e.target.value)} />
-            <select aria-label="City" value={city} onChange={(e) => setCity(e.target.value)} style={{ ...input, width: "auto", maxWidth: 170, paddingRight: 8, appearance: "auto" as any }}>
-              <option value="All">All cities</option>
-              <option value="All India">All India</option>
-              <option value="Worldwide">Worldwide</option>
-              {cities.online && <option value="Online">Online</option>}
-              {cities.india.length > 0 && (
-                <optgroup label="India">
-                  {cities.india.map((c) => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
-              )}
-              {cities.world.length > 0 && (
-                <optgroup label="Worldwide">
-                  {cities.world.map((c) => <option key={c} value={c}>{c}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </div>
-          <div role="group" aria-label="Filter by date" className="nq-chips" style={chipRow}>
-            {DATE_FILTERS.map((d) => (
-              <button key={d} onClick={() => setDateFilter(d)} aria-pressed={dateFilter === d} style={chip(dateFilter === d)}>
-                {d}
-              </button>
-            ))}
-          </div>
-          <div role="group" aria-label="Filter by category" className="nq-chips" style={chipRow}>
-            <button onClick={() => setCategory("All")} aria-pressed={category === "All"} style={chip(category === "All")}>
-              All · {base.length}
+          {/* Search with the location built in */}
+          <div style={{ display: "flex", alignItems: "center", gap: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: "4px 4px 4px 14px", minHeight: 52, boxSizing: "border-box" }}>
+            <span aria-hidden style={{ color: t.muted, display: "flex" }}><I.Search size={18} /></span>
+            <input aria-label="Search events" placeholder="Search events" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: t.text, fontSize: 16, padding: "0 10px", fontFamily: "inherit", minHeight: 44 }} />
+            <button onClick={() => setCityOpen(true)} aria-label={`Location: ${cityLabel}`} style={{ flexShrink: 0, minHeight: 44, maxWidth: 170, padding: "0 12px", borderRadius: 12, border: "none", background: t.raised, color: t.text, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <I.MapPin size={16} />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cityLabel}</span>
+              <span aria-hidden style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
             </button>
-            {categories.map(([c, n]) => (
-              <button key={c} onClick={() => setCategory(c)} aria-pressed={category === c} style={chip(category === c)}>
-                {c} · {n}
-              </button>
-            ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", fontSize: 13, color: t.muted }}>
-            <span style={{ flex: 1 }} aria-live="polite">{visible.length} event{visible.length === 1 ? "" : "s"}</span>
+
+          {/* When: one calm segmented control + a calendar for any exact day */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <div role="group" aria-label="Filter by date" style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", background: t.raised, borderRadius: 14, padding: 3, gap: 2 }}>
+              {(["Any time", "Today", "This weekend", "This week"] as const).map((d) => {
+                const on = dateFilter === d;
+                return (
+                  <button key={d} onClick={() => setDateFilter(d)} aria-pressed={on} style={{ minHeight: 40, borderRadius: 11, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", background: on ? t.surface : "transparent", color: on ? t.text : t.muted, boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "background 0.15s ease, color 0.15s ease" }}>
+                    {d === "Any time" ? "All" : d === "This weekend" ? "Weekend" : d}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => setCalOpen(true)} aria-label={dateFilter === "Pick" ? `Date: ${dateLabel}` : "Pick a date"} aria-pressed={dateFilter === "Pick"} style={{ flexShrink: 0, minWidth: 46, minHeight: 46, padding: dateFilter === "Pick" ? "0 12px" : 0, borderRadius: 14, border: "none", cursor: "pointer", background: dateFilter === "Pick" ? PURPLE : t.raised, color: dateFilter === "Pick" ? "#FFFFFF" : t.text, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 13, fontWeight: 600 }}>
+              <I.Calendar size={18} />
+              {dateFilter === "Pick" && dateLabel}
+            </button>
+          </div>
+
+          {/* What */}
+          <div role="group" aria-label="Filter by category" className="nq-chips" style={{ display: "flex", gap: 6, overflowX: "auto", scrollbarWidth: "none", margin: "0 -16px", padding: "0 16px" } as React.CSSProperties}>
+            {[["All", base.length] as const, ...categories].map(([c, n]) => {
+              const on = category === c;
+              return (
+                <button key={c} onClick={() => setCategory(c)} aria-pressed={on} style={{ flexShrink: 0, minHeight: 34, padding: "0 12px", borderRadius: 17, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", border: "none", background: on ? (isDark ? "#FFFFFF" : "#1C1C1E") : t.surface, color: on ? (isDark ? "#1C1C1E" : "#FFFFFF") : t.text, boxShadow: on ? "none" : `inset 0 0 0 1px ${t.border}` }}>
+                  {c} · {n}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", fontSize: 14, color: t.muted, padding: "0 2px" }}>
+            <span style={{ flex: 1 }} aria-live="polite">
+              {visible.length} event{visible.length === 1 ? "" : "s"}
+              {city !== "All" ? ` · ${cityLabel}` : ""}
+              {dateLabel ? ` · ${dateLabel}` : ""}
+            </span>
             {filtered && (
-              <button onClick={() => { setCity("All"); setDateFilter("Any time"); setCategory("All"); setQuery(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+              <button onClick={() => { setCity("All"); setDateFilter("Any time"); setPickedDay(null); setCategory("All"); setQuery(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 600, fontSize: 14, cursor: "pointer", minHeight: 32 }}>
                 Clear filters
               </button>
             )}
@@ -304,18 +326,12 @@ export function EventsHub({
       )}
 
       {events === null ? (
-        <ul role="status" aria-label="Loading events" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
+        <ul role="status" aria-label="Loading events" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
           {[0, 1, 2].map((i) => (
-            <li key={i} style={{ ...card, padding: 0, overflow: "hidden" }}>
-              <Skeleton h={140} r={0} />
-              <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-                <Skeleton w="40%" h={12} />
-                <Skeleton w="85%" h={17} />
-                <Skeleton w="60%" h={12} />
-                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-                  <Skeleton w={150} h={44} r={12} />
-                  <Skeleton w={110} h={44} r={12} />
-                </div>
+            <li key={i}>
+              <Skeleton h={0} r={22} style={{ aspectRatio: "1.586", height: "auto" }} />
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <Skeleton w="100%" h={44} r={14} />
               </div>
             </li>
           ))}
@@ -335,81 +351,237 @@ export function EventsHub({
             {events.length ? <I.Search size={24} /> : <I.Calendar size={24} />}
           </div>
           <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>{events.length ? "No events match your filters" : "No upcoming events yet"}</div>
-          <div style={{ color: t.muted, fontSize: 14, maxWidth: 420, margin: "0 auto" }}>
-            {events.length ? "Try another date, category or city." : "Paste a link to an event you're going to — everyone on NetworQ will see it, with a link to the official page."}
+          <div style={{ color: t.muted, fontSize: 14, maxWidth: 420, margin: "0 auto 16px" }}>
+            {events.length ? "Try another date, category or city." : "Add an event you're going to — everyone on NetworQ will see it, with a link to the official page."}
           </div>
+          {!events.length && <button style={btn(true)} onClick={() => setAddOpen(true)}>Add an event</button>}
         </div>
       ) : (
-        <ul aria-label="Upcoming events" className="nq-stagger" style={{ listStyle: "none", margin: 0, padding: 0, display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 14 }}>
-          {visible.map((ev) => (
-            <li key={ev.id} style={{ ...card, padding: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-              {ev.image && <EventImage src={ev.image} bg={t.raised} muted={t.muted} />}
-              <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", fontSize: 12 }}>
-                  <span style={{ color: PURPLE, fontWeight: 700 }}>{whenLabel(ev.starts_at)}</span>
-                  {ev.category && <span style={{ background: t.raised, color: t.muted, borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>{ev.category}</span>}
-                  {ev.verified && <span style={{ background: "rgba(52,199,89,0.15)", color: "#34C759", borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>Verified</span>}
-                </div>
-                <h3 style={{ margin: 0, fontSize: 17, lineHeight: 1.3 }}>{ev.title}</h3>
-                {(ev.venue || ev.city) && <div style={{ color: t.muted, fontSize: 13 }}>{[ev.venue, ev.city && !(ev.venue || "").includes(ev.city) ? ev.city : null].filter(Boolean).join(" · ")}</div>}
-                {ev.organizer && <div style={{ color: t.muted, fontSize: 13 }}>By {ev.organizer}</div>}
-                <div style={{ color: t.muted, fontSize: 12 }}>Source: {ev.source_host}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: "auto", paddingTop: 10 }}>
-                  <button style={btn(true)} onClick={() => onAttend(ev)}>
-                    I'm attending · Radar
-                  </button>
-                  <a style={btn()} href={ev.url} target="_blank" rel="noopener noreferrer">
-                    Event page ↗
-                  </a>
-                  <button
-                    style={btn()}
-                    aria-label={`Add ${ev.title} to calendar`}
-                    onClick={() => {
-                      const blob = new Blob([icsFor(ev)], { type: "text/calendar" });
-                      const a = document.createElement("a");
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `${ev.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}.ics`;
-                      a.click();
-                      URL.revokeObjectURL(a.href);
-                    }}
-                  >
-                    Add to calendar
-                  </button>
-                  <button style={btn()} onClick={() => onAddContactForEvent(ev.title)} aria-label={`Add a contact met at ${ev.title}`}>
-                    + Contact
-                  </button>
-                </div>
+        <div aria-label="Upcoming events" role="list" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {groups.map((g) => (
+            <section key={g.key} role="presentation">
+              <h3 style={{ position: "sticky", top: 0, zIndex: 1, margin: "0 0 10px", padding: "6px 2px", fontSize: 17, fontWeight: 700, letterSpacing: "-0.01em", background: isDark ? "rgba(0,0,0,0.82)" : "rgba(245,245,247,0.86)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", borderRadius: 10 }}>{g.label}</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 18 }}>
+                {g.items.map((ev) => (
+                  <EventCard key={ev.id} ev={ev} t={t} isDark={isDark} onAttend={onAttend} onAddContact={onAddContactForEvent} />
+                ))}
               </div>
-            </li>
+            </section>
           ))}
-        </ul>
+        </div>
+      )}
+
+      {addOpen && (
+        <Sheet title="Add an event" t={t} onClose={() => setAddOpen(false)}>
+          <p style={{ color: t.muted, fontSize: 15, margin: "0 0 14px", lineHeight: 1.45 }}>Paste a link from Luma, Eventbrite, Meetup or a calendar (.ics). We read the published name, date and venue from the page.</p>
+          <form onSubmit={(e) => { e.preventDefault(); importLink(); }} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <input style={{ ...input, width: "100%", minHeight: 50 }} aria-label="Event or calendar link" placeholder="https://lu.ma/…" value={link} onChange={(e) => setLink(e.target.value)} inputMode="url" autoFocus />
+            <button type="submit" style={{ ...btn(true), minHeight: 52, fontSize: 17, opacity: importing || !link.trim() ? 0.5 : 1 }} disabled={importing || !link.trim()}>
+              {importing ? "Adding…" : "Add event"}
+            </button>
+          </form>
+          <p style={{ color: t.muted, fontSize: 13, margin: "12px 0 0" }}>Hosting your own? Create it in Radar to get a join code.</p>
+        </Sheet>
+      )}
+
+      {cityOpen && (
+        <Sheet title="Location" t={t} onClose={() => setCityOpen(false)}>
+          <div role="radiogroup" aria-label="City" style={{ display: "flex", flexDirection: "column" }}>
+            {[
+              { v: "All", label: "All cities" },
+              { v: "All India", label: "All India" },
+              ...(cities.online ? [{ v: "Online", label: "Online" }] : []),
+              ...cities.india.map((c) => ({ v: c, label: c })),
+              { v: "Worldwide", label: "Worldwide" },
+              ...cities.world.map((c) => ({ v: c, label: c })),
+            ].map((o, i) => {
+              const on = city === o.v;
+              const n = cityCount(o.v);
+              return (
+                <button key={o.v} role="radio" aria-checked={on} onClick={() => { setCity(o.v); setCityOpen(false); }} style={{ all: "unset", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, minHeight: 52, padding: "0 4px", borderTop: i ? `1px solid ${t.border}` : "none", cursor: "pointer", color: t.text }}>
+                  <span style={{ flex: 1, fontSize: 16, fontWeight: on ? 600 : 400 }}>{o.label}</span>
+                  <span style={{ color: t.muted, fontSize: 14 }}>{n}</span>
+                  <span aria-hidden style={{ width: 22, color: PURPLE, display: "flex", justifyContent: "flex-end" }}>{on && <I.Check size={20} strokeWidth={2.4} />}</span>
+                </button>
+              );
+            })}
+          </div>
+        </Sheet>
+      )}
+
+      {calOpen && (
+        <Sheet title="Pick a date" t={t} onClose={() => setCalOpen(false)}>
+          <MonthPicker
+            t={t}
+            isDark={isDark}
+            selected={dateFilter === "Pick" ? pickedDay : null}
+            busyDays={busyDays}
+            onPick={(day) => { setPickedDay(day); setDateFilter("Pick"); setCalOpen(false); }}
+          />
+        </Sheet>
       )}
     </div>
   );
 }
 
-// Fixed-height frame: no layout jump while loading, a soft fade-in, and a calm placeholder if it fails
-function EventImage({ src, bg, muted }: { src: string; bg: string; muted: string }) {
-  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+// A premium, card-shaped event: the picture fills it, everything important is readable at a glance,
+// one clear action ("Going") with quieter extras beside it.
+const CATEGORY_TINT: Record<string, [string, string]> = {
+  "AI & Data": ["#4F46E5", "#7C3AED"],
+  "Finance & Web3": ["#0F766E", "#2563EB"],
+  Networking: ["#7C3AED", "#DB2777"],
+  "Conferences & Expos": ["#1E3A8A", "#7C3AED"],
+  Startups: ["#EA580C", "#DB2777"],
+  Design: ["#DB2777", "#9333EA"],
+};
+function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent; t: ReturnType<typeof theme>; isDark: boolean; onAttend: (ev: PublicEvent) => void; onAddContact: (name: string) => void }) {
+  const [img, setImg] = useState<"loading" | "ok" | "failed">(ev.image ? "loading" : "failed");
+  const d = new Date(ev.starts_at);
+  const [c1, c2] = CATEGORY_TINT[ev.category || ""] || ["#3B1A7A", "#7C3AED"];
+  const place = [ev.venue, ev.city && !(ev.venue || "").includes(ev.city) ? ev.city : null].filter(Boolean).join(" · ");
+  const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const round: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", flexShrink: 0, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: t.raised, color: t.text, textDecoration: "none" };
+  const addToCalendar = () => {
+    const blob = new Blob([icsFor(ev)], { type: "text/calendar" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${ev.title.replace(/[^a-z0-9]+/gi, "-").slice(0, 40)}.ics`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
   return (
-    <div style={{ position: "relative", width: "100%", height: 140, background: bg, overflow: "hidden" }}>
-      {state === "loading" && <Skeleton h={140} r={0} style={{ position: "absolute", inset: 0 }} />}
-      {state === "failed" ? (
-        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: muted }}>
-          <I.Calendar size={28} />
+    <article role="listitem" className="nq-pop" aria-label={ev.title} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ position: "relative", aspectRatio: "1.586", borderRadius: 22, overflow: "hidden", background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`, color: "#FFFFFF", boxShadow: isDark ? "0 12px 30px -14px rgba(0,0,0,0.8)" : "0 14px 32px -16px rgba(40,20,90,0.45)" }}>
+        {ev.image && img !== "failed" && (
+          <img src={ev.image} alt="" loading="lazy" referrerPolicy="no-referrer" onLoad={() => setImg("ok")} onError={() => setImg("failed")} className={`nq-fade${img === "ok" ? " is-loaded" : ""}`} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
+        {img === "failed" && (
+          <span aria-hidden style={{ position: "absolute", right: -18, bottom: -26, opacity: 0.14, color: "#FFFFFF" }}>
+            <I.Calendar size={150} strokeWidth={1.2} />
+          </span>
+        )}
+        <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.82) 100%)" }} />
+        {/* Date tile */}
+        <div style={{ position: "absolute", top: 14, left: 14, width: 52, borderRadius: 14, overflow: "hidden", textAlign: "center", background: "rgba(255,255,255,0.94)", color: "#1C1C1E", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: "#7C3AED", color: "#FFFFFF", padding: "3px 0" }}>{d.toLocaleDateString([], { month: "short" })}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, padding: "5px 0 2px" }}>{d.getDate()}</div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#6E6E73", paddingBottom: 4 }}>{d.toLocaleDateString([], { weekday: "short" })}</div>
         </div>
-      ) : (
-        <img
-          src={src}
-          alt=""
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          className={`nq-fade${state === "loaded" ? " is-loaded" : ""}`}
-          onLoad={() => setState("loaded")}
-          onError={() => setState("failed")}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-        />
-      )}
+        {ev.category && (
+          <span style={{ position: "absolute", top: 14, right: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 12, fontWeight: 600, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#FFFFFF" }}>{ev.category}</span>
+        )}
+        <div style={{ position: "absolute", left: 16, right: 16, bottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.01em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 6px rgba(0,0,0,0.35)" } as React.CSSProperties}>{ev.title}</h3>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 13, color: "rgba(255,255,255,0.88)", overflow: "hidden" }}>
+            <I.Clock size={14} /> <span style={{ flexShrink: 0 }}>{time}</span>
+            {place && (
+              <>
+                <span aria-hidden style={{ opacity: 0.6 }}>·</span>
+                <I.MapPin size={14} />
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{place}</span>
+              </>
+            )}
+          </div>
+          {(ev.organizer || ev.verified) && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+              {ev.organizer && (
+                <>
+                  <span aria-hidden style={{ width: 18, height: 18, borderRadius: 9, background: "rgba(255,255,255,0.25)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#FFFFFF" }}>{ev.organizer.trim().charAt(0).toUpperCase()}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>By {ev.organizer}</span>
+                </>
+              )}
+              {ev.verified && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "#7CF0A0", fontWeight: 600, flexShrink: 0 }}>
+                  <I.Check size={13} strokeWidth={2.6} /> Verified
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button onClick={() => onAttend(ev)} aria-label={`I'm attending ${ev.title} · Radar`} className="btn-press" style={{ flex: 1, minHeight: 44, borderRadius: 22, border: "none", background: PURPLE, color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <I.Check size={17} strokeWidth={2.4} /> Going
+        </button>
+        <button onClick={addToCalendar} aria-label={`Add ${ev.title} to calendar`} title="Add to calendar" style={round}>
+          <I.Calendar size={18} />
+        </button>
+        <a href={ev.url} target="_blank" rel="noopener noreferrer" aria-label={`Event page on ${ev.source_host}`} title={`Open on ${ev.source_host}`} style={round}>
+          <I.Globe size={18} />
+        </a>
+        <button onClick={() => onAddContact(ev.title)} aria-label={`Add a contact met at ${ev.title}`} title="Add someone you met here" style={round}>
+          <I.UserPlus size={18} />
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function Sheet({ title, t, onClose, children }: { title: string; t: ReturnType<typeof theme>; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [onClose]);
+  return (
+    <div role="dialog" aria-modal="true" aria-label={title} style={{ position: "fixed", inset: 0, zIndex: 400, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+      <div className="nq-backdrop" onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.4)" }} />
+      <div className="nq-sheet-up" style={{ position: "relative", width: "100%", maxWidth: 520, maxHeight: "86dvh", overflowY: "auto", background: t.surface, color: t.text, borderRadius: "28px 28px 0 0", padding: "10px 20px calc(24px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))", boxSizing: "border-box" }}>
+        <div aria-hidden style={{ width: 36, height: 5, borderRadius: 3, background: t.border, margin: "0 auto 12px" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{title}</h3>
+          <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <I.X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Month calendar: days with events get a dot; past days are dimmed
+function MonthPicker({ t, isDark, selected, busyDays, onPick }: { t: ReturnType<typeof theme>; isDark: boolean; selected: string | null; busyDays: Set<string>; onPick: (day: string) => void }) {
+  const today = new Date(new Date().toDateString());
+  const [month, setMonth] = useState(() => (selected ? new Date(selected + "T00:00:00") : today));
+  const first = new Date(month.getFullYear(), month.getMonth(), 1);
+  const lead = (first.getDay() + 6) % 7; // Monday first
+  const daysIn = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysIn }, (_, i) => i + 1)];
+  const key = (d: number) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  const canPrev = month.getFullYear() > today.getFullYear() || month.getMonth() > today.getMonth();
+  const nav: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", background: t.raised, color: t.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <button aria-label="Previous month" disabled={!canPrev} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={{ ...nav, opacity: canPrev ? 1 : 0.35 }}>
+          <I.ChevronLeft size={20} />
+        </button>
+        <div style={{ fontSize: 17, fontWeight: 600 }}>{month.toLocaleDateString([], { month: "long", year: "numeric" })}</div>
+        <button aria-label="Next month" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={nav}>
+          <I.ChevronLeft size={20} style={{ transform: "rotate(180deg)" }} />
+        </button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
+        {["M", "T", "W", "T", "F", "S", "S"].map((w, i) => (
+          <div key={i} style={{ fontSize: 12, color: t.muted, fontWeight: 600, padding: "4px 0" }}>{w}</div>
+        ))}
+        {cells.map((d, i) => {
+          if (d === null) return <div key={`b${i}`} />;
+          const k = key(d);
+          const past = new Date(k + "T00:00:00") < today;
+          const on = selected === k;
+          const isToday = new Date(k + "T00:00:00").getTime() === today.getTime();
+          const busy = busyDays.has(k);
+          return (
+            <button key={k} disabled={past} onClick={() => onPick(k)} aria-label={`${new Date(k + "T00:00:00").toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}${busy ? ", has events" : ""}`} aria-pressed={on} style={{ position: "relative", aspectRatio: "1", borderRadius: 999, border: "none", cursor: past ? "default" : "pointer", fontSize: 15, fontWeight: on || isToday ? 700 : 500, background: on ? PURPLE : "transparent", color: on ? "#FFFFFF" : past ? (isDark ? "#48484A" : "#C7C7CC") : isToday ? PURPLE : t.text }}>
+              {d}
+              {busy && !past && <span aria-hidden style={{ position: "absolute", left: "50%", bottom: 5, width: 4, height: 4, marginLeft: -2, borderRadius: 2, background: on ? "#FFFFFF" : PURPLE }} />}
+            </button>
+          );
+        })}
+      </div>
+      <p style={{ fontSize: 13, color: t.muted, margin: "12px 0 0", textAlign: "center" }}>Days with a dot have events.</p>
     </div>
   );
 }

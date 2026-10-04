@@ -325,7 +325,7 @@ test.describe("Event Radar", () => {
     await login(page, "asha@acme.test");
     if (isMobileProject()) await page.getByRole("button", { name: "Events", exact: true }).last().click();
     else await page.getByRole("complementary").getByRole("button", { name: /^Events Hub/ }).click();
-    await page.getByRole("button", { name: "I'm attending · Radar" }).first().click();
+    await page.getByRole("button", { name: /^I'm attending/ }).first().click();
     await expect(page.getByText("You're attending Bengaluru Product Circle")).toBeVisible();
     await expect(page.getByText("Live at")).toBeVisible();
     expect(db.events[0]).toMatchObject({ source: "listed", external_id: db.table("public_events")[0].id });
