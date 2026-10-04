@@ -33,14 +33,14 @@ export function NetworQLogo({
           <stop offset="0%" stopColor="rgba(192, 132, 252, 0)" />
           <stop offset="25%" stopColor="#C084FC" />
           <stop offset="50%" stopColor="#FFFFFF" />
-          <stop offset="75%" stopColor="#38BDF8" />
-          <stop offset="100%" stopColor="rgba(56, 189, 248, 0)" />
+          <stop offset="75%" stopColor="#A78BFA" />
+          <stop offset="100%" stopColor="rgba(167, 139, 250, 0)" />
         </linearGradient>
 
         <linearGradient id="qBeamWash" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
-          <stop offset="60%" stopColor="rgba(168, 85, 247, 0.2)" />
-          <stop offset="100%" stopColor="rgba(56, 189, 248, 0.4)" />
+          <stop offset="60%" stopColor="rgba(168, 85, 247, 0.25)" />
+          <stop offset="100%" stopColor="rgba(139, 92, 246, 0.4)" />
         </linearGradient>
 
         <filter id="qLaserGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -100,7 +100,7 @@ export function NetworQLogo({
             <animate attributeName="r" values="3;34;3" dur="2.2s" repeatCount="indefinite" />
             <animate attributeName="opacity" values="0.8;0;0.8" dur="2.2s" repeatCount="indefinite" />
           </circle>
-          <circle cx="247" cy="328" r="6" fill="#38BDF8" opacity="0.5">
+          <circle cx="247" cy="328" r="6" fill="#8B5CF6" opacity="0.5">
             <animate attributeName="r" values="3;30;3" dur="2.2s" repeatCount="indefinite" />
             <animate attributeName="opacity" values="0.7;0;0.7" dur="2.2s" repeatCount="indefinite" />
           </circle>
