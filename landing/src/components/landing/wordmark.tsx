@@ -1,4 +1,6 @@
 import React from "react";
+import networqLogo from "../../assets/networq-logo.png";
+import networqLogoDark from "../../assets/networq-logo-dark.png";
 
 export function NetworQLogo({
   size = 28,
@@ -112,26 +114,52 @@ export function NetworQLogo({
 
 export function Wordmark({
   className = "",
-  size = 26,
-  scanning = true,
+  size = 28,
+  theme = "auto",
+  style,
 }: {
   className?: string;
   size?: number;
   scanning?: boolean;
+  theme?: "auto" | "light" | "dark";
+  style?: React.CSSProperties;
 }) {
+  if (theme === "light") {
+    return (
+      <img
+        src={networqLogo}
+        alt="NetworQ"
+        style={{ height: size, width: "auto", ...style }}
+        className={`object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  if (theme === "dark") {
+    return (
+      <img
+        src={networqLogoDark}
+        alt="NetworQ"
+        style={{ height: size, width: "auto", ...style }}
+        className={`object-contain select-none ${className}`}
+      />
+    );
+  }
+
   return (
-    <div
-      className={`inline-flex items-center gap-1 select-none ${className}`}
-      style={{
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
-        fontSize: size,
-        fontWeight: 700,
-        letterSpacing: "-0.03em",
-        lineHeight: 1,
-      }}
-    >
-      <span className="text-foreground">Networ</span>
-      <NetworQLogo size={Math.round(size * 0.94)} scanning={scanning} />
+    <div className={`inline-flex items-center select-none ${className}`} style={style}>
+      <img
+        src={networqLogo}
+        alt="NetworQ"
+        style={{ height: size, width: "auto" }}
+        className="dark:hidden block object-contain"
+      />
+      <img
+        src={networqLogoDark}
+        alt="NetworQ"
+        style={{ height: size, width: "auto" }}
+        className="hidden dark:block object-contain"
+      />
     </div>
   );
 }

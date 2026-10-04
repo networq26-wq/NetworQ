@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, CheckCircle2, Share2, Sparkles, Loader2 } from "lucide-react";
 import { Reveal } from "./reveal";
-import darkTexture from "../../assets/dark-texture.jpg";
 
 const SUPABASE_URL = "https://jpuxmkkuzqojqeatespa.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -67,15 +66,14 @@ export function Waitlist() {
 
   return (
     <section id="waitlist" className="section-dark relative isolate overflow-hidden">
-      <img
-        src={darkTexture}
-        alt=""
+      {/* Ambient Royal Violet Tech Mesh Glow */}
+      <div
         aria-hidden="true"
-        loading="lazy"
-        width={1920}
-        height={1088}
-        className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-70"
-      />
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[480px] bg-gradient-to-tr from-violet-600/20 via-purple-600/10 to-indigo-600/0 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:36px_36px] opacity-[0.08]" />
+      </div>
       <div className="relative mx-auto max-w-3xl px-6 py-28 text-center md:py-40">
         <Reveal>
           <h2 className="text-4xl leading-[1.14] font-semibold tracking-[-0.035em] text-balance sm:text-[3.25rem]">

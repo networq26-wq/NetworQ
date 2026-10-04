@@ -37,11 +37,11 @@ export function Problem() {
             <figure className="mb-12 overflow-hidden rounded-2xl border border-border bg-card">
               <img
                 src={conversation}
-                alt="Two professionals in conversation at a conference"
+                alt="Two professionals connecting and exchanging contact at a conference"
                 width={1600}
                 height={1104}
                 loading="lazy"
-                className="aspect-[16/11] w-full object-cover grayscale"
+                className="aspect-[16/11] w-full object-cover shadow-sm transition-transform duration-500 hover:scale-[1.02]"
               />
             </figure>
           </Reveal>

@@ -258,14 +258,14 @@ const Icons = {
             <stop offset="0%" stopColor="rgba(192, 132, 252, 0)" />
             <stop offset="25%" stopColor="#C084FC" />
             <stop offset="50%" stopColor="#FFFFFF" />
-            <stop offset="75%" stopColor="#38BDF8" />
-            <stop offset="100%" stopColor="rgba(56, 189, 248, 0)" />
+            <stop offset="75%" stopColor="#A78BFA" />
+            <stop offset="100%" stopColor="rgba(167, 139, 250, 0)" />
           </linearGradient>
 
           <linearGradient id="qBeamWash" x1="0%" y1="0%" x2="0%" y2="100%">
             <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
-            <stop offset="60%" stopColor="rgba(168, 85, 247, 0.2)" />
-            <stop offset="100%" stopColor="rgba(56, 189, 248, 0.4)" />
+            <stop offset="60%" stopColor="rgba(139, 92, 246, 0.25)" />
+            <stop offset="100%" stopColor="rgba(109, 40, 217, 0.4)" />
           </linearGradient>
 
           <filter id="qLaserGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -285,12 +285,12 @@ const Icons = {
         {/* Left bracket (Capture) - exact PDF vector */}
         <path
           d="M 115.08 352.76 C 115.08 363.63, 123.89 372.44, 134.76 372.44 L 216 372.44 L 216 487.53 L 107.59 487.53 C 48.17 487.53, 0 439.36, 0 379.94 L 0 107.57 C 0 48.17, 48.17 0, 107.59 0 L 216 0 L 216 115.08 L 134.76 115.08 C 123.89 115.08, 115.08 123.87, 115.08 134.74 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#361DD9")}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#7C3AED")}
         />
         {/* Right bracket with Q tail (Continuity) - exact PDF vector */}
         <path
           d="M 468.55 467.77 L 548.05 550.87 L 426.92 550.87 L 365.37 487.53 L 298.01 413.36 L 260.86 372.44 L 379.27 372.44 C 390.12 372.44, 398.93 363.63, 398.93 352.76 L 398.93 134.74 C 398.93 123.87, 390.12 115.08, 379.27 115.08 L 298.01 115.08 L 298.01 0 L 406.43 0 C 465.85 0, 514.01 48.17, 514.01 107.57 L 514.01 379.94 C 514.01 416.22, 496.05 448.31, 468.55 467.77 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#5E35F5")}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#6D28D9")}
         />
         {/* Center connector bar (Connection) - exact PDF vector */}
         <rect
@@ -298,7 +298,7 @@ const Icons = {
           y="202.75"
           width="283.85"
           height="82.01"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#715DFC")}
+          fill={gradient ? "url(#qPurpleGrad)" : (color || "#7C3AED")}
         />
 
         {/* ── SCANNER BEAM INSIDE THE Q CAVITY ── */}
@@ -330,7 +330,7 @@ const Icons = {
               <animate attributeName="r" values="3;34;3" dur="2.2s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="0.8;0;0.8" dur="2.2s" repeatCount="indefinite" />
             </circle>
-            <circle cx="247" cy="328" r="6" fill="#38BDF8" opacity="0.5">
+            <circle cx="247" cy="328" r="6" fill="#8B5CF6" opacity="0.6">
               <animate attributeName="r" values="3;30;3" dur="2.2s" repeatCount="indefinite" />
               <animate attributeName="opacity" values="0.7;0;0.7" dur="2.2s" repeatCount="indefinite" />
             </circle>
@@ -376,27 +376,22 @@ const Icons = {
       <line x1="17" y1="9" x2="23" y2="15" />
     </svg>
   ),
-  Wordmark: ({ size = 26, isDark = false, style, scanning = true }: { size?: number; isDark?: boolean; style?: React.CSSProperties; scanning?: boolean }) => {
-    const textColor = isDark ? "#F5F5F7" : "#1D1D1F";
+  Wordmark: ({ size = 26, isDark = false, style }: { size?: number; isDark?: boolean; style?: React.CSSProperties; scanning?: boolean }) => {
+    const src = isDark ? "/networq-logo-dark.png" : "/networq-logo.png";
     return (
-      <div
+      <img
+        src={src}
+        alt="NetworQ"
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: Math.max(2, Math.round(size * 0.05)),
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif",
-          fontWeight: 700,
-          fontSize: size,
-          letterSpacing: "-0.03em",
-          color: textColor,
+          height: size,
+          width: "auto",
+          objectFit: "contain",
           userSelect: "none",
-          lineHeight: 1,
+          display: "inline-block",
+          verticalAlign: "middle",
           ...style,
         }}
-      >
-        <span>Networ</span>
-        <Icons.Logo size={Math.round(size * 0.94)} scanning={scanning} />
-      </div>
+      />
     );
   },
   Home: ({ size = 16, color = "currentColor", style }: IconProps) => (
