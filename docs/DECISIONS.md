@@ -84,3 +84,38 @@
 **Decision:** Keep nodemailer in the email handler as fallback
 
 **Reason:** Some deployments may have corporate SMTP servers. nodemailer allows Resend → SMTP → dev-log fallback chain without breaking changes.
+
+---
+
+## ADR-011 — Render (supersedes ADR-006)
+**Decision:** Production runs on Render, auto-deploying `main` to https://www.networq.co.in.
+**Reason:** one-push deploys from GitHub, managed TLS and env vars, persistent Node process for jobs and webhooks. Fly.io/Surge configs are legacy.
+
+## ADR-012 — Android app as a WebView shell
+**Decision:** The Android app is an Expo shell that loads the live site and exposes native features (camera, microphone, Bluetooth radar, push, back button, Google sign-in) through bridges.
+**Reason:** one product to build and test; most releases reach phones instantly. Trade-off: shell changes need a new APK.
+
+## ADR-013 — Database-enforced social features
+**Decision:** Connections, messages, calls, blocking and radar are written only through security-definer RPCs; tables deny direct writes.
+**Reason:** the client is untrusted; rules like "only connected, unblocked people can message or call" must hold even with a modified app.
+
+## ADR-014 — Push for free: Expo Push + Web Push
+**Decision:** Expo Push (FCM V1 under the hood) for Android, Web Push (VAPID) for browsers — no paid push service. (Supersedes ADR-007.)
+
+## ADR-015 — WebRTC calls with Supabase Realtime signalling
+**Decision:** 1:1 calls are peer-to-peer WebRTC; ringing is a `calls` row (Realtime + push), signalling on the private `call:` channel; TURN optional via `/api/calls/ice`.
+**Reason:** no per-minute call costs; privacy (media never on our servers). Group calls will use an SFU (Jitsi/LiveKit) later.
+
+## ADR-016 — Server-side speech recognition (Whisper)
+**Decision:** Voice features record audio (MediaRecorder) and transcribe on the server with Whisper.
+**Reason:** browser speech recognition doesn't exist in Android WebViews and handles Indian English poorly; Whisper works everywhere and is free on Groq.
+
+## ADR-017 — Honest AI
+**Decision:** No canned or fabricated AI responses. If the model is busy, say so (503); extraction returns empty fields rather than guesses; research drafts are fact-checked against sources.
+
+## ADR-018 — Information architecture: four tabs + Me
+**Decision:** People · Messages · Radar · Events in the bottom bar; Me (card + settings) behind the header avatar; scan/type/voice/QR/follow-ups as home quick actions; AI as a quiet floating button.
+**Reason:** fewer, clearer destinations (the "2-year-old / 80-year-old" test); one way to reach each thing.
+
+## ADR-019 — Official brand artwork only
+**Decision:** The logo is the official artwork (`public/brand/*.png`, cropped and background-removed with pixel-exact colours); only the scan beam is animated in CSS.

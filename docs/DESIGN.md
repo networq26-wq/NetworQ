@@ -1,202 +1,70 @@
-# Design System — NetworQ
+# Design — NetworQ
 
-## Philosophy
-Premium, minimal, focused. Inspired by Apple and Google's design principles.
-No rainbow gradients. No gimmicks. Everything serves the user.
+## The test every screen must pass
+*Could a 2-year-old or an 80-year-old use this without being taught?*
+- **One idea per screen.** One primary action, everything else quieter.
+- **Plain words.** "Who's next", "Going", "Save contact" — never jargon ("Auto-Pilot", "CRM sync").
+- **Big, obvious targets.** ≥ 44 pt touch targets; the main action is a filled pill.
+- **Honest states.** Skeletons while loading, plain errors with a way out, empty states that say what to do next. Never fake data.
+- **One way to each thing.** No duplicate entries (e.g. Me is reached only from the header avatar).
 
-> "Design is not just what it looks like. Design is how it works." — Steve Jobs
+## Information architecture (phone)
 
----
+```
+Header:  [NetworQ logo]                         [Search] [Bell] [Avatar → Me]
+Body:    People | Messages | Radar | Events  (the current tab)
+Bottom:  ─────────── People · Messages · Radar · Events ───────────  (+ quiet AI button)
+```
+
+| Tab | Top to bottom |
+|---|---|
+| **People** | Greeting + live line → at-a-glance strip → quick actions (Scan · Type · Voice · My QR · Follow up) → Who's next → Coming up → Your people (search, one filter row, list; Select mode) |
+| **Messages** | Title + New message → conversations (unread first by recency) |
+| **Radar** | Nearby / Events switch → state card (off → turn on; on → discoverable, people, privacy) |
+| **Events** | Title + Add → search with location pill → date control + calendar → categories → results by day |
+| **Me** | Card (flip for QR) → Show QR / Share → grouped rows: Profile · Card · Organization / Notifications · Privacy · Password & devices · Appearance / Tools / Data · Help · Account (each a sub-page with "‹ Me") |
+
+Desktop uses a left sidebar with the same destinations and a right-hand contact inspector.
 
 ## Brand
+- **Logo:** official artwork only — `public/brand/networq-wordmark.png` (light), `networq-wordmark-white.png` (dark), `networq-q*.png` (mark). The **Q scan beam** (CSS `.nq-qscan`) sweeps inside the Q's opening in the logo's own violets (#5E35F5 / #715DFC with a light core).
+- **Tagline:** "Never lose a conversation again."
+- **Primary:** Royal violet `#7C3AED` (dark-mode accent `#C4B5FD` / `#A78BFA`). Logo violets `#361DD9 → #5E35F5`, bar `#715DFC`.
+- **Status:** success `#34C759`, warning `#FF9F0A`, destructive `#FF3B30`.
 
-| Element | Value |
-|---|---|
-| Primary Color | `#7C3AED` (Purple) |
-| Brand Name | NetworQ |
-| Logo | Animated Q with laser scanner beam |
-| Tagline | Professional Network Intelligence |
-
----
-
-## Color Palette
-
-### Dark Mode (Primary)
-| Token | Value | Usage |
+## Tokens
+| Token | Light | Dark |
 |---|---|---|
-| Background | `#000000` | App background |
-| Surface | `#1C1C1E` | Cards, modals |
-| Surface 2 | `#2C2C2E` | Inputs, hover |
-| Border | `rgba(255,255,255,0.08)` | Dividers, borders |
-| Text Primary | `#FFFFFF` | Headings |
-| Text Secondary | `#AEAEB2` | Labels, muted |
-| Text Muted | `#6E6E73` | Placeholders |
-| Accent | `#7C3AED` | Buttons, active states |
-| Success | `#10B981` | Sent, confirmed |
-| Warning | `#F59E0B` | Reminders, alerts |
-| Error | `#EF4444` | Errors |
+| Background | `#F2F2F7` / `#F5F5F7` | `#000000` |
+| Surface (cards, sheets) | `#FFFFFF` | `#1C1C1E` |
+| Raised (inputs, chips) | `#F2F2F7` | `#2C2C2E` |
+| Text | `#1C1C1E` | `#FFFFFF` |
+| Secondary text | `#6E6E73` | `#AEAEB2` |
+| Hairline | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.08)` |
 
-### Light Mode
-| Token | Value | Usage |
-|---|---|---|
-| Background | `#F2F2F7` | App background |
-| Surface | `#FFFFFF` | Cards, modals |
-| Surface 2 | `#F2F2F7` | Inputs |
-| Border | `rgba(0,0,0,0.08)` | Dividers |
-| Text Primary | `#1C1C1E` | Headings |
-| Text Secondary | `#3C3C43` | Labels |
-| Text Muted | `#8E8E93` | Placeholders |
-
-### Prohibited Colors
-- No bright HSL rainbow gradients on roles or tags
-- No neon or fluorescent colors
-- No random color-per-user schemes
-- Tags are always neutral: `rgba(255,255,255,0.06)` dark / `rgba(0,0,0,0.04)` light
-
----
-
-## Typography
-
-| Element | Font | Size | Weight |
-|---|---|---|---|
-| App font | SF Pro / -apple-system / Arial | — | — |
-| H1 (page titles) | System | 28–32px | 700–800 |
-| H2 (section) | System | 20–24px | 600–700 |
-| Body | System | 15px | 400 |
-| Label | System | 13px | 500 |
-| Caption | System | 11–12px | 400 |
-| Monospace | SF Mono / monospace | 13px | 400 |
-
----
-
-## Spacing
-Based on 4px grid:
-- `4px` — micro gap
-- `8px` — compact
-- `12px` — default inner padding
-- `16px` — card padding
-- `20–24px` — section gap
-- `32–48px` — page sections
-
----
-
-## Border Radius
-| Element | Radius |
-|---|---|
-| Buttons | `10px` |
-| Cards | `14–16px` |
-| Inputs | `10px` |
-| Modals | `20px` |
-| Chips/Tags | `20px` (pill) |
-| Avatar | `50%` (circle) |
-| Logo container | `24px` |
-
----
-
-## Buttons
-
-### Primary
-```
-background: #7C3AED
-color: white
-padding: 12px 20px
-border-radius: 10px
-font-weight: 600
-```
-
-### Secondary
-```
-background: rgba(255,255,255,0.06)
-color: inherit
-border: 1px solid rgba(255,255,255,0.1)
-```
-
-### Destructive
-```
-background: rgba(239,68,68,0.15)
-color: #EF4444
-border: 1px solid rgba(239,68,68,0.3)
-```
-
----
+Typography: system font (SF Pro / Roboto). Titles 28 / 22 / 17 semibold–bold with −0.02em tracking; body 15–16; captions 12–13. Radius: 14 inputs, 18–22 cards, 28 sheet tops, full pills for chips and buttons.
 
 ## Components
+- **Grouped list** (iOS-style): one rounded card, hairline separators, 44 px avatar, name + one secondary line, at most two round icon buttons.
+- **Sheets** slide up from the bottom with a grabber; tap outside or Back to close.
+- **Chips:** pill, inverted (black/white) when selected.
+- **Segmented control:** for 2–4 mutually exclusive choices (dates, reminder, radar scope).
+- **Card-shaped surfaces** (ID-1 ratio 1.586): your digital card, event cards, Coming up tiles.
+- **Badges/pills** are vertically centred inline-flex with even height.
 
-### Cards
-- Background: surface color
-- Border: 1px solid border color
-- Border-radius: 14–16px
-- Padding: 16–20px
-- No drop shadows by default (Apple-style flat)
-- Hover: slight background lift
-
-### Inputs
-- Background: surface-2
-- Border: 1px solid border
-- Border-radius: 10px
-- Focus: 2px solid `#7C3AED`
-- Height: 44px (touch-friendly)
-
-### Modals
-- Background: surface with `backdrop-filter: blur(20px)`
-- Max-width: 480–520px
-- Border-radius: 20px
-- Overlay: `rgba(0,0,0,0.5)`
-
-### Avatar / Display Picture
-- Circle, 36–44px
-- Photo if available
-- Otherwise: SF-style user silhouette icon on neutral `#3A3A3C` background
-- Never: colored initials, rainbow backgrounds
-
-### Tags / Chips
-- Neutral only: no bright colors
-- Pill shape (border-radius: 20px)
-- Font-size: 11–12px
-- Padding: 3px 10px
-
----
-
-## Icons
-- Library: Custom SVG inline in `Icons` object in `App.tsx`
-- Style: Lucide-inspired line icons
-- Size: 16px default, 20px for nav, 24px for featured
-- Color: inherits from parent (no hardcoded colors except brand elements)
-
----
-
-## Motion & Animation
-- Page transitions: `fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)`
-- Modals: scale + fade in
-- Splash scanner: SVG animated laser beam in Q cavity
-- Confetti: physics-based particle system on success
-- No excessive bounce or spring animations
-
----
-
-## Responsive Design
-| Breakpoint | Width | Layout |
+## Motion (Apple HIG-inspired)
+| Class | Use | Feel |
 |---|---|---|
-| Mobile | < 768px | Full-width, bottom nav |
-| Tablet | 768–1024px | Sidebar + content |
-| Desktop | > 1024px | Wide sidebar + content |
+| `nq-screen` | tab change | quick opacity fade (no transform, so fixed overlays aren't trapped) |
+| `nq-sheet-up` / `nq-sheet-right` | sheets / sub-pages | 0.3–0.34 s, cubic-bezier(0.32, 0.72, 0, 1) |
+| `nq-pop` | new list items, dialogs | 0.24 s scale from 0.94 |
+| `nq-stagger` | lists | children fade in 25 ms apart |
+| `nq-skeleton` | loading | soft shimmer |
+| `nq-success-*` | important success | check draws itself |
+| `nq-qscan`, `nq-scanline` | brand / scanning | slow sweep |
+| Call screen | ringing | pulsing rings; tone + vibration |
 
----
+No motion on frequent, repetitive interactions. Everything respects `prefers-reduced-motion`. Glass (blur) only on floating controls (bottom bar, AI button, select bar, call controls).
 
-## UX Requirements
-- Every async action must have a loading state
-- Every form must have error states
-- Empty states must have a helpful message + CTA
-- All interactive elements must be keyboard-navigable
-- Minimum touch target: 44×44px (Apple HIG)
-- Accessible color contrast (WCAG AA minimum)
-
----
-
-## What NOT to do
-- ❌ Bright role badges (founders = green, investor = blue etc.)
-- ❌ Rainbow tag colors
-- ❌ "Powered by Groq" or vendor branding in UI
-- ❌ Fancy glassmorphism everywhere (use sparingly)
-- ❌ Animations that block or delay user actions
-- ❌ Colored initials avatars — use icon silhouette instead
+## Writing style
+Short sentences, second person, verbs on buttons ("Save contact", "Send 3 emails"), real numbers ("2 people are waiting to hear from you"), and explain limits honestly ("Finding people around you uses Bluetooth, so it works in the NetworQ phone app").
