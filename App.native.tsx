@@ -90,6 +90,17 @@ function Shell() {
         if (Platform.OS === "android") PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA).catch(() => {});
         return;
       }
+      // Calls and voice notes: ask Android for the microphone (and camera for video), then tell the page
+      if (msg?.type === "perm:media") {
+        const reply = (granted: boolean) =>
+          webViewRef.current?.injectJavaScript(`window.__networqPermResult&&window.__networqPermResult(${JSON.stringify({ id: msg.id, granted })});true;`);
+        if (Platform.OS !== "android") return reply(true);
+        const wanted = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, ...(msg.video ? [PermissionsAndroid.PERMISSIONS.CAMERA] : [])];
+        PermissionsAndroid.requestMultiple(wanted)
+          .then((r) => reply(wanted.every((p) => r[p] === PermissionsAndroid.RESULTS.GRANTED)))
+          .catch(() => reply(false));
+        return;
+      }
       if (msg?.type !== "nav:back" || msg.handled) return;
       if (canGoBack) return webViewRef.current?.goBack(); // e.g. from /privacy back to the app
       const now = Date.now();

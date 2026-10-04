@@ -63,6 +63,7 @@ const MIGRATIONS = [
   "20261010_push_notifications.sql",
   "20261011_realtime_chat.sql",
   "20261012_chat_hardening.sql",
+  "20261013_calls.sql",
 ];
 
 const authConfig = {

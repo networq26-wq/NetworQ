@@ -25,6 +25,7 @@ import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
 import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
+import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
@@ -1201,13 +1202,19 @@ function NetworQApp() {
   const [openTarget] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const t = new URLSearchParams(window.location.search).get("open");
-    return t && ["radar", "contacts", "events", "settings", "chat"].includes(t) ? t : null;
+    return t && ["radar", "contacts", "events", "settings", "chat", "call"].includes(t) ? t : null;
   });
   // ?open=chat&with=<user id> (from a message push notification)
   const [openChatWith] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const w = new URLSearchParams(window.location.search).get("with");
     return w && /^[0-9a-f-]{36}$/i.test(w) ? w : null;
+  });
+  // ?open=call&call=<call id> (from an incoming-call push)
+  const [openCallId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const c = new URLSearchParams(window.location.search).get("call");
+    return c && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
   });
   const [inviteCode] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -1710,7 +1717,10 @@ VOICE & ASSISTANT DIRECTIVES:
 
   useEffect(() => {
     if (screen !== "app" || !openTarget) return;
-    if (openTarget === "chat") {
+    if (openTarget === "call") {
+      // let the call layer mount and subscribe first
+      if (openCallId) setTimeout(() => openCall(openCallId), 600);
+    } else if (openTarget === "chat") {
       if (openChatWith) {
         setChatPartner({ id: openChatWith, name: "Message" });
         setChatEvent(null);
@@ -1747,6 +1757,10 @@ VOICE & ASSISTANT DIRECTIVES:
     notif.markRead([n.id]);
     setNotifOpen(false);
     const screen = n.data?.screen;
+    if (screen === "call" && n.data?.call_id) {
+      openCall(n.data.call_id); // still ringing → Accept / Decline; otherwise "That call has ended"
+      return;
+    }
     if (screen === "chat" && n.data?.from_user) {
       // Message notification → open that conversation
       setChatPartner({ id: n.data.from_user, name: n.title });
@@ -1795,6 +1809,7 @@ VOICE & ASSISTANT DIRECTIVES:
 
   const backState = useRef<() => boolean>(() => false);
   backState.current = () => {
+    if ((window as any).__networqCallBusy) return true; // back never drops a live call
     // Sheets/dialogs inside feature screens close on Escape
     const openDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
     if (openDialog) {
@@ -7255,6 +7270,11 @@ Keep it punchy, sharp, and directly actionable.`;
           isDark={isDark}
           showToast={showToast}
         />
+      )}
+
+      {/* ── CALLS: ring anywhere; voice & video ── */}
+      {screen === "app" && currentUser?.id && (
+        <CallLayer supabase={supabase} me={{ id: currentUser.id, name: currentUser.name }} apiBaseUrl={apiBase(AI_PROXY)} showToast={showToast} />
       )}
 
       {/* ── REALTIME IN-APP CHAT & EVENT ROOM MESSAGING ── */}

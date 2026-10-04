@@ -16,6 +16,7 @@ const { startEventsCrawler } = require("./api/eventsCrawler");
 const { createTtsRouter, productionDeps: ttsDeps } = require("./api/tts");
 const { createNotifyHookRouter, productionDeps: notifyDeps } = require("./api/notifyHook");
 const { createProspectRouter, productionDeps: prospectDeps } = require("./api/prospect");
+const { createIceRouter, productionDeps: iceDeps, STUN } = require("./api/ice");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -249,6 +250,11 @@ if (accountDeps) {
 const evDeps = eventsDeps();
 if (evDeps) app.use("/api", createEventsRouter(evDeps));
 else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
+
+// ── Call relay settings (STUN always; TURN when configured) ────────────────────
+const iceDepsValue = iceDeps();
+if (iceDepsValue) app.use("/api", createIceRouter(iceDepsValue));
+else app.get("/api/calls/ice", (req, res) => res.json({ iceServers: STUN, relay: false }));
 
 // ── Dev-only Bluetooth simulator for the device preview (never in production) ──
 // Preview windows publish their current Radar token here and "hear" each other,

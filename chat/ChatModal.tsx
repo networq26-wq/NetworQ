@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { I } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createChatApi, type ChatMessage } from "./chatApi";
-import { WebRtcCallManager, type CallPeerState } from "./callSignaling";
+import { placeCall } from "../calls/CallLayer";
 
 export function ChatModal({
   open,
@@ -36,17 +36,10 @@ export function ChatModal({
   const [sending, setSending] = useState(false);
   const [chatId, setChatId] = useState<string | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
-  const [callState, setCallState] = useState<CallPeerState>({
-    inCall: false,
-    isCalling: false,
-    isReceiving: false,
-    muted: false,
-  });
 
   const chatApi = useRef(createChatApi(supabase)).current;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<any>(null);
-  const callManagerRef = useRef<WebRtcCallManager | null>(null);
   const channelRef = useRef<any>(null);
 
   // Initialize Chat & Load History
@@ -93,18 +86,6 @@ export function ChatModal({
         );
         channelRef.current = channel;
 
-        // Initialize WebRTC Call Manager if partner exists
-        if (partner?.id && currentUser?.id) {
-          callManagerRef.current = new WebRtcCallManager({
-            supabase,
-            currentUserId: currentUser.id,
-            partnerId: partner.id,
-            partnerName: partner.name || "Peer",
-            onStateChange: (st) => {
-              if (isMounted) setCallState(st);
-            },
-          });
-        }
       } catch (err: any) {
         console.warn("Chat init error:", err);
       }
@@ -115,7 +96,6 @@ export function ChatModal({
     return () => {
       isMounted = false;
       channelRef.current?.unsubscribe();
-      callManagerRef.current?.destroy();
     };
   }, [open, partner?.id, eventId, currentUser?.id]);
 
@@ -265,27 +245,29 @@ export function ChatModal({
             </div>
           </div>
 
-          {/* WebRTC Quick Audio Meet */}
+          {/* Voice & video calls ring the other person anywhere in the app (and by push) */}
           {partner && (
-            <button
-              onClick={() => callManagerRef.current?.startCall()}
-              disabled={callState.inCall || callState.isCalling}
-              style={{
-                background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
-                border: "none",
-                borderRadius: 12,
-                padding: "8px 12px",
-                color: isDark ? "#C4B5FD" : "#7C3AED",
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <I.Phone size={15} /> Call
-            </button>
+            <div style={{ display: "flex", gap: 6 }}>
+              {(["audio", "video"] as const).map((kind) => (
+                <button
+                  key={kind}
+                  onClick={() => placeCall({ id: partner.id, name: partner.name || "NetworQ member", avatar_url: partner.avatar_url || null }, kind)}
+                  aria-label={kind === "audio" ? `Call ${partner.name}` : `Video call ${partner.name}`}
+                  title={kind === "audio" ? "Voice call" : "Video call"}
+                  className="btn-press"
+                  style={{ width: 40, height: 40, borderRadius: 20, border: "none", background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)", color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                >
+                  {kind === "audio" ? (
+                    <I.Phone size={18} />
+                  ) : (
+                    <svg width={19} height={19} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="m22 8-6 4 6 4V8Z" />
+                      <rect x="2" y="6" width="14" height="12" rx="2" />
+                    </svg>
+                  )}
+                </button>
+              ))}
+            </div>
           )}
 
           <button
@@ -303,83 +285,6 @@ export function ChatModal({
             <I.X size={18} />
           </button>
         </div>
-
-        {/* WebRTC Active Call Overlay */}
-        {(callState.inCall || callState.isCalling || callState.isReceiving) && (
-          <div
-            style={{
-              padding: "12px 18px",
-              background: callState.inCall ? "linear-gradient(135deg, #059669 0%, #047857 100%)" : "linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)",
-              color: "#FFFFFF",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              animation: "fadeIn 0.2s ease",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <I.Mic size={20} />
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>
-                  {callState.inCall ? "Audio Meet in Progress" : callState.isCalling ? `Calling ${partner?.name}…` : `Incoming Call from ${partner?.name}`}
-                </div>
-                <div style={{ fontSize: 11, opacity: 0.85 }}>P2P High-Definition WebRTC Audio</div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 8 }}>
-              {callState.isReceiving && (
-                <button
-                  onClick={() => callManagerRef.current?.acceptCall()}
-                  style={{
-                    background: "#10B981",
-                    color: "#FFFFFF",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "6px 12px",
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  Accept
-                </button>
-              )}
-              {callState.inCall && (
-                <button
-                  onClick={() => callManagerRef.current?.toggleMute()}
-                  style={{
-                    background: callState.muted ? "#EF4444" : "rgba(255, 255, 255, 0.2)",
-                    color: "#FFFFFF",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "6px 10px",
-                    fontWeight: 600,
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
-                >
-                  {callState.muted ? "Unmute" : "Mute"}
-                </button>
-              )}
-              <button
-                onClick={() => callManagerRef.current?.hangup()}
-                style={{
-                  background: "#EF4444",
-                  color: "#FFFFFF",
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "6px 12px",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  cursor: "pointer",
-                }}
-              >
-                End
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Message Feed */}
         <div
@@ -399,7 +304,7 @@ export function ChatModal({
                 Direct Connection Active
               </div>
               <p style={{ fontSize: 12, maxWidth: 280, margin: "6px auto 14px", lineHeight: 1.4 }}>
-                Send a quick message, schedule a coffee, or start an instant audio meet.
+                Send a message, or start a voice or video call.
               </p>
             </div>
           ) : (
