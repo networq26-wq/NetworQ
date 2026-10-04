@@ -45,18 +45,17 @@ function createIceRouter(deps) {
 }
 
 function productionDeps() {
-  const url = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return null;
   const { createClient } = require("@supabase/supabase-js");
-  const admin = createClient(url, key, { auth: { persistSession: false } });
+  const client = createClient(url, anon, { auth: { persistSession: false, autoRefreshToken: false } });
   return {
     env: process.env,
     fetchImpl: (...a) => fetch(...a),
     async getUser(token) {
-      const { data, error } = await admin.auth.getUser(token);
-      if (error) throw error;
-      return data.user;
+      const { data, error } = await client.auth.getUser(token);
+      return error ? null : data.user;
     },
   };
 }

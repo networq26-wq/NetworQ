@@ -26,6 +26,7 @@ import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
 import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
 import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
+import { useVoiceRecorder } from "./voice/useVoiceRecorder";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
@@ -1333,7 +1334,6 @@ function NetworQApp() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiListening, setAiListening] = useState(false);
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isSpeakingReply, setIsSpeakingReply] = useState(false);
   const [voicePersona, setVoicePersona] = useState<"siri" | "jarvis">("siri");
@@ -1346,7 +1346,6 @@ function NetworQApp() {
     },
   ]);
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
-  const speechRecRef = useRef<any>(null);
 
   useEffect(() => {
     if (aiOpen) {
@@ -1507,57 +1506,26 @@ VOICE & ASSISTANT DIRECTIVES:
     }
   };
 
-  const toggleMicListening = () => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast("Speech recognition is not supported in this browser. Please type your message.", "info");
-      return;
+  // AI mic: record → Whisper on our server → send (works in the Android app, unlike browser speech recognition)
+  const aiVoice = useVoiceRecorder({
+    supabase,
+    apiBaseUrl: apiBase(AI_PROXY),
+    onText: (text) => {
+      setVoiceReplyEnabled(true);
+      setAiInput(text);
+      sendAiQuery(text, true);
+    },
+  });
+  const aiListening = aiVoice.state === "recording";
+  useEffect(() => {
+    if (aiVoice.state === "error" && aiVoice.error) {
+      showToast(aiVoice.error, "error");
+      aiVoice.clearError();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiVoice.state, aiVoice.error]);
+  const toggleMicListening = () => (aiListening ? aiVoice.stop() : aiVoice.start());
 
-    if (aiListening && speechRecRef.current) {
-      speechRecRef.current.stop();
-      setAiListening(false);
-      return;
-    }
-
-    try {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = "en-US";
-
-      rec.onstart = () => {
-        setAiListening(true);
-        setVoiceReplyEnabled(true);
-      };
-
-      rec.onresult = (ev: any) => {
-        const transcript = ev.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setAiInput(transcript);
-          sendAiQuery(transcript, true);
-        }
-      };
-
-      rec.onerror = (ev: any) => {
-        setAiListening(false);
-        if (ev.error !== "no-speech") {
-          showToast(`Voice input: ${ev.error}`, "info");
-        }
-      };
-
-      rec.onend = () => {
-        setAiListening(false);
-      };
-
-      speechRecRef.current = rec;
-      rec.start();
-    } catch (err: any) {
-      console.warn("Speech start failed:", err);
-      setAiListening(false);
-    }
-  };
 
   const toggleSpeechPlayback = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -6814,10 +6782,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 onClick={() => {
                   setAiOpen(false);
                   voicePlayer.stop();
-                  if (aiListening && speechRecRef.current) {
-                    speechRecRef.current.stop();
-                    setAiListening(false);
-                  }
+                  aiVoice.cancel();
                 }}
                 title="Close"
                 aria-label="Close"
@@ -7034,6 +6999,11 @@ Keep it punchy, sharp, and directly actionable.`;
             )}
 
             {/* Listening Wave Banner */}
+            {aiVoice.state === "transcribing" && (
+              <div role="status" style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(124, 58, 237, 0.08)", fontSize: 13, fontWeight: 600, color: "#7C3AED" }}>
+                Writing down what you said…
+              </div>
+            )}
             {aiListening && (
               <div
                 style={{
@@ -7049,7 +7019,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 10px #EF4444" }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#7C3AED" }}>
-                  Listening… Speak your prompt now
+                  {aiVoice.heard || aiVoice.elapsed < 3500 ? "Listening… tap the mic again when you're done" : "We can't hear you yet — speak closer to the phone"}
                 </div>
               </div>
             )}
@@ -7264,7 +7234,7 @@ Keep it punchy, sharp, and directly actionable.`;
           currentUser={currentUser}
           isDark={isDark}
           showToast={showToast}
-          apiBaseUrl={AI_PROXY}
+          apiBaseUrl={apiBase(AI_PROXY)}
           onContactCreated={(c) => {
             setContacts((prev) => [dbToContact(c), ...prev]);
             showToast(`${c.name || "Contact"} saved to your CRM!`, "success");

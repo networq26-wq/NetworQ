@@ -17,6 +17,7 @@ const { createTtsRouter, productionDeps: ttsDeps } = require("./api/tts");
 const { createNotifyHookRouter, productionDeps: notifyDeps } = require("./api/notifyHook");
 const { createProspectRouter, productionDeps: prospectDeps } = require("./api/prospect");
 const { createIceRouter, productionDeps: iceDeps, STUN } = require("./api/ice");
+const { createTranscribeRouter, productionDeps: transcribeDeps } = require("./api/transcribe");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -70,6 +71,7 @@ const limiter = (windowMs, limit) =>
 app.use("/api/", limiter(15 * 60 * 1000, 600));
 app.use("/api/enrich", limiter(60 * 1000, 30));
 app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
+app.use("/api/transcribe", limiter(60 * 1000, 20));
 app.use("/api/email", limiter(60 * 1000, 20));
 app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 app.use("/api/events", limiter(60 * 1000, 20));
@@ -250,6 +252,11 @@ if (accountDeps) {
 const evDeps = eventsDeps();
 if (evDeps) app.use("/api", createEventsRouter(evDeps));
 else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
+
+// ── Voice typing (Whisper) ────────────────────────────────────────────────────
+const trDeps = transcribeDeps();
+if (trDeps) app.use("/api", createTranscribeRouter(trDeps));
+else app.post("/api/transcribe", (req, res) => res.status(503).json({ error: "Voice typing isn't available on this server." }));
 
 // ── Call relay settings (STUN always; TURN when configured) ────────────────────
 const iceDepsValue = iceDeps();
