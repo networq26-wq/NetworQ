@@ -73,6 +73,7 @@ test.describe("Notifications & blocking", () => {
     });
     await login(page, "asha@acme.test");
     await page.getByTitle("Profile & Settings").click();
+    await page.getByRole("button", { name: "Notifications", exact: true }).click(); // settings are sub-pages of Me
     const sw = page.getByRole("switch", { name: "Push notifications" });
     await expect(sw).toBeDisabled();
     await expect(page.getByText(/This browser can't receive notifications/)).toBeVisible();

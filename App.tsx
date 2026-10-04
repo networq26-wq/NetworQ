@@ -24,7 +24,7 @@ import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
-import { WhoNext, GroupMessageSheet } from "./people/PeopleExtras";
+import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
@@ -2583,10 +2583,17 @@ Keep it punchy, sharp, and directly actionable.`;
     setBulkSending(true);
     let sentCount = 0;
     let failedCount = 0;
+    let unsavedCount = 0;
+    // The server allows 20 emails a minute; pace big batches so none get refused
+    const pending = bulkDrafts.filter((d) => d.status !== "sent").length;
+    const gapMs = pending > 18 ? 3300 : 0;
+    let first = true;
 
     for (let i = 0; i < bulkDrafts.length; i++) {
       const draft = bulkDrafts[i];
       if (draft.status === "sent") continue;
+      if (!first && gapMs) await new Promise((r) => setTimeout(r, gapMs));
+      first = false;
 
       setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sending" } : d)));
 
@@ -2599,10 +2606,17 @@ Keep it punchy, sharp, and directly actionable.`;
           fromName: currentUser?.name || "",
           replyTo: currentUser?.email || "",
         });
+        // The email went out; remember it so the next follow-up run doesn't email them again
+        let saved = true;
         if (draft.contact.id) {
-          await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
+          const { error: saveErr } = await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
+          if (saveErr) {
+            saved = false;
+            console.warn("Couldn't record follow-up as sent for", draft.contact.name, saveErr.message);
+          }
         }
-        setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
+        if (saved) setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
+        else unsavedCount++;
         setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sent" } : d)));
         sentCount++;
       } catch (err: any) {
@@ -2613,7 +2627,9 @@ Keep it punchy, sharp, and directly actionable.`;
     }
     setBulkSending(false);
     if (sentCount > 0) successFeedback();
-    if (failedCount === 0) {
+    if (failedCount === 0 && unsavedCount > 0) {
+      showToast(`Sent ${sentCount}. ${unsavedCount} couldn't be marked as sent — check your connection.`, "error");
+    } else if (failedCount === 0) {
       showToast(`Sent ${sentCount} follow-up email${sentCount === 1 ? "" : "s"}.`, "success");
     } else {
       showToast(`Sent ${sentCount}, failed ${failedCount}. Failed emails can be retried.`, "error");
@@ -2653,6 +2669,8 @@ Keep it punchy, sharp, and directly actionable.`;
     return Math.min(99, base + emailsCount + meetsCount);
   }, [effectiveContacts]);
 
+  // Same rule as "Who's next": follow-ups due, plus people met recently but not emailed
+  const waitingCount = useMemo(() => pickNext(effectiveContacts, today, Infinity).length, [effectiveContacts, today]);
   const filtered = useMemo(() => {
     return effectiveContacts
       .filter(
@@ -4221,8 +4239,8 @@ Keep it punchy, sharp, and directly actionable.`;
               <p style={{ color: themeStyles.textMuted, fontSize: 15, margin: "6px 0 0", fontWeight: 400 }}>
                 {contactsLoading
                   ? "Loading your people…"
-                  : dueReminders.length
-                    ? `${dueReminders.length} follow-up${dueReminders.length === 1 ? "" : "s"} due today`
+                  : waitingCount
+                    ? `${waitingCount} ${waitingCount === 1 ? "person is" : "people are"} waiting to hear from you`
                     : effectiveContacts.length
                       ? "You're all caught up."
                       : "Scan your first card to get started."}
@@ -4245,7 +4263,7 @@ Keep it punchy, sharp, and directly actionable.`;
             >
               {[
                 { count: effectiveContacts.length, label: "People" },
-                { count: dueReminders.length, label: "Follow-ups", accent: dueReminders.length > 0 },
+                { count: waitingCount, label: "To follow up", accent: waitingCount > 0 },
                 { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities" },
                 { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
               ].map((m, i) => (
@@ -4253,7 +4271,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
                     {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
                   </div>
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
+                  <div style={{ fontSize: "clamp(10px, 3vw, 12px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
                 </div>
               ))}
             </div>
@@ -6596,7 +6614,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Send size={14} />
                 <span>
                   {bulkSending
-                    ? "Sending…"
+                    ? `Sending ${bulkDrafts.filter((d) => d.status === "sent").length + 1} of ${bulkDrafts.length}…`
                     : bulkDrafts.every((d) => d.status === "sent")
                     ? "All sent"
                     : (() => { const n = bulkDrafts.filter((d) => d.status !== "sent").length; return `Send ${n} email${n === 1 ? "" : "s"}`; })()}

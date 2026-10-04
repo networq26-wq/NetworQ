@@ -40,12 +40,14 @@ for (const vp of [{ name: "pixel7", width: 412, height: 915 }, { name: "small", 
     await page.getByRole("button", { name: "Close" }).last().click();
     await nav("Events"); await shot("04-events");
     await nav("Radar"); await shot("05-radar");
-    await nav("Scan"); await shot("06-scan");
-    await nav("Pass"); await shot("07-pass");
-    await nav("Add"); await shot("08-add");
+    // Bottom bar is People · Messages · Radar · Events; Scan / QR / Add are People-home quick actions
+    await nav("People"); await nav("Scan a card"); await shot("06-scan-camera");
+    await page.getByRole("button", { name: "Close camera" }).click(); await shot("06b-scan-tab");
+    await nav("People"); await nav("My QR"); await shot("07-pass");
+    await nav("People"); await nav("Type it in"); await shot("08-add");
     await page.getByRole("button", { name: "Profile & Settings" }).click().catch(() => console.log(`NO SETTINGS ENTRY ${vp.name}`));
     await shot("09-settings");
-    await nav("Contacts");
+    await nav("People");
     const ai = page.getByRole("button", { name: "AI Assistant" });
     if (await ai.count()) { await ai.first().click(); await shot("10-ai-open"); }
   });
