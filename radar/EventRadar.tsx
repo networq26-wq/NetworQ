@@ -201,7 +201,7 @@ export function EventRadar({
 
   const radarBody = (
     <>
-          <StatusBanner t={t} status={radar.status} mode={radar.mode} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
+          <StatusBanner t={t} status={radar.status} mode={radar.mode} nearby={scope === "nearby"} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
 
           {radar.incoming.length > 0 && (
             <section style={card} aria-label="Connection requests">
@@ -236,6 +236,8 @@ export function EventRadar({
             </section>
           )}
 
+          {/* In a browser on Nearby there's no radar to draw — skip the empty card (the list below explains) */}
+          {!(radar.settings?.radar_on && radar.mode === "web" && scope === "nearby" && !radar.hiddenCount) && (
           <section style={{ ...card, padding: 16 }}>
             {radar.settings?.radar_on ? (
               <>
@@ -243,13 +245,11 @@ export function EventRadar({
                 {radar.mode === "native" && (
                   <RadarCanvas people={radar.people} isDark={isDark} onSelect={setSelected} scanning={radar.status === "scanning" || radar.status === "scan_only"} />
                 )}
-                <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: "10px 0 0" }}>
-                  {radar.mode === "native"
-                    ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy."
-                    : scope === "nearby"
-                      ? "Nearby uses Bluetooth, so it works in the NetworQ Android app. Browsers can't scan for people nearby."
-                      : "Attendees active at this event in the last 15 minutes."}
-                </p>
+                {!(radar.mode === "web" && scope === "nearby") && (
+                  <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: radar.mode === "native" ? "10px 0 0" : 0 }}>
+                    {radar.mode === "native" ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy." : "Attendees active at this event in the last 15 minutes."}
+                  </p>
+                )}
                 {radar.hiddenCount > 0 && (
                   <p style={{ textAlign: "center", fontSize: 13, margin: "10px 0 0" }}>
                     {radar.hiddenCount} {radar.hiddenCount === 1 ? "person is" : "people are"} nearby. Turn on visibility to see who.
@@ -267,6 +267,7 @@ export function EventRadar({
               </div>
             )}
           </section>
+          )}
 
           {radar.settings?.radar_on && (
             <NearbyList
@@ -359,15 +360,6 @@ export function EventRadar({
         )
       ) : !activeEvent ? (
         <>
-          <section style={{ ...card, padding: 16 }}>
-            <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
-            <div style={{ textAlign: "center", padding: "14px 12px 4px" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Event Radar Room</div>
-              <div style={{ color: t.muted, fontSize: 13, maxWidth: 420, margin: "0 auto" }}>
-                Join an active event to discover fellow attendees on the radar and connect in real time.
-              </div>
-            </div>
-          </section>
           <NoEvent
             t={t}
             card={card}
@@ -583,7 +575,7 @@ function ConfirmLink({ t, label, confirmLabel, ariaLabel, onConfirm }: { t: Them
       onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
       onBlur={() => setArmed(false)}
       aria-label={armed ? `Confirm: ${ariaLabel}` : ariaLabel}
-      style={{ minHeight: 44, padding: "8px 10px", border: "none", background: "none", color: "#FF453A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+      style={{ minHeight: 36, padding: "0 14px", borderRadius: 18, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 14, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
     >
       {armed ? confirmLabel : label}
     </button>
@@ -626,7 +618,10 @@ function NoEvent({
     <section style={card}>
       {!compact && (
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em" }}>Event Radar</div>
+          <div aria-hidden style={{ width: 64, height: 64, borderRadius: 32, margin: "4px auto 14px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(124,58,237,0.1)", color: "#7C3AED" }}>
+            <I.Target size={30} />
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>Event Radar</div>
           <div style={{ color: t.muted, fontSize: 15, marginTop: 6, maxWidth: 460, marginInline: "auto" }}>
             See who's around you at an event, with approximate distance. You choose who gets your contact details.
           </div>
@@ -785,8 +780,9 @@ const STATUS_COPY: Partial<Record<RadarStatus, { title: string; body: string; ac
   offline: { title: "You're offline", body: "Showing the last people seen. Radar resumes when you reconnect." },
 };
 
-function StatusBanner({ t, status, mode, onBluetooth, onRetry }: { t: Theme; status: RadarStatus; mode: "native" | "web"; onBluetooth: () => void; onRetry: () => void }) {
+function StatusBanner({ t, status, mode, nearby, onBluetooth, onRetry }: { t: Theme; status: RadarStatus; mode: "native" | "web"; nearby?: boolean; onBluetooth: () => void; onRetry: () => void }) {
   if (mode === "web" && status === "scanning") {
+    if (nearby) return null; // the Nearby list says it once
     return (
       <div role="status" style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 16, padding: "12px 16px", fontSize: 14 }}>
         <strong>Live distance works in the NetworQ Android app.</strong> <span style={{ color: t.muted }}>Here you can see who's at the event and connect.</span>
@@ -846,7 +842,7 @@ function NearbyList({
               ? "Looking for NetworQ people around you… They need Nearby on and Discoverable."
               : "Looking for attendees… Ask people near you to open Radar in NetworQ."
             : nearbyScope
-              ? "Open NetworQ in the Android app to find people around you over Bluetooth. Browsers can't use Bluetooth for this."
+              ? "Finding people around you uses Bluetooth, so it works in the NetworQ phone app. Open NetworQ on your phone to see who's nearby."
               : "No one else is active yet. Share the event code to invite people."}
         </div>
       ) : (
