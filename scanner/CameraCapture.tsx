@@ -115,8 +115,8 @@ export function CameraCapture({
             <div style={{ fontSize: 15, lineHeight: 1.45, color: "rgba(255,255,255,0.85)", maxWidth: 300 }}>{error}</div>
             <button
               onClick={() => {
+                onFallback(); // first, so closing doesn't navigate away from Scan
                 onClose();
-                onFallback();
               }}
               style={{ padding: "12px 22px", borderRadius: 999, border: "none", background: "#FFFFFF", color: "#000", fontWeight: 600, fontSize: 15, cursor: "pointer" }}
             >

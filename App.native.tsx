@@ -63,12 +63,17 @@ function Shell() {
   // Hardware back: let the web app close overlays / go to the previous tab first;
   // on the home screen, a second press within 2 s exits.
   const lastBackAt = useRef(0);
+  const backFallback = useRef<any>(null);
+  const handleNavRef = useRef<(raw: string) => void>(() => {});
   const hasErrorRef = useRef(false);
   hasErrorRef.current = hasError;
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const onBackPress = () => {
       if (hasErrorRef.current) return false; // offline screen: let Android close the app
+      // If the page doesn't answer (still loading, crashed), still go back — never exit on one press
+      clearTimeout(backFallback.current);
+      backFallback.current = setTimeout(() => handleNavRef.current(JSON.stringify({ type: "nav:back", handled: false })), 600);
       webViewRef.current?.injectJavaScript(
         `(function(){var h=false;try{h=!!(window.__networqHandleBack&&window.__networqHandleBack());}catch(e){}window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:"nav:back",handled:h}));})();true;`
       );
@@ -101,7 +106,9 @@ function Shell() {
           .catch(() => reply(false));
         return;
       }
-      if (msg?.type !== "nav:back" || msg.handled) return;
+      if (msg?.type !== "nav:back") return;
+      clearTimeout(backFallback.current);
+      if (msg.handled) return;
       if (canGoBack) return webViewRef.current?.goBack(); // e.g. from /privacy back to the app
       const now = Date.now();
       if (now - lastBackAt.current < 2000) return BackHandler.exitApp();
@@ -110,6 +117,8 @@ function Shell() {
     },
     [canGoBack]
   );
+
+  handleNavRef.current = handleNavMessage;
 
   // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
@@ -156,7 +165,8 @@ function Shell() {
           injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}`}
           onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {
-            if (e.nativeEvent.url.startsWith(TARGET_URL)) handleNavMessage(e.nativeEvent.data);
+            // any page on our own domain (www or not, any path) can answer the back button
+            if (/^https:\/\/([a-z0-9-]+\.)*networq\.co\.in(\/|$)/i.test(e.nativeEvent.url)) handleNavMessage(e.nativeEvent.data);
             radarBridge.onMessage(e);
             googleAuth.onMessage(e);
             push.onMessage(e);

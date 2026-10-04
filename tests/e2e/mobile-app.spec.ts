@@ -71,4 +71,40 @@ test.describe("Android app behaviour", () => {
     await page.getByRole("button", { name: "Scan a card", exact: true }).click();
     await expect.poll(() => page.evaluate(() => (window as any).__sent.map((m: any) => m.type))).toContain("perm:camera");
   });
+
+  test("back closes every sheet and screen in order, and only exits from home", async ({ page }) => {
+    await login(page, "asha@acme.test");
+    const home = page.getByText("Your people");
+    const step = async (open: () => Promise<void>, visible: import("@playwright/test").Locator, label: string) => {
+      await open();
+      await expect(visible, `${label} opened`).toBeVisible();
+      expect(await back(page), `${label}: back handled`).toBe(true);
+      await expect(visible, `${label}: closed by back`).toHaveCount(0);
+    };
+    await step(() => page.getByRole("button", { name: "AI Assistant" }).click(), page.getByText("NetworQ Assistant"), "AI sheet");
+    await step(() => page.getByRole("button", { name: /^Notifications/ }).first().click(), page.getByRole("dialog", { name: "Notifications" }), "notifications");
+    await step(() => page.getByRole("button", { name: "Open Ravi Kumar" }).first().click(), page.getByRole("button", { name: "Edit contact", exact: true }), "contact sheet");
+    await step(() => page.getByRole("button", { name: "Voice note" }).click(), page.getByText("Voice note", { exact: true }).last(), "voice note");
+    await step(() => page.getByRole("button", { name: "Select", exact: true }).click(), page.getByRole("toolbar", { name: "Selected people" }), "select mode");
+    await step(() => page.getByRole("button", { name: "Scan a card" }).click(), page.getByRole("dialog", { name: "Card camera" }), "camera");
+
+    // Me → sub-page → back to Me → back to People
+    await page.getByRole("button", { name: "Profile & Settings" }).click();
+    await page.getByRole("button", { name: /^Appearance/ }).click();
+    await expect(page.getByRole("button", { name: "Back to Me" })).toBeVisible();
+    expect(await back(page)).toBe(true);
+    await expect(page.getByRole("button", { name: "Back to Me" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Appearance/ })).toBeVisible();
+    expect(await back(page)).toBe(true);
+    await expect(home).toBeVisible();
+
+    // Tabs: People → Messages → Events → back → Messages → back → People → back = exit (handled false)
+    await page.getByRole("button", { name: "Messages", exact: true }).last().click();
+    await page.getByRole("button", { name: "Events", exact: true }).last().click();
+    expect(await back(page)).toBe(true);
+    await expect(page.getByRole("heading", { name: "Messages" })).toBeVisible();
+    expect(await back(page)).toBe(true);
+    await expect(home).toBeVisible();
+    expect(await back(page)).toBe(false);
+  });
 });

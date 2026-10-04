@@ -1798,6 +1798,16 @@ VOICE & ASSISTANT DIRECTIVES:
   // Closes the top-most overlay first, then walks back through visited tabs.
   const tabHistory = useRef<string[]>([]);
   const navigatingBack = useRef(false);
+  // Camera opened straight from a home shortcut: closing it goes back to where you were, not to an empty Scan page
+  const cameraFromShortcut = useRef(false);
+  const closeCamera = () => {
+    setLiveCameraOpen(false);
+    if (cameraFromShortcut.current && !scanPreview) {
+      cameraFromShortcut.current = false;
+      navigatingBack.current = true;
+      setTab((tabHistory.current.pop() as typeof tab) || "contacts");
+    }
+  };
   const lastTab = useRef(tab);
   useEffect(() => {
     if (lastTab.current !== tab) {
@@ -1810,14 +1820,26 @@ VOICE & ASSISTANT DIRECTIVES:
   const backState = useRef<() => boolean>(() => false);
   backState.current = () => {
     if ((window as any).__networqCallBusy) return true; // back never drops a live call
-    // Sheets/dialogs inside feature screens close on Escape
-    const openDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
-    if (openDialog) {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-      return true;
+    // Topmost open sheet/dialog (incl. ones inside feature screens): press its own Close/Back button,
+    // otherwise send Escape. Back always closes what's on top first.
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).filter((d) => d.offsetParent !== null || getComputedStyle(d).position === "fixed");
+    const top = dialogs[dialogs.length - 1];
+    if (top) {
+      const close = top.querySelector<HTMLElement>('button[aria-label="Close"], button[aria-label^="Close "], button[aria-label="Back"], button[aria-label^="Back to"], button[aria-label="Cancel"], button[aria-label="Done"]');
+      if (close) close.click();
+      else {
+        const esc = new KeyboardEvent("keydown", { key: "Escape", bubbles: true });
+        top.dispatchEvent(esc);
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      }
+      // fall through to the state checks only if nothing reacted
+      if (top.isConnected && !close) {
+        /* handled below by state */
+      } else return true;
     }
     if (notifOpen) return setNotifOpen(false), true;
-    if (liveCameraOpen) return setLiveCameraOpen(false), true;
+    if (liveCameraOpen) return closeCamera(), true;
     if (batchScannerOpen) return setBatchScannerOpen(false), true;
     if (networkMapOpen) return setNetworkMapOpen(false), true;
     if (introductionsOpen) return setIntroductionsOpen(false), true;
@@ -4295,7 +4317,7 @@ Keep it punchy, sharp, and directly actionable.`;
             {/* ── QUICK ACTIONS: round icons with short labels — all five fit in one row (Radar lives in the bottom bar) ── */}
             <section aria-label="Quick actions" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, marginBottom: 28, maxWidth: isMobile ? undefined : 480 }}>
               {[
-                { label: "Scan", full: "Scan a card", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
+                { label: "Scan", full: "Scan a card", icon: Icons.Camera, primary: true, act: () => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); } },
                 { label: "Type", full: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
                 { label: "Voice", full: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
                 { label: "My QR", full: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
@@ -5399,9 +5421,9 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
             <CameraCapture
               open={liveCameraOpen}
-              onClose={() => setLiveCameraOpen(false)}
-              onCapture={(f) => handleFile(f)}
-              onFallback={() => cameraFileRef.current?.click()}
+              onClose={closeCamera}
+              onCapture={(f) => { cameraFromShortcut.current = false; handleFile(f); }}
+              onFallback={() => { cameraFromShortcut.current = false; cameraFileRef.current?.click(); }}
             />
 
             {/* ── SCAN TIPS: three things that make the AI read a card right first time ── */}
