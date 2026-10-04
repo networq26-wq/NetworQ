@@ -1913,7 +1913,6 @@ VOICE & ASSISTANT DIRECTIVES:
     if (modal) return setModal(null), setPrepBrief(null), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
-    if (addSheetOpen) return setAddSheetOpen(false), true;
     if (tab === "me" && meSection) return setMeSection(null), true;
     if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
     const prev = tabHistory.current.pop();
@@ -2612,7 +2611,6 @@ Keep it punchy, sharp, and directly actionable.`;
   useEffect(() => {
     if (tab === "settings" || tab === "qr") setTab("me");
   }, [tab]);
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
 
   const handleSignedOut = useCallback(
     (message?: string) => {
@@ -4185,16 +4183,6 @@ Keep it punchy, sharp, and directly actionable.`;
                 )}
               </button>
 
-              {isMobile && (
-                <button
-                  onClick={() => setAiOpen(true)}
-                  title="AI Assistant"
-                  aria-label="AI Assistant"
-                  style={{ width: 44, height: 44, borderRadius: 12, border: "none", background: "rgba(124,58,237,0.12)", color: "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                >
-                  <Icons.Sparkles size={20} color="#7C3AED" />
-                </button>
-              )}
 
               {!isMobile && (
               <button
@@ -4410,49 +4398,46 @@ Keep it punchy, sharp, and directly actionable.`;
               ))}
             </div>
 
-            {/* ── MOBILE HERO BANNER (Brand Identity Guideline Page 9) ── */}
-            {isMobile && (
-              <div
-                style={{
-                  ...themeStyles.glassCard,
-                  background: isDark ? "#1C1C1E" : "#FFFFFF",
-                  borderRadius: 20,
-                  padding: 18,
-                  marginBottom: 20,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E5EA"}`,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: themeStyles.text, fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
-                    Build Relationships That Matter
-                  </div>
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500 }}>
-                    Connect. Collaborate. Grow.
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setTab("add"); setAddStep("form"); }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: isDark ? "#A78BFA" : "#7C3AED",
-                    color: "#fff",
-                    border: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(124, 58, 237, 0.25)",
-                  }}
-                >
-                  <Icons.ArrowRight size={16} color="#fff" />
-                </button>
+            {/* ── QUICK ACTIONS: the app's main jobs, one tap each (scrolls sideways on phones) ── */}
+            <section aria-label="Quick actions" style={{ marginBottom: 24 }}>
+              <div className="nq-chips" style={{ display: "flex", gap: 10, overflowX: "auto", scrollSnapType: "x mandatory", scrollPaddingLeft: isMobile ? 16 : 2, scrollPaddingRight: isMobile ? 16 : 2, scrollbarWidth: "none", padding: "2px 2px 6px", margin: isMobile ? "0 -16px" : 0, paddingLeft: isMobile ? 16 : 2, paddingRight: isMobile ? 16 : 2 } as React.CSSProperties}>
+                {[
+                  { label: "Scan a card", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
+                  { label: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+                  { label: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
+                  { label: "Find nearby", icon: Icons.Radar, act: () => setTab("radar") },
+                  { label: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
+                  { label: "Follow-ups", icon: I.Mail, act: () => openBulkFollowUpModal() },
+                ].map((q) => (
+                  <button
+                    key={q.label}
+                    onClick={q.act}
+                    style={{
+                      flex: "0 0 auto",
+                      scrollSnapAlign: "start",
+                      width: 96,
+                      minHeight: 96,
+                      borderRadius: 20,
+                      border: q.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                      background: q.primary ? "#7C3AED" : isDark ? "#1C1C1E" : "#FFFFFF",
+                      color: q.primary ? "#FFFFFF" : themeStyles.text,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 10,
+                      cursor: "pointer",
+                      padding: "12px 6px",
+                    }}
+                  >
+                    <span aria-hidden style={{ width: 40, height: 40, borderRadius: 20, display: "flex", alignItems: "center", justifyContent: "center", background: q.primary ? "rgba(255,255,255,0.18)" : isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: q.primary ? "#FFFFFF" : isDark ? "#C4B5FD" : "#7C3AED" }}>
+                      <q.icon size={20} color="currentColor" />
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.2, textAlign: "center" }}>{q.label}</span>
+                  </button>
+                ))}
               </div>
-            )}
+            </section>
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
@@ -4478,7 +4463,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
-                <div style={{ position: "relative", flex: isMobile ? "1 1 100%" : "1 1 220px", minWidth: 0 }}>
+                <div style={{ position: "relative", flex: isMobile ? "1 1 0" : "1 1 220px", minWidth: 0 }}>
                   <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
                     <Icons.Search size={15} />
                   </span>
@@ -4544,6 +4529,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
                 )}
 
+                {!isMobile && (
                 <button
                   style={{
                     ...S.btn,
@@ -4559,6 +4545,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <Icons.Mail size={14} />
                   <span>{isMobile ? "Follow-ups" : "1-Click Follow-ups"}</span>
                 </button>
+                )}
 
                 {!contactsLoading && contacts.length > 0 && (
                   <button
@@ -6641,52 +6628,35 @@ Keep it punchy, sharp, and directly actionable.`;
         </nav>
       )}
 
-      {/* ── PEOPLE: one obvious way to add someone ── */}
-      {isMobile && screen === "app" && tab === "contacts" && (
+      {/* ── AI: a quiet floating button; the assistant slides up as a bottom sheet ── */}
+      {isMobile && screen === "app" && !aiOpen && (tab === "contacts" || tab === "events" || tab === "messages") && (
         <button
-          onClick={() => setAddSheetOpen(true)}
-          aria-label="Add a person"
+          onClick={() => setAiOpen(true)}
+          aria-label="AI Assistant"
+          title="AI Assistant"
           className="nq-pop"
-          style={{ position: "fixed", right: "max(20px, calc(var(--safe-right, 0px) + 20px))", bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 92px)", width: 60, height: 60, borderRadius: 30, border: "none", background: "#7C3AED", color: "#FFF", zIndex: 190, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 12px 28px rgba(124, 58, 237, 0.42)", cursor: "pointer" }}
+          style={{
+            position: "fixed",
+            right: "max(18px, calc(var(--safe-right, 0px) + 18px))",
+            bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 90px)",
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(124,58,237,0.16)"}`,
+            background: isDark ? "rgba(28,28,30,0.86)" : "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(16px) saturate(180%)",
+            WebkitBackdropFilter: "blur(16px) saturate(180%)",
+            color: "#7C3AED",
+            zIndex: 190,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: isDark ? "0 10px 24px rgba(0,0,0,0.5)" : "0 10px 24px rgba(60, 30, 120, 0.16)",
+            cursor: "pointer",
+          }}
         >
-          <Icons.Plus size={28} color="#FFFFFF" />
+          <Icons.Sparkles size={22} color={isDark ? "#C4B5FD" : "#7C3AED"} />
         </button>
-      )}
-      {addSheetOpen && (
-        <div className="nq-backdrop" onClick={() => setAddSheetOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Add a person"
-            className="nq-sheet-up"
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "100%", maxWidth: 520, background: isDark ? "#1C1C1E" : "#FFFFFF", color: themeStyles.text, borderRadius: "28px 28px 0 0", padding: "10px 16px calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 20px)" }}
-          >
-            <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "#48484A" : "#D1D1D6", margin: "0 auto 14px" }} />
-            <div style={{ fontSize: 20, fontWeight: 700, margin: "0 4px 4px" }}>Add a person</div>
-            <div style={{ fontSize: 14, color: themeStyles.textMuted, margin: "0 4px 14px" }}>Pick the easiest way.</div>
-            {[
-              { label: "Scan a business card", hint: "Point your camera at it", icon: Icons.Camera, primary: true, act: () => { setTab("scan"); setLiveCameraOpen(true); } },
-              { label: "Upload a photo", hint: "A card or QR from your photos", icon: Icons.Upload, act: () => setTab("scan") },
-              { label: "Type it in", hint: "Name, company, email…", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
-              { label: "Voice note", hint: "Say who you met — AI fills it in", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
-            ].map((o) => (
-              <button
-                key={o.label}
-                onClick={() => { setAddSheetOpen(false); o.act(); }}
-                style={{ all: "unset", boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "12px 12px", minHeight: 64, borderRadius: 16, cursor: "pointer", marginTop: 4, background: o.primary ? (isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.07)") : "transparent" }}
-              >
-                <span aria-hidden style={{ width: 44, height: 44, borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", background: o.primary ? "#7C3AED" : isDark ? "#2C2C2E" : "#F2F2F7", color: o.primary ? "#FFF" : isDark ? "#C4B5FD" : "#7C3AED", flexShrink: 0 }}>
-                  <o.icon size={22} />
-                </span>
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: "block", fontSize: 17, fontWeight: 600 }}>{o.label}</span>
-                  <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2 }}>{o.hint}</span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* ── 1-CLICK BULK AUTOMATED FOLLOW-UPS MODAL ── */}
@@ -6916,26 +6886,28 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* Floating Assistant Window */}
+      {aiOpen && isMobile && <div className="nq-backdrop" onClick={() => setAiOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1199, background: "rgba(0,0,0,0.32)" }} />}
       {aiOpen && (
         <div
+          className={isMobile ? "nq-sheet-up" : undefined}
           style={{
             position: "fixed",
-            // Phones: full-screen sheet above the tab bar; desktop: floating panel
-            top: isMobile ? 0 : undefined,
+            // Phones: bottom sheet (tap outside or swipe the grabber area to close); desktop: floating panel
+            top: undefined,
             left: isMobile ? 0 : undefined,
             bottom: isMobile ? 0 : "calc(var(--safe-bottom, 0px) + 26px)",
             right: isMobile ? 0 : "calc(var(--safe-right, 0px) + 28px)",
             width: isMobile ? "100%" : 390,
-            height: isMobile ? "100dvh" : 560,
-            maxHeight: isMobile ? "100dvh" : 600,
-            paddingTop: isMobile ? "var(--safe-top, env(safe-area-inset-top, 0px))" : 0,
+            height: isMobile ? "min(82dvh, 760px)" : 560,
+            maxHeight: isMobile ? "calc(100dvh - var(--safe-top, 0px) - 24px)" : 600,
+            paddingTop: isMobile ? 8 : 0,
             paddingBottom: isMobile ? "var(--safe-bottom, env(safe-area-inset-bottom, 0px))" : 0,
             paddingLeft: isMobile ? "var(--safe-left, env(safe-area-inset-left, 0px))" : 0,
             paddingRight: isMobile ? "var(--safe-right, env(safe-area-inset-right, 0px))" : 0,
             boxSizing: "border-box",
             zIndex: 1200,
-            borderRadius: isMobile ? 0 : 22,
-            background: isDark ? "rgba(22, 22, 23, 0.96)" : "rgba(255, 255, 255, 0.98)",
+            borderRadius: isMobile ? "28px 28px 0 0" : 22,
+            background: isDark ? "rgba(22, 22, 23, 0.98)" : "rgba(255, 255, 255, 0.99)",
             backdropFilter: "blur(25px)",
             WebkitBackdropFilter: "blur(25px)",
             border: isDark ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(124, 58, 237, 0.2)",
@@ -6945,9 +6917,10 @@ Keep it punchy, sharp, and directly actionable.`;
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            animation: "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            animation: isMobile ? undefined : "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
+          {isMobile && <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "#48484A" : "#D1D1D6", margin: "0 auto 4px", flexShrink: 0 }} />}
           {/* Assistant Header */}
           <div
             style={{
