@@ -46,17 +46,7 @@ module.exports = async function handler(req, res) {
 
     const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) {
-      if (action === "chat") {
-        return res.status(200).json({
-          choices: [{
-            message: {
-              role: "assistant",
-              content: "I am your NetworQ AI Assistant. I can help search your contacts, analyze roles (Founders, Investors, Engineers), draft customized follow-ups, and prepare you for networking events.",
-            },
-          }],
-        });
-      }
-      return res.status(500).json({ error: "GROQ_API_KEY is not configured on the server." });
+      return res.status(503).json({ error: "The AI assistant isn't available right now." });
     }
 
   try {
@@ -98,43 +88,10 @@ module.exports = async function handler(req, res) {
     res.status(response.status).json(data);
   } catch (e) {
     console.warn("Groq request warning:", e.message);
+    // Never substitute canned or fabricated output for an AI answer: say it's unavailable instead
+    const busy = /rate limit|tokens per minute|429|Request too large/i.test(e.message || "");
+    return res.status(503).json({ error: busy ? "The AI is busy right now. Please try again in a minute." : "The AI assistant isn't available right now. Please try again." });
 
-    // Provide intelligent fallback for chat so local dev and offline demos never crash
-    if (action === "chat") {
-      const lastUserMsg = [...(messages || [])].reverse().find(m => m.role === "user")?.content || "";
-      let reply = "I am your NetworQ AI & Voice Assistant, connected to Groq. I can help search your contacts, analyze roles (Founders, Investors, Engineers), draft customized follow-ups, and prepare you for networking events.";
-      
-      const lower = lastUserMsg.toLowerCase();
-      if (lower.includes("follow up") || lower.includes("reminder")) {
-        reply = "Looking across your contacts, prioritize connecting with contacts who have pending reminders or haven't connected in over 14 days. You can tap '1-Click Follow-ups' in the sidebar to auto-generate personalized catch-up drafts for all of them!";
-      } else if (lower.includes("founder") || lower.includes("investor")) {
-        reply = "You can filter your contacts by selecting the 'Founders' or 'Investors' role chips at the top of your Contacts table, or use the 'Roles & Taxonomy' view in your sidebar.";
-      } else if (lower.includes("email") || lower.includes("draft")) {
-        reply = "Here is an executive follow-up note:\n\nSubject: Great reconnecting via NetworQ\n\nHi,\n\nIt was a pleasure meeting you. I've been reflecting on our discussion and would love to schedule 15 minutes this week to explore opportunities for collaboration.\n\nBest regards,\nNetworQ Member";
-      }
-
-      return res.status(200).json({
-        choices: [{
-          message: {
-            role: "assistant",
-            content: reply
-          }
-        }]
-      });
-    }
-
-    if (action === "email_generation") {
-      return res.status(200).json({
-        choices: [{
-          message: {
-            role: "assistant",
-            content: "Hi,\n\nIt was great speaking with you recently. I'd love to schedule some time for us to catch up and explore collaboration opportunities.\n\nBest regards,\nNetworQ Member"
-          }
-        }]
-      });
-    }
-
-    res.status(500).json({ error: e.message });
   }
   } catch (fatalErr) {
     console.error("AI Handler fatal exception:", fatalErr);

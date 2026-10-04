@@ -38,11 +38,13 @@ export function DigitalPass({
   isDark,
   showToast,
   onEditProfile,
+  onWriteNfc,
 }: {
   user: { name?: string; role?: string; company?: string; email?: string; phone?: string; linkedin?: string; website?: string; avatar_url?: string };
   isDark: boolean;
   showToast: (m: string, t?: "success" | "error" | "info") => void;
   onEditProfile: () => void;
+  onWriteNfc?: () => void;
 }) {
   const prefs = useMemo(readPrefs, []);
   const [styleId, setStyleId] = useState(prefs.style || "violet");
@@ -383,9 +385,33 @@ export function DigitalPass({
         <div style={{ fontSize: 13, fontWeight: 700, color: muted, textTransform: "uppercase", letterSpacing: "0.04em", marginTop: 18 }}>On your pass</div>
         <Toggle label="Email" checked={showEmail} onChange={setShowEmail} isDark={isDark} disabled={!user?.email} />
         <Toggle label="Phone" checked={showPhone} onChange={setShowPhone} isDark={isDark} disabled={!user?.phone} hint={!user?.phone ? "Add a phone number in Settings" : undefined} />
-        <button onClick={onEditProfile} style={{ marginTop: 8, border: "none", background: "none", color: PURPLE, fontWeight: 600, fontSize: 15, cursor: "pointer", padding: "8px 0" }}>
-          Edit name, role and photo
-        </button>
+        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+          {onWriteNfc && (
+            <button
+              onClick={onWriteNfc}
+              style={{
+                padding: "10px 18px",
+                borderRadius: 12,
+                border: "none",
+                background: "linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)",
+                color: "#FFFFFF",
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                boxShadow: "0 2px 8px rgba(124, 58, 237, 0.3)",
+              }}
+            >
+              <I.Contact size={15} /> Write to NFC card
+            </button>
+          )}
+          <button onClick={onEditProfile} style={{ border: "none", background: "none", color: PURPLE, fontWeight: 600, fontSize: 14, cursor: "pointer", padding: "8px 0" }}>
+            Edit name, role and photo
+          </button>
+        </div>
       </section>
 
       <p style={{ color: muted, fontSize: 12, textAlign: "center", margin: 0, lineHeight: 1.5 }}>

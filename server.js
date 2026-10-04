@@ -294,7 +294,18 @@ app.options("/api/email", (req, res) => res.status(200).end());
 // ── Serve web frontend build if dist directory exists ─────────────────────────
 const distPath = path.join(__dirname, "dist");
 if (fs.existsSync(distPath)) {
-  app.get("/waitlist.html", (req, res) => waitlistHandler(req, res));
+  app.get(["/waitlist", "/waitlist.html"], (req, res) => waitlistHandler(req, res));
+
+  // Serve waitlist at root if on waitlist subdomain or if WAITLIST_MODE is set
+  app.use((req, res, next) => {
+    const host = req.headers.host || "";
+    if (host.startsWith("waitlist.") || process.env.WAITLIST_MODE === "true" || process.env.SERVE_WAITLIST_AT_ROOT === "true") {
+      if (req.path === "/" || req.path === "/index.html") {
+        return waitlistHandler(req, res);
+      }
+    }
+    next();
+  });
 
   // Serve static assets with high-performance caching (1 year for immutable hashed bundles)
   app.use(

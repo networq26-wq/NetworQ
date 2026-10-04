@@ -18,6 +18,7 @@ const ICON: Record<string, { Icon: (p: { size?: number; color?: string }) => Rea
   connection_accepted: { Icon: I.UserCheck, color: "#34C759" },
   connection_declined: { Icon: I.User, color: "#8E8E93" },
   reminder: { Icon: I.Clock, color: "#FF9F0A" },
+  message: { Icon: I.Mail, color: "#7C3AED" },
   security: { Icon: I.Lock, color: "#FF3B30" },
   event: { Icon: I.Calendar, color: "#0A84FF" },
   system: { Icon: I.Bell, color: "#8E8E93" },

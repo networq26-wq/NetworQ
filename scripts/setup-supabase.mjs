@@ -61,6 +61,8 @@ const MIGRATIONS = [
   "20261008_nearby_radar.sql",
   "20261009_events_categories.sql",
   "20261010_push_notifications.sql",
+  "20261011_realtime_chat.sql",
+  "20261012_chat_hardening.sql",
 ];
 
 const authConfig = {

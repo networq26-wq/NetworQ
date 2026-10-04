@@ -22,6 +22,11 @@ import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
+import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
+import { NfcWriterModal } from "./pass/NfcWriterModal";
+import { ExportContactsModal } from "./crm/ExportContactsModal";
+import { ChatModal } from "./chat/ChatModal";
+import { AiCopilotModal } from "./ai/AiCopilotModal";
 
 const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
@@ -1003,6 +1008,7 @@ function dbToContact(row: any) {
     reminderDate: row.reminder_date,
     image: row.image,
     addedAt: row.added_at,
+    linkedUserId: row.linked_user_id || null, // set when you connected on Radar — enables in-app messaging
     reminderDone: row.reminder_done,
     emailSent: row.email_sent,
     meetLink: row.meet_link,
@@ -1309,7 +1315,13 @@ function NetworQApp() {
   const [openTarget] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const t = new URLSearchParams(window.location.search).get("open");
-    return t && ["radar", "contacts", "events", "settings"].includes(t) ? t : null;
+    return t && ["radar", "contacts", "events", "settings", "chat"].includes(t) ? t : null;
+  });
+  // ?open=chat&with=<user id> (from a message push notification)
+  const [openChatWith] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const w = new URLSearchParams(window.location.search).get("with");
+    return w && /^[0-9a-f-]{36}$/i.test(w) ? w : null;
   });
   const [inviteCode] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -1393,6 +1405,13 @@ function NetworQApp() {
   const [introTargetContact, setIntroTargetContact] = useState<any | null>(null);
   const [daySummaryOpen, setDaySummaryOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [voiceDebriefOpen, setVoiceDebriefOpen] = useState(false);
+  const [nfcWriterOpen, setNfcWriterOpen] = useState(false);
+  const [exportContactsOpen, setExportContactsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatPartner, setChatPartner] = useState<any | null>(null);
+  const [chatEvent, setChatEvent] = useState<{ id: string; name: string } | null>(null);
+  const [copilotOpen, setCopilotOpen] = useState(false);
 
   const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     setToast({ message, type });
@@ -1562,18 +1581,16 @@ VOICE & ASSISTANT DIRECTIVES:
       }
     } catch (e: any) {
       console.warn("AI Assistant error:", e);
-      const fallbackReply = `I've analyzed your network. ${e.message ? `(Notice: ${e.message})` : ""}. How can I assist you with your contacts, roles, or follow-ups?`;
+      // Say plainly that no answer was produced — never a canned reply that looks like one
+      const reason = e?.message || "The AI assistant isn't available right now.";
       setAiMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: fallbackReply,
+          content: `I couldn't answer that just now. ${reason}`,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
-      if (wasSpoken || voiceReplyEnabled) {
-        playJarvisVoice(fallbackReply);
-      }
     } finally {
       setAiLoading(false);
     }
@@ -1789,7 +1806,13 @@ VOICE & ASSISTANT DIRECTIVES:
 
   useEffect(() => {
     if (screen !== "app" || !openTarget) return;
-    setTab(openTarget as typeof tab);
+    if (openTarget === "chat") {
+      if (openChatWith) {
+        setChatPartner({ id: openChatWith, name: "Message" });
+        setChatEvent(null);
+        setChatOpen(true);
+      }
+    } else setTab(openTarget as typeof tab);
     try {
       window.history.replaceState(null, "", window.location.pathname);
     } catch {
@@ -1820,6 +1843,13 @@ VOICE & ASSISTANT DIRECTIVES:
     notif.markRead([n.id]);
     setNotifOpen(false);
     const screen = n.data?.screen;
+    if (screen === "chat" && n.data?.from_user) {
+      // Message notification → open that conversation
+      setChatPartner({ id: n.data.from_user, name: n.title });
+      setChatEvent(null);
+      setChatOpen(true);
+      return;
+    }
     if (screen === "radar" || screen === "contacts" || screen === "events" || screen === "settings") setTab(screen);
   };
 
@@ -1874,6 +1904,11 @@ VOICE & ASSISTANT DIRECTIVES:
     if (introductionsOpen) return setIntroductionsOpen(false), true;
     if (daySummaryOpen) return setDaySummaryOpen(false), true;
     if (globalSearchOpen) return setGlobalSearchOpen(false), true;
+    if (voiceDebriefOpen) return setVoiceDebriefOpen(false), true;
+    if (nfcWriterOpen) return setNfcWriterOpen(false), true;
+    if (exportContactsOpen) return setExportContactsOpen(false), true;
+    if (chatOpen) return setChatOpen(false), true;
+    if (copilotOpen) return setCopilotOpen(false), true;
     if (composer) return setComposer(null), true;
     if (meetModal) return setMeetModal(null), true;
     if (bulkEmailModalOpen) return setBulkEmailModalOpen(false), true;
@@ -5219,6 +5254,26 @@ Keep it punchy, sharp, and directly actionable.`;
                       <span>Schedule 1:1</span>
                     </button>
                     <button
+                      disabled={!selectedContact.linkedUserId}
+                      title={selectedContact.linkedUserId ? "Message" : "Connect on Radar to message each other in NetworQ"}
+                      onClick={() => {
+                        if (!selectedContact.linkedUserId) return;
+                        setChatPartner({
+                          id: selectedContact.linkedUserId,
+                          name: selectedContact.name,
+                          avatar_url: selectedContact.avatar,
+                          role: selectedContact.role,
+                          company: selectedContact.company,
+                        });
+                        setChatEvent(null);
+                        setChatOpen(true);
+                      }}
+                      style={{ ...S.btnSm, flex: 1, padding: "8px 12px", background: "rgba(124, 58, 237, 0.15)", color: "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
+                    >
+                      <I.Mail size={13} />
+                      <span>Message</span>
+                    </button>
+                    <button
                       onClick={() => downloadVCard(selectedContact)}
                       style={{ ...S.btnSmOut, padding: "8px 12px" }}
                       title="Download vCard"
@@ -5342,12 +5397,22 @@ Keep it punchy, sharp, and directly actionable.`;
               setRadarListedEvent(null);
             }}
             onOpenEventsHub={() => setTab("events")}
+            onOpenChat={(p) => {
+              setChatPartner(p);
+              setChatEvent(null);
+              setChatOpen(true);
+            }}
+            onOpenEventChat={(evId, evName) => {
+              setChatPartner(null);
+              setChatEvent({ id: evId, name: evName });
+              setChatOpen(true);
+            }}
           />
         )}
 
         {/* ── SCAN TAB ── */}
         {tab === "scan" && (
-          <div style={{ maxWidth: 580, margin: "0 auto" }}>
+          <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
             <CameraCapture
               open={liveCameraOpen}
               onClose={() => setLiveCameraOpen(false)}
@@ -5355,13 +5420,87 @@ Keep it punchy, sharp, and directly actionable.`;
               onFallback={() => cameraFileRef.current?.click()}
             />
 
-            <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 28, marginBottom: 4, letterSpacing: "-0.02em" }}>
-              Scan a card
-            </h2>
-            <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
-              Point your camera at a business card or NetworQ QR, or upload a photo. We fill in the details for you.
-            </p>
+            {/* ── LAZY VOICE DEBRIEF HERO BANNER (Instant Voice Debrief) ── */}
+            <div
+              onClick={() => setVoiceDebriefOpen(true)}
+              style={{
+                borderRadius: 20,
+                padding: "20px 22px",
+                background: isDark
+                  ? "linear-gradient(135deg, rgba(124, 58, 237, 0.22) 0%, rgba(99, 102, 241, 0.15) 100%)"
+                  : "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(167, 139, 250, 0.12) 100%)",
+                border: `1.5px solid ${isDark ? "rgba(167, 139, 250, 0.35)" : "rgba(124, 58, 237, 0.25)"}`,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+                boxShadow: isDark
+                  ? "0 4px 20px rgba(0, 0, 0, 0.3)"
+                  : "0 4px 18px rgba(124, 58, 237, 0.08)",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 27,
+                  background: "linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)",
+                  fontSize: 24,
+                }}
+              >
+                <I.Mic size={24} color="#FFFFFF" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
+                    Lazy Voice Debrief
+                  </span>
+                  <span
+                    style={{
+                      background: "rgba(124, 58, 237, 0.15)",
+                      color: isDark ? "#C4B5FD" : "#7C3AED",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: "2px 8px",
+                      borderRadius: 999,
+                      letterSpacing: "0.04em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    AI auto-CRM
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45 }}>
+                  Speak for 10s after meeting someone. AI extracts details, sets your follow-up reminder, and pre-drafts the email!
+                </p>
+              </div>
+              <button
+                type="button"
+                style={{
+                  background: "#7C3AED",
+                  color: "#FFF",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "8px 14px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  cursor: "pointer",
+                }}
+              >
+                Tap to Speak
+              </button>
+            </div>
 
+            {/* ── SCANNER TILES GRID ── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {([
                 { key: "scan", label: "Scan", sub: "Use camera", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
@@ -5371,7 +5510,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   key={b.key}
                   onClick={b.act}
                   disabled={scanning}
-                  aria-label={b.key === "scan" ? "Scan with camera" : "Upload photos"}
+                  aria-label={b.label}
                   onDragOver={b.key === "upload" ? (e) => e.preventDefault() : undefined}
                   onDrop={b.key === "upload" ? (e: any) => {
                     e.preventDefault();
@@ -5384,60 +5523,54 @@ Keep it punchy, sharp, and directly actionable.`;
                     }
                   } : undefined}
                   style={{
-                    padding: "26px 12px 22px",
-                    borderRadius: 20,
-                    border: b.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-                    background: b.primary ? "#7C3AED" : isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+                    padding: "20px 12px 18px",
+                    borderRadius: 18,
+                    border: b.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E5EA"}`,
+                    background: b.primary ? "#7C3AED" : isDark ? "rgba(255,255,255,0.05)" : "#FFFFFF",
                     color: b.primary ? "#FFFFFF" : themeStyles.text,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: 10,
+                    gap: 8,
                     cursor: scanning ? "default" : "pointer",
                     opacity: scanning ? 0.6 : 1,
+                    textAlign: "center",
                   }}
                 >
                   <span
                     style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 26,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       background: b.primary ? "rgba(255,255,255,0.18)" : isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)",
                     }}
                   >
-                    <b.icon size={24} color={b.primary ? "#FFFFFF" : isDark ? "#A78BFA" : "#7C3AED"} />
+                    <b.icon size={22} color={b.primary ? "#FFFFFF" : isDark ? "#A78BFA" : "#7C3AED"} />
                   </span>
-                  <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>{b.label}</span>
-                  <span style={{ fontSize: 12, opacity: 0.75 }}>{b.sub}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{b.label}</span>
+                  <span style={{ fontSize: 11, opacity: 0.75 }}>{b.sub}</span>
                 </button>
               ))}
             </div>
 
-            <div style={{ textAlign: "center", marginTop: 14 }}>
-              <button
-                onClick={() => {
-                  setBatchInitialFiles([]);
-                  setBatchScannerOpen(true);
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: isDark ? "#A78BFA" : "#7C3AED",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  padding: "6px 12px",
-                }}
-              >
-                <I.Zap size={14} style={{ marginRight: 4, verticalAlign: "-2px" }} />Batch scan up to 25 cards
-              </button>
+            {/* Secondary tools stay one tap away without crowding the two main choices */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 4, marginTop: 14, flexWrap: "wrap" }}>
+              {[
+                { label: "Batch scan up to 25 cards", icon: I.Zap, act: () => { setBatchInitialFiles([]); setBatchScannerOpen(true); } },
+                { label: "Write NFC card", icon: I.Contact, act: () => setNfcWriterOpen(true) },
+              ].map((l) => (
+                <button key={l.label} onClick={l.act} style={{ background: "transparent", border: "none", color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 12px", minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <l.icon size={15} />
+                  {l.label}
+                </button>
+              ))}
             </div>
 
             {(scanning || scanPreview || scanErr) && (
-              <div style={{ ...S.card, marginTop: 16, textAlign: "center" }}>
+              <div style={{ ...S.card, textAlign: "center" }}>
                 {scanPreview && (
                   <div className="nq-pop" style={{ position: "relative", display: "inline-block", maxWidth: "100%", borderRadius: 12, overflow: "hidden", marginBottom: scanning || scanErr ? 14 : 0 }}>
                     <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, maxWidth: "100%", display: "block", filter: scanning ? "saturate(0.85) brightness(0.92)" : "none", transition: "filter 0.3s ease" }} />
@@ -5462,7 +5595,166 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             )}
 
-            {/* Fallback: the phone's own camera app (used when the live camera can't start) */}
+            {/* ── RECENT SCANS & QUICK CRM ACTIONS TRAY ── */}
+            <div style={{ ...S.card, display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
+                    Recent Scans & Captured
+                  </h3>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: isDark ? "rgba(255,255,255,0.08)" : "#E5E5EA", color: themeStyles.textMuted }}>
+                    {contacts.length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setExportContactsOpen(true)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: isDark ? "#A78BFA" : "#7C3AED",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "4px 8px",
+                  }}
+                >
+                  <I.ArrowRight size={13} style={{ transform: "rotate(90deg)" }} /> Export
+                </button>
+              </div>
+
+              {contacts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 12px", color: themeStyles.textMuted }}>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}><I.Contact size={30} /></div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, marginBottom: 4 }}>
+                    No scanned cards yet
+                  </div>
+                  <div style={{ fontSize: 12, maxWidth: 320, margin: "0 auto 14px" }}>
+                    Scan a card with your camera or try our 10-second Lazy Voice Debrief after meeting someone.
+                  </div>
+                  <button
+                    onClick={() => setVoiceDebriefOpen(true)}
+                    style={{
+                      background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
+                      border: `1px solid ${isDark ? "rgba(167, 139, 250, 0.3)" : "rgba(124, 58, 237, 0.3)"}`,
+                      color: isDark ? "#C4B5FD" : "#7C3AED",
+                      padding: "8px 16px",
+                      borderRadius: 10,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <I.Mic size={14} style={{ marginRight: 6, verticalAlign: "-2px" }} />Try Voice Debrief
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {contacts.slice(0, 5).map((c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                        padding: 10,
+                        borderRadius: 14,
+                        background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
+                        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E5E5EA"}`,
+                      }}
+                    >
+                      <div
+                        onClick={() => setModal(c)}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          background: "#7C3AED",
+                          color: "#FFF",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: 14,
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {(c.name || "U")[0].toUpperCase()}
+                      </div>
+                      <div onClick={() => setModal(c)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {c.name || "Unnamed"}
+                        </div>
+                        <div style={{ fontSize: 12, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {[c.role, c.company].filter(Boolean).join(" · ") || "Scanned Contact"}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => openEmail(c, "Networking follow-up")}
+                          title="Draft AI Follow-up Email"
+                          aria-label={`Draft follow-up email to ${c.name}`}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
+                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+                            color: themeStyles.text,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <I.Mail size={13} /> Follow-up
+                        </button>
+                        <button
+                          onClick={() => setMeetModal(c)}
+                          title="Schedule Follow-up Reminder"
+                          aria-label={`Schedule reminder for ${c.name}`}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
+                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
+                            color: themeStyles.text,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <I.Calendar size={13} style={{ marginRight: 4, verticalAlign: "-2px" }} />Meet
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {contacts.length > 5 && (
+                    <button
+                      onClick={() => setTab("contacts")}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: isDark ? "#A78BFA" : "#7C3AED",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        padding: "6px 0",
+                        textAlign: "center",
+                      }}
+                    >
+                      View all {contacts.length} contacts in CRM →
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Fallback inputs */}
             <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
             <input
               ref={fileRef}
@@ -5487,7 +5779,13 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {/* ── 3D MY QR PASS TAB ── */}
         {tab === "qr" && (
-          <DigitalPass user={currentUser} isDark={isDark} showToast={showToast} onEditProfile={() => setTab("settings")} />
+          <DigitalPass
+            user={currentUser}
+            isDark={isDark}
+            showToast={showToast}
+            onEditProfile={() => setTab("settings")}
+            onWriteNfc={() => setNfcWriterOpen(true)}
+          />
         )}
 
         {/* ── ADD CONTACT TAB ── */}
@@ -7002,6 +7300,80 @@ Keep it punchy, sharp, and directly actionable.`;
             showToast("Connection request sent!", "success");
           }}
           supabase={supabase}
+        />
+      )}
+
+      {/* ── LAZY VOICE DEBRIEF MODAL (Instant AI Voice Debrief) ── */}
+      {voiceDebriefOpen && (
+        <LazyVoiceDebriefModal
+          open={voiceDebriefOpen}
+          onClose={() => setVoiceDebriefOpen(false)}
+          supabase={supabase}
+          currentUser={currentUser}
+          isDark={isDark}
+          showToast={showToast}
+          apiBaseUrl={AI_PROXY}
+          onContactCreated={(c) => {
+            setContacts((prev) => [dbToContact(c), ...prev]);
+            showToast(`${c.name || "Contact"} saved to your CRM!`, "success");
+          }}
+        />
+      )}
+
+      {/* ── PHYSICAL NFC SMART CARD WRITER ── */}
+      {nfcWriterOpen && (
+        <NfcWriterModal
+          open={nfcWriterOpen}
+          onClose={() => setNfcWriterOpen(false)}
+          user={currentUser}
+          isDark={isDark}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── 1-CLICK CONTACTS EXPORTER ── */}
+      {exportContactsOpen && (
+        <ExportContactsModal
+          open={exportContactsOpen}
+          onClose={() => setExportContactsOpen(false)}
+          contacts={contacts}
+          isDark={isDark}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── REALTIME IN-APP CHAT & EVENT ROOM MESSAGING ── */}
+      {chatOpen && (
+        <ChatModal
+          open={chatOpen}
+          onClose={() => {
+            setChatOpen(false);
+            setChatPartner(null);
+            setChatEvent(null);
+          }}
+          supabase={supabase}
+          currentUser={currentUser}
+          partner={chatPartner}
+          eventId={chatEvent?.id || null}
+          eventName={chatEvent?.name || null}
+          isDark={isDark}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── NETWORQ INTELLIGENCE AI COPILOT ── */}
+      {copilotOpen && (
+        <AiCopilotModal
+          open={copilotOpen}
+          onClose={() => setCopilotOpen(false)}
+          callAI={callAI}
+          contacts={contacts}
+          isDark={isDark}
+          showToast={showToast}
+          onDraftOutreach={(c) => {
+            setCopilotOpen(false);
+            openEmail(c, "Networking follow-up");
+          }}
         />
       )}
 
