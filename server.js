@@ -18,6 +18,7 @@ const { createNotifyHookRouter, productionDeps: notifyDeps } = require("./api/no
 const { createProspectRouter, productionDeps: prospectDeps } = require("./api/prospect");
 const { createIceRouter, productionDeps: iceDeps, STUN } = require("./api/ice");
 const { createTranscribeRouter, productionDeps: transcribeDeps } = require("./api/transcribe");
+const { createGoogleRouter, productionDeps: googleDeps } = require("./api/google");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -80,6 +81,7 @@ app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 app.use("/api/events", limiter(60 * 1000, 20));
 app.use("/api/tts", limiter(60 * 1000, 30));
 app.use("/api/calls", limiter(60 * 1000, 10));
+app.use("/api/google", limiter(60 * 1000, 30));
 app.use(["/api/prospect", "/api/organization"], limiter(60 * 1000, 20));
 
 function parseEnvContent(content) {
@@ -257,6 +259,11 @@ else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "
 const trDeps = transcribeDeps();
 if (trDeps) app.use("/api", createTranscribeRouter(trDeps));
 else app.post("/api/transcribe", (req, res) => res.status(503).json({ error: "Voice typing isn't available on this server." }));
+
+// ── Google Calendar + Meet (connect once; works on web and in the app) ─────────
+const gDeps = googleDeps();
+if (gDeps) app.use("/api", createGoogleRouter(gDeps));
+else app.all("/api/google/*splat", (req, res) => res.status(503).json({ error: "Google Calendar isn't set up on this server yet." }));
 
 // ── Call relay settings (STUN always; TURN when configured) ────────────────────
 const iceDepsValue = iceDeps();

@@ -282,49 +282,54 @@ export function CardSettings({ user, isDark, onEditProfile, onWriteNfc }: { user
   );
 }
 
-// Circuit traces + network nodes, with signal pulses running toward the logo. Decorative only.
+// Circuit traces drawn by rule (not by eye): a bus of parallel traces from the right edge, 30px apart,
+// each with one exact 45° bend, staggered so they stay parallel and never cross, each ending on a via.
+// Plus three vertical traces rising from the bottom edge. Pulses travel along the same paths. Decorative.
 function NetworkTraces({ accent, pearl }: { accent: string; pearl: boolean }) {
-  const line = pearl ? "rgba(124,58,237,0.22)" : "rgba(255,255,255,0.16)";
-  const node = pearl ? "rgba(124,58,237,0.45)" : accent;
+  const line = pearl ? "rgba(124,58,237,0.24)" : "rgba(255,255,255,0.17)";
+  const via = pearl ? "rgba(124,58,237,0.55)" : accent;
   const pulse = pearl ? "#7C3AED" : "#FFFFFF";
-  // Right-angle traces (PCB style) from the right edge and bottom-right toward the top-left logo area
-  const traces = [
-    "M856 120 H700 L670 90 H520 L490 60 H300",
-    "M856 210 H760 L720 170 H600 L560 130 H430",
-    "M856 300 H790 L750 260 H640",
-    "M730 540 V430 L700 400 V330 L670 300 H560",
-    "M856 470 H800 L770 440 H700",
-  ];
-  const nodes: [number, number][] = [[300, 60], [430, 130], [640, 260], [560, 300], [700, 440], [520, 90], [600, 170], [700, 400]];
+  const W = 856;
+  const PITCH = 30; // spacing between parallel traces
+  const RISE = 60; // every bend is exactly 45°: run = rise
+
+  type T = { d: string; end: [number, number] };
+  // Bus: trace i enters at y0+i·pitch, bends up-left at x = bend0 − i·pitch, rises RISE, runs to its end
+  const bus: T[] = [0, 1, 2, 3].map((i) => {
+    const y = 140 + i * PITCH;
+    const bendX = 720 - i * PITCH;
+    const yTop = y - RISE;
+    const endX = 380 + i * 50;
+    return { d: `M${W} ${y} H${bendX} L${bendX - RISE} ${yTop} H${endX}`, end: [endX, yTop] };
+  });
+  // Risers: from the bottom edge straight up, one 45° bend inward, end on a via (clear of the name)
+  const risers: T[] = [0, 1, 2].map((j) => {
+    const x = 760 + j * PITCH;
+    const turnY = 380 + j * PITCH;
+    const run = 40;
+    return { d: `M${x} 540 V${turnY} L${x - run} ${turnY - run}`, end: [x - run, turnY - run] };
+  });
+  const all = [...bus, ...risers];
   return (
-    <svg aria-hidden viewBox="0 0 856 540" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+    <svg aria-hidden viewBox={`0 0 ${W} 540`} preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
       <style>{`
-        .nq-trace-pulse { stroke-dasharray: 46 1400; animation: nqTracePulse 4.8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
-        .nq-trace-pulse.p2 { animation-delay: 1.6s; } .nq-trace-pulse.p3 { animation-delay: 3.1s; }
-        .nq-node-glow { animation: nqNodeGlow 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
-        @keyframes nqTracePulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -1446; } }
-        @keyframes nqNodeGlow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
-        @media (prefers-reduced-motion: reduce) { .nq-trace-pulse { display: none; } .nq-node-glow { animation: none; } }
+        .nq-trace-pulse { stroke-dasharray: 7 100; animation: nqTracePulse 4.2s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+        .nq-trace-pulse.p2 { animation-delay: 1.4s; } .nq-trace-pulse.p3 { animation-delay: 2.8s; }
+        @keyframes nqTracePulse { from { stroke-dashoffset: 7; } to { stroke-dashoffset: -100; } }
+        @media (prefers-reduced-motion: reduce) { .nq-trace-pulse { display: none; } }
       `}</style>
-      {/* faint connection mesh (network) behind the traces */}
-      <g stroke={line} strokeWidth={1}>
-        <line x1="640" y1="260" x2="520" y2="90" />
-        <line x1="600" y1="170" x2="560" y2="300" />
-        <line x1="700" y1="400" x2="640" y2="260" />
+      <g fill="none" stroke={line} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+        {all.map((t, i) => <path key={i} d={t.d} />)}
       </g>
-      <g fill="none" stroke={line} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-        {traces.map((d, i) => <path key={i} d={d} />)}
+      <g fill="none" stroke={pulse} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" opacity={0.9}>
+        <path className="nq-trace-pulse" pathLength={100} d={bus[0].d} />
+        <path className="nq-trace-pulse p2" pathLength={100} d={bus[2].d} />
+        <path className="nq-trace-pulse p3" pathLength={100} d={risers[1].d} />
       </g>
-      {/* signal pulses travelling inward */}
-      <g fill="none" stroke={pulse} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.9}>
-        <path className="nq-trace-pulse" d={traces[0]} />
-        <path className="nq-trace-pulse p2" d={traces[1]} />
-        <path className="nq-trace-pulse p3" d={traces[3]} />
-      </g>
-      {nodes.map(([x, y], i) => (
+      {all.map((t, i) => (
         <g key={i}>
-          <circle cx={x} cy={y} r={7} fill="none" stroke={node} strokeWidth={2} opacity={0.7} />
-          <circle className={i % 3 === 0 ? "nq-node-glow" : undefined} cx={x} cy={y} r={3} fill={node} />
+          <circle cx={t.end[0]} cy={t.end[1]} r={7} fill={pearl ? "#FFFFFF" : "rgba(0,0,0,0.25)"} stroke={via} strokeWidth={2} />
+          <circle cx={t.end[0]} cy={t.end[1]} r={2.6} fill={via} />
         </g>
       ))}
     </svg>

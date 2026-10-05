@@ -271,6 +271,8 @@ export function EventsHub({
         </button>
       </header>
 
+      {events && events.length > 0 && <HeroCarousel events={events} cityMatch={cityMatch} isDark={isDark} onAttend={onAttend} />}
+
       {events && events.length > 0 && (
         <section aria-label="Filters" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {/* Search with the location built in */}
@@ -598,5 +600,95 @@ function MonthPicker({ t, isDark, selected, busyDays, onPick }: { t: ReturnType<
       </div>
       <p style={{ fontSize: 13, color: t.muted, margin: "12px 0 0", textAlign: "center" }}>Days with a dot have events.</p>
     </div>
+  );
+}
+
+// Featured events hero (BookMyShow / District style): auto-advances every 5 s with a smooth slide,
+// swipeable, dots show where you are; pauses while touched/hovered and when motion is reduced.
+function HeroCarousel({ events, cityMatch, isDark, onAttend }: { events: PublicEvent[]; cityMatch: (e: PublicEvent) => boolean; isDark: boolean; onAttend: (ev: PublicEvent) => void }) {
+  const featured = useMemo(() => {
+    const now = Date.now();
+    const soon = (e: PublicEvent) => {
+      const t = new Date(e.starts_at).getTime();
+      return t >= now - 3 * 3600e3 && t <= now + 21 * 86400e3;
+    };
+    const withImg = events.filter((e) => e.image && soon(e));
+    const local = withImg.filter(cityMatch);
+    const pool = (local.length >= 3 ? local : withImg).slice();
+    const india = (e: PublicEvent) => (INDIA_CITIES.has(e.city || "") ? 1 : 0); // India-first when no city is chosen
+    pool.sort((a, b) => india(b) - india(a) || Number(b.verified) - Number(a.verified) || new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+    return pool.slice(0, 6);
+  }, [events, cityMatch]);
+  const track = React.useRef<HTMLDivElement>(null);
+  const [index, setIndex] = useState(0);
+  const paused = React.useRef(false);
+  const reduce = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const goTo = useCallback((i: number) => {
+    const el = track.current;
+    if (!el) return;
+    const n = el.children.length;
+    const next = ((i % n) + n) % n;
+    el.scrollTo({ left: next * el.clientWidth, behavior: reduce ? "auto" : "smooth" });
+  }, [reduce]);
+
+  // which slide is showing (from the scroll position — works for swipes too)
+  useEffect(() => {
+    const el = track.current;
+    if (!el) return;
+    const onScroll = () => setIndex(Math.round(el.scrollLeft / Math.max(1, el.clientWidth)));
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [featured.length]);
+
+  // auto-advance
+  useEffect(() => {
+    if (reduce || featured.length < 2) return;
+    const t = setInterval(() => {
+      if (!paused.current && document.visibilityState === "visible") goTo(index + 1);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [index, featured.length, goTo, reduce]);
+
+  if (featured.length === 0) return null;
+  const hold = { onPointerDown: () => (paused.current = true), onPointerUp: () => setTimeout(() => (paused.current = false), 2500), onMouseEnter: () => (paused.current = true), onMouseLeave: () => (paused.current = false) };
+
+  return (
+    <section aria-label="Featured events" aria-roledescription="carousel" style={{ position: "relative", margin: "0 -16px" }}>
+      <div ref={track} className="nq-chips" {...hold} style={{ display: "flex", overflowX: "auto", scrollSnapType: "x mandatory", scrollBehavior: reduce ? "auto" : "smooth", scrollbarWidth: "none" } as React.CSSProperties}>
+        {featured.map((ev, i) => {
+          const d = new Date(ev.starts_at);
+          const allDay = isAllDay(ev.starts_at);
+          const when = `${d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" })}${allDay ? "" : ` · ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`}`;
+          const place = [ev.venue, ev.city && !(ev.venue || "").includes(ev.city) ? ev.city : null].filter(Boolean).join(" · ");
+          return (
+            <div key={ev.id} role="group" aria-roledescription="slide" aria-label={`${i + 1} of ${featured.length}: ${ev.title}`} style={{ flex: "0 0 100%", scrollSnapAlign: "center", padding: "0 16px", boxSizing: "border-box" }}>
+              <div style={{ position: "relative", aspectRatio: "16 / 10", borderRadius: 24, overflow: "hidden", background: "linear-gradient(135deg, #3B1A7A, #7C3AED)", color: "#FFFFFF", boxShadow: isDark ? "0 16px 36px -18px rgba(0,0,0,0.9)" : "0 18px 40px -20px rgba(40,20,90,0.55)" }}>
+                <img src={ev.image!} alt="" referrerPolicy="no-referrer" loading={i === 0 ? "eager" : "lazy"} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+                <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.88) 100%)" }} />
+                <span style={{ position: "absolute", top: 14, left: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", background: "rgba(124,58,237,0.92)" }}>Featured</span>
+                <div style={{ position: "absolute", left: 18, right: 18, bottom: 16, display: "flex", alignItems: "flex-end", gap: 12 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{when}</div>
+                    <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2, marginTop: 4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 8px rgba(0,0,0,0.4)" } as React.CSSProperties}>{ev.title}</div>
+                    {place && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{place}</div>}
+                  </div>
+                  <button onClick={() => onAttend(ev)} aria-label={`Going to ${ev.title} — opens its Radar`} className="btn-press" style={{ flexShrink: 0, minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: "#FFFFFF", color: "#1C1C1E", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
+                    Going
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {featured.length > 1 && (
+        <div role="tablist" aria-label="Choose featured event" style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: 10 }}>
+          {featured.map((ev, i) => (
+            <button key={ev.id} role="tab" aria-selected={index === i} aria-label={`Show ${ev.title}`} onClick={() => goTo(i)} style={{ width: index === i ? 22 : 8, height: 8, borderRadius: 4, border: "none", padding: 0, cursor: "pointer", background: index === i ? PURPLE : isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.18)", transition: "width 0.3s ease, background 0.3s ease" }} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

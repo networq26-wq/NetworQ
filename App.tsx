@@ -807,80 +807,6 @@ async function enrichCompanyDomain(urlOrDomain: string) {
   return null;
 }
 
-function loadGISScript(): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window !== "undefined" && (window as any).google?.accounts) {
-      resolve();
-      return;
-    }
-    if (typeof document === "undefined") {
-      resolve();
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = "https://accounts.google.com/gsi/client";
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = () => resolve();
-    document.head.appendChild(s);
-  });
-}
-
-// Google Meet links can only be created through Google Calendar, which needs the user's consent.
-// requestCalendarToken MUST be called synchronously inside the tap handler, otherwise browsers
-// block the Google pop-up. GIS must already be loaded (preloaded when the meeting sheet opens).
-const GOOGLE_MEET_AVAILABLE =
-  !IS_NATIVE_WEBVIEW && !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
-
-function requestCalendarToken(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const oauth2 = (window as any).google?.accounts?.oauth2;
-    if (!oauth2) return reject(new Error("Google sign-in didn't load. Check your connection, or paste a meeting link instead."));
-    const timer = setTimeout(() => reject(new Error("Google didn't respond. Try again, or paste a meeting link instead.")), 120_000);
-    const client = oauth2.initTokenClient({
-      client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
-      scope: "https://www.googleapis.com/auth/calendar.events",
-      callback: (resp: any) => {
-        clearTimeout(timer);
-        if (resp.error || !resp.access_token) reject(new Error(resp.error_description || "Google Calendar access wasn't granted."));
-        else resolve(resp.access_token);
-      },
-      // Pop-up blocked or closed: fail clearly instead of hanging on "Sending…"
-      error_callback: (err: any) => {
-        clearTimeout(timer);
-        reject(new Error(err?.type === "popup_closed" ? "The Google window was closed before access was granted." : "Your browser blocked the Google window. Allow pop-ups for this site, or paste a meeting link instead."));
-      },
-    });
-    client.requestAccessToken({ prompt: "" });
-  });
-}
-
-// Creates the event in the organiser's Google Calendar with a Meet link; Google emails the invite.
-async function createGoogleMeetEvent(token: string, opts: { title: string; description: string; start: Date; minutes: number; attendeeEmail: string }) {
-  const end = new Date(opts.start.getTime() + opts.minutes * 60_000);
-  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      summary: opts.title,
-      description: opts.description,
-      start: { dateTime: opts.start.toISOString() },
-      end: { dateTime: end.toISOString() },
-      attendees: [{ email: opts.attendeeEmail }],
-      conferenceData: { createRequest: { requestId: `networq-${Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } } },
-      reminders: { useDefault: true },
-    }),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    if (res.status === 403) throw new Error("Google Calendar isn't enabled for NetworQ yet. Paste a meeting link instead.");
-    throw new Error(json.error?.message || `Google Calendar error ${res.status}`);
-  }
-  const meetLink = json.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === "video")?.uri || json.hangoutLink || "";
-  if (!meetLink) throw new Error("Google created the event but no Meet link. Check that Google Meet is enabled for your account.");
-  return { meetLink, eventLink: json.htmlLink || "" };
-}
-
 function dbToContact(row: any) {
   return {
     id: row.id,
@@ -1909,6 +1835,26 @@ VOICE & ASSISTANT DIRECTIVES:
     };
   }, []);
 
+  // Finishing "Sign in with Google" on our own domain: the ID token arrives in the URL fragment
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const idToken = h.get("google_id_token");
+    const gErr = h.get("google_error");
+    if (!idToken && !gErr) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    if (gErr) {
+      setAuthMsg({ text: gErr, type: "error" });
+      return;
+    }
+    setGoogleLoading(true);
+    supabase.auth.signInWithIdToken({ provider: "google", token: idToken! }).then(({ error }) => {
+      if (error) setAuthMsg({ text: error.message, type: "error" });
+      setGoogleLoading(false);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Always run the newest version: when the app comes back to the screen (Android keeps it alive for
   // days), check whether a newer build is live and refresh — never during a call or while typing.
   useEffect(() => {
@@ -1973,20 +1919,32 @@ VOICE & ASSISTANT DIRECTIVES:
     if (NATIVE_GOOGLE_AUTH && !framedPreview) {
       const onNative = async (e: Event) => {
         const msg = (e as CustomEvent).detail;
-        if (msg?.type !== "auth:session" && msg?.type !== "auth:error") return;
+        if (msg?.type !== "auth:session" && msg?.type !== "auth:error" && msg?.type !== "auth:idtoken") return;
         window.removeEventListener("networq-native", onNative);
         if (msg.type === "auth:error") {
           setAuthMsg({ text: msg.message, type: "error" });
           setGoogleLoading(false);
           return;
         }
-        const { error } = await supabase.auth.setSession({ access_token: msg.access_token, refresh_token: msg.refresh_token });
+        const { error } =
+          msg.type === "auth:idtoken"
+            ? await supabase.auth.signInWithIdToken({ provider: "google", token: msg.idToken })
+            : await supabase.auth.setSession({ access_token: msg.access_token, refresh_token: msg.refresh_token });
         if (error) setAuthMsg({ text: error.message, type: "error" });
         setGoogleLoading(false);
       };
       window.addEventListener("networq-native", onNative);
       window.ReactNativeWebView?.postMessage(JSON.stringify({ type: "auth:google" }));
       return;
+    }
+    // Sign in through NetworQ's own domain (Google shows "continue to networq.co.in")
+    const onOwnDomain = typeof window !== "undefined" && /networq\.co\.in$/.test(window.location.hostname) && window.self === window.top;
+    if (onOwnDomain) {
+      const ok = await fetch("/api/google/available").then((r) => r.json()).then((d) => !!d.available).catch(() => false);
+      if (ok) {
+        window.location.href = "/api/google/signin?from=web";
+        return;
+      }
     }
     try {
       // Google refuses to render its sign-in page inside a frame (403). When framed
@@ -2432,10 +2390,48 @@ Keep it punchy, sharp, and directly actionable.`;
     recognition.start();
   };
 
+  // Google Calendar connection (connect once in the browser; NetworQ then creates Meet invites from the server)
+  const [gcal, setGcal] = useState<{ available: boolean; connected: boolean; email: string | null } | null>(null);
+  const gcalApi = async (path: string, init: RequestInit = {}) => {
+    const { data } = await supabase.auth.getSession();
+    return fetch(`${apiBase(AI_PROXY)}/api/google/${path}`, { ...init, headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session?.access_token || ""}`, ...(init.headers || {}) } });
+  };
+  const refreshGcal = async () => {
+    try {
+      const r = await gcalApi("status");
+      if (r.ok) setGcal(await r.json());
+    } catch {}
+  };
+  const connectGoogleCalendar = async () => {
+    try {
+      const r = await gcalApi("connect", { method: "POST", body: JSON.stringify({ from: IS_NATIVE_WEBVIEW ? "app" : "web" }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url) throw new Error(d.error || "Couldn't start Google.");
+      // In the Android app this opens the phone's browser (Google requires it); on the web, a new tab
+      if (IS_NATIVE_WEBVIEW) window.location.href = d.url;
+      else window.open(d.url, "_blank", "noopener");
+    } catch (e: any) {
+      showToast(e.message, "error");
+    }
+  };
+  useEffect(() => {
+    if (screen !== "app") return;
+    refreshGcal();
+    const onBack = () => document.visibilityState === "visible" && refreshGcal(); // coming back from Google
+    document.addEventListener("visibilitychange", onBack);
+    window.addEventListener("focus", onBack);
+    return () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("focus", onBack);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screen]);
+
   useEffect(() => {
     if (!meetModal) return;
     setMeetResult(null);
-    if (GOOGLE_MEET_AVAILABLE) loadGISScript(); // so the Google window can open instantly on tap
+    refreshGcal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetModal]);
 
   const sendMeeting = async () => {
@@ -2446,8 +2442,7 @@ Keep it punchy, sharp, and directly actionable.`;
     const start = new Date(`${meetDetails.date}T${meetDetails.time}`);
     if (isNaN(start.getTime())) return showToast("Pick a date and time.", "error");
     if (start.getTime() < Date.now() - 5 * 60_000) return showToast("That time is in the past.", "error");
-    // Google: ask for consent right now, inside the tap, before any await (or the pop-up is blocked)
-    const tokenPromise = meetMode === "google" ? requestCalendarToken() : null;
+    if (meetMode === "google" && !gcal?.connected) return connectGoogleCalendar();
     setMeetSending(true);
     try {
       const title = `${currentUser?.name || "NetworQ"} <> ${meetModal.name}`;
@@ -2456,9 +2451,14 @@ Keep it punchy, sharp, and directly actionable.`;
       let via: "google" | "email" = "email";
       let ics: string | undefined;
 
-      if (tokenPromise) {
-        const token = await tokenPromise;
-        const ev = await createGoogleMeetEvent(token, { title, description: agenda || `Scheduled with NetworQ`, start, minutes: meetDuration, attendeeEmail: meetModal.email });
+      if (meetMode === "google") {
+        const r = await gcalApi("meet", { method: "POST", body: JSON.stringify({ title, description: agenda || "Scheduled with NetworQ", start: start.toISOString(), minutes: meetDuration, attendeeEmail: meetModal.email }) });
+        const ev = await r.json().catch(() => ({}));
+        if (r.status === 409 && ev.needsConnect) {
+          setGcal((g) => (g ? { ...g, connected: false } : g));
+          throw new Error("Connect Google Calendar first (tap Google Meet again).");
+        }
+        if (!r.ok || !ev.meetLink) throw new Error(ev.error || "Google couldn't create the meeting.");
         link = ev.meetLink;
         via = "google"; // Google emails the invite (with Accept / Decline) and adds it to both calendars
       } else {
@@ -3150,7 +3150,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "check_email") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 440, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
@@ -3173,7 +3173,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "complete_profile") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 480, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
@@ -3288,7 +3288,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "reset_password") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
@@ -3331,7 +3331,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "forgot_password") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
@@ -3390,7 +3390,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "login") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         <div style={{ width: "100%", maxWidth: 390, zIndex: 1, animation: "fadeUp 0.3s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 26 }}>
@@ -3504,7 +3504,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
   if (screen === "signup") {
     return (
-      <div style={{ ...S.page, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
         <style>{CSS}</style>
         <div style={{ width: "100%", maxWidth: 440, zIndex: 1, animation: "fadeUp 0.3s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 22 }}>
@@ -6333,7 +6333,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <label style={S.label}>Video link</label>
                 <div role="radiogroup" aria-label="Video link" style={{ display: "flex", padding: 3, borderRadius: 12, background: themeStyles.subtleBg, marginBottom: 10 }}>
                   {([
-                    ...(GOOGLE_MEET_AVAILABLE ? [{ k: "google", l: "Google Meet" }] : []),
+                    ...(gcal?.available !== false ? [{ k: "google", l: "Google Meet" }] : []),
                     { k: "paste", l: "Paste link" },
                     { k: "jitsi", l: "Free room" },
                   ] as const).map((o) => (
@@ -6344,10 +6344,16 @@ Keep it punchy, sharp, and directly actionable.`;
                 </div>
                 <div style={{ fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
                   {meetMode === "google" ? (
-                    <>
-                      Google asks you to allow NetworQ to add events to your calendar, then creates a Meet link and emails the invite.{" "}
-                      <span style={{ color: themeStyles.text }}>If Google says “Access blocked”, choose <b>Free room</b> or <b>Paste link</b> instead.</span>
-                    </>
+                    gcal?.connected ? (
+                      <>Creates a Google Meet in your calendar{gcal.email ? ` (${gcal.email})` : ""} and Google emails the invite with Accept / Decline.</>
+                    ) : (
+                      <>
+                        Connect your Google Calendar once — then every Google Meet invite is one tap.
+                        <button onClick={connectGoogleCalendar} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", minHeight: 44, marginTop: 10, borderRadius: 12, border: `1px solid ${themeStyles.tableRowBorder}`, background: isDark ? "#2C2C2E" : "#FFFFFF", color: themeStyles.text, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                          <I.Calendar size={18} /> Connect Google Calendar
+                        </button>
+                      </>
+                    )
                   ) : meetMode === "paste" ? (
                     <>
                       <input
@@ -6371,7 +6377,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   disabled={!meetDetails.date || !meetDetails.time || meetSending}
                 >
                   <Icons.Calendar size={14} />
-                  <span>{meetSending ? (meetMode === "google" ? "Waiting for Google…" : "Sending…") : "Send invite"}</span>
+                  <span>{meetSending ? (meetMode === "google" ? "Creating Google Meet…" : "Sending…") : meetMode === "google" && !gcal?.connected ? "Connect Google first" : "Send invite"}</span>
                 </button>
               </>
             )}

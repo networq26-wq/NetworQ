@@ -67,6 +67,20 @@ function welcome({ name, appUrl, setPasswordUrl }) {
   };
 }
 
+function setPassword({ name, appUrl, setPasswordUrl }) {
+  return {
+    subject: "Set a password for NetworQ",
+    appUrl,
+    preview: "Sign in with your email too — one tap to set a password.",
+    heading: `Set a password, ${first(name)}`,
+    lines: [
+      "You signed in to NetworQ with Google. Set a password and you can also sign in with your email address — handy on a new phone or a shared computer.",
+    ],
+    cta: { label: "Set a password", url: setPasswordUrl },
+    footnote: `This one-time link expires in 1 hour. You can also set one any time in Me → Password & devices, or keep using Continue with Google. Open NetworQ: ${appUrl}`,
+  };
+}
+
 function newSignIn({ name, device, when, city, secureUrl, appUrl = "https://www.networq.co.in" }) {
   return {
     subject: "New sign-in to your NetworQ account",
@@ -144,4 +158,4 @@ async function render(tpl) {
   return { subject: tpl.subject, html, text };
 }
 
-module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, render };
+module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, render, setPassword };
