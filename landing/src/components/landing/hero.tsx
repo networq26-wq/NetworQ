@@ -10,7 +10,7 @@ export function Hero() {
   });
 
   return (
-    <section id="top" className="relative isolate overflow-hidden pt-32 pb-20 md:pt-40 md:pb-28">
+    <section id="top" className="relative isolate overflow-hidden pt-24 pb-16 md:pt-40 md:pb-28">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] opacity-[0.35]"
@@ -22,41 +22,46 @@ export function Hero() {
           WebkitMaskImage: "radial-gradient(70% 60% at 50% 0%, black, transparent 75%)",
         }}
       />
-      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-16 px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-6 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
         <div>
           <motion.div {...rise(0)}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              Early Access · First 100 users get 3 months free
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+                Early Access · First 100 users get 3 months free
+              </span>
+            </div>
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              Never lose a conversation again
+            </p>
           </motion.div>
 
           <motion.h1
             {...rise(0.08)}
-            className="mt-8 text-[2.75rem] leading-[1.02] font-semibold tracking-[-0.04em] text-balance sm:text-6xl lg:text-[4.1rem]"
+            className="mt-4 text-[2.2rem] leading-[1.08] font-semibold tracking-[-0.035em] text-balance sm:text-6xl lg:text-[4.1rem]"
           >
             Meet people.
             <br />
-            Networ<span className="text-primary">Q</span>&nbsp;does&nbsp;the rest.
+            Networ<span className="text-[#8B5CF6]">Q</span> does the rest.
           </motion.h1>
 
           <motion.p
             {...rise(0.16)}
-            className="mt-7 max-w-lg text-[17px] leading-relaxed text-muted-foreground"
+            className="mt-6 max-w-lg text-[16px] sm:text-[17px] leading-relaxed text-muted-foreground"
           >
             You meet valuable people all the time. NetworQ remembers who they are, what you talked
             about, and when to follow up — before the connection goes cold.
           </motion.p>
 
-          <motion.div {...rise(0.24)} className="mt-9 flex flex-wrap items-center gap-5">
+          <motion.div {...rise(0.24)} className="mt-8 flex flex-col sm:flex-row sm:items-center gap-4">
             <a
               href="#waitlist"
-              className="group inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-transform duration-200 hover:-translate-y-px"
+              className="group inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3.5 text-sm font-medium text-primary-foreground shadow-[var(--shadow-soft)] transition-transform duration-200 hover:-translate-y-px"
             >
               Join the waitlist
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </a>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
               First 100 users get 3 months free.
             </span>
           </motion.div>

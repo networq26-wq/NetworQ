@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, CheckCircle2, Share2, Sparkles, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Share2, Sparkles, Loader2, Mail } from "lucide-react";
 import { Reveal } from "./reveal";
-import darkTexture from "../../assets/dark-texture.jpg";
 
 const SUPABASE_URL = "https://jpuxmkkuzqojqeatespa.supabase.co";
 const SUPABASE_ANON_KEY =
@@ -67,42 +66,34 @@ export function Waitlist() {
 
   return (
     <section id="waitlist" className="section-dark relative isolate overflow-hidden">
-      <img
-        src={darkTexture}
-        alt=""
+      {/* Ambient Royal Violet Tech Mesh Glow */}
+      <div
         aria-hidden="true"
-        loading="lazy"
-        width={1920}
-        height={1088}
-        className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-70"
-      />
-      <div className="relative mx-auto max-w-3xl px-6 py-28 text-center md:py-40">
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[480px] bg-gradient-to-tr from-violet-600/20 via-purple-600/10 to-indigo-600/0 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#8b5cf6_1px,transparent_1px)] [background-size:36px_36px] opacity-[0.08]" />
+      </div>
+      <div className="relative mx-auto max-w-3xl px-6 py-16 text-center sm:py-24 md:py-36">
         <Reveal>
-          <h2 className="text-4xl leading-[1.14] font-semibold tracking-[-0.035em] text-balance sm:text-[3.25rem]">
-            You met{" "}
-            <span className="inline-flex items-center justify-center px-3.5 py-0.5 mx-1 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white font-mono font-bold shadow-lg shadow-violet-500/30 text-3xl sm:text-5xl tracking-tight align-middle">
-              12
-            </span>{" "}
-            people at that event. You'll remember{" "}
-            <span className="inline-flex items-center justify-center px-3.5 py-0.5 mx-1 rounded-2xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white font-mono font-bold shadow-lg shadow-rose-500/30 text-3xl sm:text-5xl tracking-tight align-middle">
-              2
-            </span>{" "}
-            by Friday.
+          <h2 className="text-2xl leading-snug font-semibold tracking-[-0.03em] text-balance sm:text-4xl md:text-[3.25rem]">
+            You met <span className="font-serif italic text-[#8B5CF6] font-semibold">12</span> people at that event. You'll remember{" "}
+            <span className="font-serif italic text-[#8B5CF6] font-semibold">2</span> by Friday.
           </h2>
         </Reveal>
         <Reveal delay={0.08}>
-          <p className="mx-auto mt-6 max-w-md text-[17px] text-muted-foreground">
+          <p className="mx-auto mt-4 sm:mt-6 max-w-md text-[15px] sm:text-[17px] text-muted-foreground leading-relaxed">
             NetworQ scans business cards and QR codes, drafts your follow-up emails, and nudges you to reconnect before people forget you ever met.
           </p>
         </Reveal>
 
         <Reveal delay={0.14}>
           {status === "success" || status === "already" ? (
-            <div className="mx-auto mt-10 max-w-md rounded-2xl border border-violet-500/30 bg-card/90 p-8 text-center backdrop-blur-xl shadow-2xl">
+            <div className="mx-auto mt-8 sm:mt-10 max-w-md rounded-2xl border border-violet-500/30 bg-card/90 p-6 sm:p-8 text-center backdrop-blur-xl shadow-2xl">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-600/20 text-violet-400">
                 <CheckCircle2 className="h-8 w-8" />
               </div>
-              <h3 className="mt-4 text-2xl font-bold text-foreground">
+              <h3 className="mt-4 text-xl sm:text-2xl font-bold text-foreground">
                 {status === "already" ? "You're already on the list!" : "You're on the early access list!"}
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -133,41 +124,55 @@ export function Waitlist() {
               </div>
             </div>
           ) : (
-            <form
-              onSubmit={onSubmit}
-              className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 sm:flex-row"
-            >
-              <label htmlFor="waitlist-email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="waitlist-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email address"
-                disabled={status === "loading"}
-                className="h-12 flex-1 rounded-xl border border-input bg-card px-4 text-[15px] outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:opacity-50"
+            <div className="relative mx-auto mt-8 sm:mt-10 w-full max-w-xl px-2 sm:px-0">
+              {/* Subtle ambient violet back-glow */}
+              <div
+                aria-hidden="true"
+                className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-violet-600/35 via-purple-600/25 to-violet-600/35 blur-md opacity-80"
               />
-              <button
-                type="submit"
-                disabled={status === "loading"}
-                className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-medium text-primary-foreground transition-transform duration-200 hover:-translate-y-px disabled:opacity-50"
+
+              <form
+                onSubmit={onSubmit}
+                className="relative flex w-full flex-col sm:flex-row gap-2.5 sm:gap-2 rounded-2xl border border-white/20 bg-card/95 p-2 sm:p-2 backdrop-blur-xl shadow-2xl text-left"
+                style={{ width: "100%", boxSizing: "border-box" }}
               >
-                {status === "loading" ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Reserving…</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Get early access</span>
-                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
-                  </>
-                )}
-              </button>
-            </form>
+                <label htmlFor="waitlist-email" className="sr-only">
+                  Email address
+                </label>
+                <div className="relative flex flex-1 items-center" style={{ width: "100%", minHeight: "52px" }}>
+                  <Mail className="absolute left-4 h-5 w-5 text-muted-foreground/60 pointer-events-none" />
+                  <input
+                    id="waitlist-email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    disabled={status === "loading"}
+                    className="h-12 w-full rounded-xl bg-transparent pl-12 pr-4 text-base sm:text-[15px] text-foreground outline-none placeholder:text-muted-foreground/60 transition-colors focus:ring-0"
+                    style={{ minHeight: "52px", width: "100%", fontSize: "16px" }}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={status === "loading"}
+                  className="group inline-flex h-12 w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base sm:text-sm font-semibold text-primary-foreground shadow-md transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 shrink-0 whitespace-nowrap cursor-pointer"
+                  style={{ minHeight: "52px" }}
+                >
+                  {status === "loading" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Reserving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Get early access</span>
+                      <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
           )}
 
           {status === "error" && (
@@ -180,7 +185,7 @@ export function Waitlist() {
         <Reveal delay={0.2}>
           <div className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <Sparkles className="h-4 w-4 text-violet-400" />
-            <span>First 100 users get 3 months free. No credit card required.</span>
+            <span>First 100 users get 3 months free.</span>
           </div>
         </Reveal>
       </div>

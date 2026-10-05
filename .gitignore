@@ -12,8 +12,10 @@ expo-env.d.ts
 /android/
 .kotlin/
 
-# EAS / Vercel
+# EAS / Vercel / Cloudflare
 .vercel/
+.output/
+.wrangler/
 
 # Metro
 .metro-health-check*

@@ -10,9 +10,9 @@ import { Why } from "@/components/landing/why";
 import { Waitlist } from "@/components/landing/waitlist";
 import { Footer } from "@/components/landing/footer";
 
-const title = "NetworQ — Smart Networking, Digitally.";
+const title = "NetworQ — Never lose a conversation again.";
 const description =
-  "NetworQ remembers the people you meet, what you discussed, and when to follow up. AI contact capture, context memory, follow-ups and smart search.";
+  "Never lose a conversation again. NetworQ remembers the people you meet, what you discussed, and when to follow up.";
 
 export const Route = createFileRoute("/")({
   head: () => ({
