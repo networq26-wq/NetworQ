@@ -184,3 +184,80 @@ export function PushSwitch({ supabase, t, apiBaseUrl = "", showToast }: { supaba
     </div>
   );
 }
+
+// App lock (Android app only): fingerprint / face, with the phone's PIN, pattern or password as the passcode.
+type LockState = { supported: boolean; biometric: boolean; fingerprint: boolean; face: boolean; enabled: boolean; timeoutMs: number };
+export function AppLockSetting({ t, showToast }: { t: Theme; showToast: (m: string, k?: "success" | "error" | "info") => void }) {
+  const shell = typeof window !== "undefined" ? (window as any) : null;
+  const available = !!shell?.__NETWORQ_SHELL__?.appLock && !!shell?.ReactNativeWebView;
+  const [state, setState] = useState<LockState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!available) return;
+    const onNative = (e: any) => {
+      const m = e.detail;
+      if (m?.type === "lock:state") {
+        setState(m);
+        setBusy(false);
+      } else if (m?.type === "lock:error") {
+        setBusy(false);
+        showToast(m.message, "info");
+      }
+    };
+    window.addEventListener("networq-native", onNative);
+    shell.ReactNativeWebView.postMessage(JSON.stringify({ type: "lock:get" }));
+    return () => window.removeEventListener("networq-native", onNative);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [available]);
+
+  if (!available) return null; // websites can't use the phone's fingerprint this way
+  const set = (patch: Partial<LockState>) => {
+    if (!state) return;
+    setBusy(true);
+    shell.ReactNativeWebView.postMessage(JSON.stringify({ type: "lock:set", enabled: patch.enabled ?? state.enabled, timeoutMs: patch.timeoutMs ?? state.timeoutMs }));
+  };
+  const how = state?.fingerprint ? "Fingerprint or phone PIN" : state?.face ? "Face unlock or phone PIN" : "Your phone's PIN, pattern or password";
+  const on = !!state?.enabled;
+  return (
+    <div style={{ padding: "10px 0" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600 }}>App lock</div>
+          <div style={{ color: t.muted, fontSize: 13 }}>
+            {state && !state.supported ? "Set up a fingerprint or a screen lock in your phone's settings to use App lock." : `${how} to open NetworQ.`}
+          </div>
+        </div>
+        <button
+          role="switch"
+          aria-checked={on}
+          aria-label="App lock"
+          disabled={busy || !state || !state.supported}
+          onClick={() => set({ enabled: !on })}
+          style={{ width: 52, minWidth: 52, height: 32, borderRadius: 16, border: "none", padding: 2, cursor: "pointer", opacity: !state || !state.supported ? 0.45 : 1, background: on ? "#7C3AED" : t.raised, boxShadow: `inset 0 0 0 1px ${t.border}` }}
+        >
+          <span style={{ display: "block", width: 28, height: 28, borderRadius: 14, background: "#FFFFFF", transform: `translateX(${on ? 20 : 0}px)`, transition: "transform 0.2s" }} />
+        </button>
+      </div>
+      {on && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 13, color: t.muted, marginBottom: 6 }}>Lock after</div>
+          <div role="radiogroup" aria-label="Lock after" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4, background: t.raised, padding: 3, borderRadius: 12 }}>
+            {[
+              { ms: 0, label: "Immediately" },
+              { ms: 60_000, label: "1 minute" },
+              { ms: 300_000, label: "5 minutes" },
+            ].map((o) => {
+              const sel = state?.timeoutMs === o.ms;
+              return (
+                <button key={o.ms} role="radio" aria-checked={sel} disabled={busy} onClick={() => set({ timeoutMs: o.ms })} style={{ minHeight: 38, borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: sel ? t.surface : "transparent", color: sel ? t.text : t.muted, boxShadow: sel ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

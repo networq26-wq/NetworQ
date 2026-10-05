@@ -30,7 +30,8 @@
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_ADVERTISE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.USE_BIOMETRIC"
       ],
       "googleServicesFile": "./google-services.json"
     },
@@ -61,6 +62,11 @@
           "color": "#7C3AED",
           "defaultChannel": "default"
         }
+      ],
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        { "faceIDPermission": "NetworQ uses Face ID to unlock the app." }
       ]
     ],
     "scheme": "networq"

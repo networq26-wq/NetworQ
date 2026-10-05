@@ -20,6 +20,7 @@ import { WebView } from "react-native-webview";
 import { useRadarBridge } from "./radar/shellBridge";
 import { SHELL_CAPABILITIES_JS, useGoogleAuthBridge } from "./shell/googleAuth";
 import { PUSH_CAPABILITY_JS, usePushBridge } from "./shell/pushBridge";
+import { APPLOCK_CAPABILITY_JS, useAppLock } from "./shell/appLock";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
@@ -40,6 +41,7 @@ function Shell() {
   const radarBridge = useRadarBridge(webViewRef, TARGET_URL);
   const googleAuth = useGoogleAuthBridge(webViewRef, TARGET_URL);
   const push = usePushBridge(webViewRef, TARGET_URL);
+  const lock = useAppLock(webViewRef, TARGET_URL); // fingerprint / phone passcode app lock
 
   const safeAreaScript = `
     (function() {
@@ -166,7 +168,7 @@ function Shell() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
-          injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}`}
+          injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}\n${APPLOCK_CAPABILITY_JS}`}
           onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {
             // any page on our own domain (www or not, any path) can answer the back button
@@ -174,6 +176,7 @@ function Shell() {
             radarBridge.onMessage(e);
             googleAuth.onMessage(e);
             push.onMessage(e);
+            lock.onMessage(e);
           }}
           cacheEnabled={true}
           renderLoading={() => (
@@ -195,6 +198,8 @@ function Shell() {
         />
       )}
       </KeyboardAvoidingView>
+      {/* App lock covers everything until fingerprint / phone passcode */}
+      {lock.overlay}
     </SafeAreaView>
   );
 }

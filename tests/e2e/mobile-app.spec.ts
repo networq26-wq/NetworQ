@@ -120,4 +120,43 @@ test.describe("Android app behaviour", () => {
     await page.goBack();
     await expect(page.getByText("Your people")).toBeVisible();
   });
+
+  test("App lock: shown in the Android app, turning it on goes through the shell, Lock after can be chosen", async ({ page }) => {
+    await page.addInitScript(() => {
+      const w = window as any;
+      w.__NETWORQ_SHELL__ = Object.assign(w.__NETWORQ_SHELL__ || {}, { appLock: true });
+      w.__lockMsgs = [];
+      let st = { supported: true, biometric: true, fingerprint: true, face: false, enabled: false, timeoutMs: 60000 };
+      w.ReactNativeWebView = {
+        postMessage: (raw: string) => {
+          const m = JSON.parse(raw);
+          w.__lockMsgs.push(m.type);
+          if (m.type === "lock:get" || m.type === "lock:set") {
+            if (m.type === "lock:set") st = { ...st, enabled: m.enabled, timeoutMs: m.timeoutMs };
+            setTimeout(() => window.dispatchEvent(new CustomEvent("networq-native", { detail: { type: "lock:state", ...st } })), 50);
+          }
+        },
+      };
+    });
+    await login(page, "asha@acme.test");
+    await page.getByRole("button", { name: "Profile & Settings" }).click();
+    await page.getByRole("button", { name: /^Password & devices/ }).click();
+    const sw = page.getByRole("switch", { name: "App lock" });
+    await expect(sw).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByText("Fingerprint or phone PIN to open NetworQ.")).toBeVisible();
+    await sw.click();
+    await expect(sw).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("radio", { name: "Immediately" }).click();
+    await expect(page.getByRole("radio", { name: "Immediately" })).toHaveAttribute("aria-checked", "true");
+    expect(await page.evaluate(() => (window as any).__lockMsgs)).toEqual(["lock:get", "lock:set", "lock:set"]);
+  });
+
+  test("App lock is not offered on a plain website", async ({ page }) => {
+    await page.addInitScript(() => delete (window as any).ReactNativeWebView);
+    await login(page, "asha@acme.test");
+    await page.getByRole("button", { name: "Profile & Settings" }).click();
+    await page.getByRole("button", { name: /^Password & devices/ }).click();
+    await expect(page.getByRole("button", { name: "Back to Me" })).toBeVisible();
+    await expect(page.getByRole("switch", { name: "App lock" })).toHaveCount(0);
+  });
 });
