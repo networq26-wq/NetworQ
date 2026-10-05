@@ -61,6 +61,9 @@
 | `POST /api/prospect/research`, `/prospect/draft`, `/organization/autofill` | session | Website research, 3 drafts, fact-check |
 | `POST /api/events/import` | session | Import an event page / `.ics` feed |
 | `GET /api/calls/ice` | session | STUN, plus TURN when configured |
+| `GET /api/google/available`, `GET /api/google/signin` | – | Google sign-in on networq.co.in → ID token handed to the app (fragment / `networq://auth-callback`) |
+| `POST /api/google/connect`, `GET /api/google/callback`, `GET /api/google/status`, `POST /api/google/disconnect` | session (callback: signed state) | Connect Google Calendar once; refresh token stored encrypted |
+| `POST /api/google/meet` | session | Create a Calendar event with a Google Meet link; Google emails the invite |
 | `GET /api/push/config` | – | Public VAPID key |
 | `POST /api/hooks/notification` | shared secret | DB webhook → push + email for each new notification |
 | `/api/auth/session-event`, `/api/account/*` | session | Sign-in emails, secure account actions, deletion |
@@ -69,13 +72,13 @@
 Rate limits are mounted before routes (global 600/15 min; tighter per endpoint). Background jobs (`NETWORQ_JOBS`): reminders, events crawler, account purge.
 
 ### Environment variables (server)
-`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `PUBLIC_APP_URL`, `ALLOWED_ORIGIN`, `LINK_SIGNING_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `EXPO_ACCESS_TOKEN`, `NETWORQ_JOBS`, `EVENTS_CRAWLER`, optional TURN (`CF_TURN_KEY_ID` + `CF_TURN_API_TOKEN`, or `TURN_URLS` + `TURN_USERNAME` + `TURN_CREDENTIAL`), optional SMTP/Gmail fallback, `TTS_VOICE`, `WAITLIST_MODE`.
+`EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `GROQ_API_KEY`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `PUBLIC_APP_URL`, `ALLOWED_ORIGIN`, `LINK_SIGNING_SECRET`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `EXPO_ACCESS_TOKEN`, `NETWORQ_JOBS`, `EVENTS_CRAWLER`, `GOOGLE_CLIENT_SECRET` (+ `EXPO_PUBLIC_GOOGLE_CLIENT_ID`), `ELEVENLABS_API_KEY` (+ optional `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`), optional TURN (`CF_TURN_KEY_ID` + `CF_TURN_API_TOKEN`, or `TURN_URLS` + `TURN_USERNAME` + `TURN_CREDENTIAL`), optional SMTP/Gmail fallback, `TTS_VOICE`, `WAITLIST_MODE`.
 
 ---
 
 ## Data (Supabase)
 
-Migrations: `supabase/migrations/20261001…20261013` (applied in order by `scripts/setup-supabase.mjs`).
+Migrations: `supabase/migrations/20261001…20261017` (applied in order by `scripts/setup-supabase.mjs`).
 
 | Table | What | Access |
 |---|---|---|
@@ -90,6 +93,7 @@ Migrations: `supabase/migrations/20261001…20261013` (applied in order by `scri
 | `calls` | ringing / accepted / declined / missed / cancelled / ended | read by the two people; write only via `start_call` / `answer_call` / `end_call` |
 | `notifications` | bell items (connection, message, call, reminder, …) + push/email dispatch flags | owner |
 | `push_tokens` | Expo / Web Push subscriptions | via RPCs |
+| `google_calendar_links` | per-user Google refresh token (AES-256-GCM encrypted) + email | server only (no client access) |
 | `login_devices`, `ai_usage`, `app_config`, `waitlist` | devices, AI limits, config, waitlist | scoped |
 
 **Realtime:** `postgres_changes` on `notifications`, `contacts`, `chat_messages`, `calls`; private broadcast channels `chat:<chat_id>` (typing) and `call:<user1>_<user2>` (WebRTC signalling) authorised by `realtime_topic_allowed()`.

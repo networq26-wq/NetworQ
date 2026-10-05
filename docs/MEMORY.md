@@ -8,7 +8,8 @@
 
 ## Status
 - All features in `docs/PRD.md` "What's built" are live on the web and in the app shell.
-- Database migrations through `20261013_calls.sql` are applied in production.
+- Database migrations through `20261017_password_setup_sent.sql` are applied in production.
+- ElevenLabs key and Google client secret are set on Render (5 Oct).
 - Latest release gate: see `docs/QA_REPORT.md`.
 
 ## Owner to-dos
