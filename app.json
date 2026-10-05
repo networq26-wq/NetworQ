@@ -13,7 +13,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.networq.app"
+      "bundleIdentifier": "com.networq.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "NetworQ uses the camera to scan business cards and for video calls.",
+        "NSMicrophoneUsageDescription": "NetworQ uses the microphone for voice notes, the AI assistant and calls.",
+        "NSPhotoLibraryUsageDescription": "NetworQ lets you pick a business card or profile photo from your library.",
+        "NSFaceIDUsageDescription": "NetworQ uses Face ID to unlock the app.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.networq.app",
@@ -66,7 +73,9 @@
       "expo-secure-store",
       [
         "expo-local-authentication",
-        { "faceIDPermission": "NetworQ uses Face ID to unlock the app." }
+        {
+          "faceIDPermission": "NetworQ uses Face ID to unlock the app."
+        }
       ]
     ],
     "scheme": "networq"
