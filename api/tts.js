@@ -59,7 +59,26 @@ function createTtsRouter(deps) {
 
     const text = cleanForSpeech(req.body?.text).slice(0, MAX_INPUT);
     if (!text) return res.status(400).json({ error: "Nothing to say." });
-    if (!deps.apiKey) return res.status(503).json({ error: "Voice is unavailable on this server." });
+    if (!deps.apiKey && !deps.elevenKey) return res.status(503).json({ error: "Voice is unavailable on this server." });
+
+    // ElevenLabs first (natural voice) when configured; Groq Orpheus as the fallback
+    if (deps.elevenKey) {
+      try {
+        const voiceId = deps.elevenVoice || "21m00Tcm4TlvDq8ikWAM";
+        const r = await deps.fetchImpl(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128`, {
+          method: "POST",
+          headers: { "xi-api-key": deps.elevenKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
+          body: JSON.stringify({ text, model_id: deps.elevenModel || "eleven_flash_v2_5", voice_settings: { stability: 0.45, similarity_boost: 0.8, style: 0.15, use_speaker_boost: true } }),
+          signal: AbortSignal.timeout(15000),
+        });
+        if (!r.ok) throw new Error(`elevenlabs ${r.status}`);
+        const clip = `data:audio/mpeg;base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`;
+        return res.json({ voice: "elevenlabs", clips: [clip] });
+      } catch (err) {
+        console.warn("[TTS] ElevenLabs failed, falling back:", err.message);
+        if (!deps.apiKey) return res.status(503).json({ error: "Natural voice unavailable right now." });
+      }
+    }
 
     try {
       const clips = [];
@@ -93,6 +112,10 @@ function productionDeps() {
   return {
     apiKey: process.env.GROQ_API_KEY,
     voice: process.env.TTS_VOICE || "diana",
+    // Natural voice: set ELEVENLABS_API_KEY (and optionally ELEVENLABS_VOICE_ID / ELEVENLABS_MODEL) on the server
+    elevenKey: process.env.ELEVENLABS_API_KEY,
+    elevenVoice: process.env.ELEVENLABS_VOICE_ID,
+    elevenModel: process.env.ELEVENLABS_MODEL,
     fetchImpl: fetch,
     async getUser(token) {
       const { data, error } = await client.auth.getUser(token);

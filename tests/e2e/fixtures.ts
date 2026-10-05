@@ -98,9 +98,10 @@ export async function login(page: Page, email: string, password = PASSWORD) {
 }
 
 export async function logout(page: Page) {
-  // Phones: Sign out lives in Settings; desktop: header button
+  // Phones: Me (header avatar) → Account → Sign out; desktop: header button
   if (isMobileProject()) {
     await page.getByRole("button", { name: "Profile & Settings" }).click();
+    await page.getByRole("button", { name: /^Account/ }).click();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
   } else {
     await page.getByRole("banner").getByRole("button", { name: "Sign out" }).click();
@@ -117,7 +118,8 @@ export const isMobileProject = () => test.info().project.name.includes("mobile")
 
 export async function openAddContact(page: Page) {
   if (isMobileProject()) {
-    await page.getByRole("button", { name: "Add", exact: true }).last().click();
+    // No "Add" tab any more: the People home quick action "Type it in" opens the form
+    await page.getByRole("button", { name: "Type it in", exact: true }).click();
   } else {
     await page.getByRole("banner").getByRole("button", { name: "Add Contact" }).click();
   }

@@ -13,7 +13,7 @@ function createPushSender({ fetchImpl = fetch, webpush = null, vapid = null, exp
   }
   const webReady = !!(webpush && vapid?.publicKey && vapid?.privateKey);
 
-  // message: { title, body, data, url }
+  // message: { title, body, data, url, ttl? (seconds; calls use 60) }
   async function send(tokens, message) {
     const dead = [];
     let delivered = 0;
@@ -26,7 +26,7 @@ function createPushSender({ fetchImpl = fetch, webpush = null, vapid = null, exp
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json", ...(expoAccessToken ? { Authorization: `Bearer ${expoAccessToken}` } : {}) },
           body: JSON.stringify(
-            batch.map((t) => ({ to: t.token, title: message.title, body: message.body || undefined, data: { ...(message.data || {}), url: message.url }, sound: "default", priority: "high", channelId: "default" }))
+            batch.map((t) => ({ to: t.token, title: message.title, body: message.body || undefined, data: { ...(message.data || {}), url: message.url }, sound: "default", priority: "high", channelId: "default", ...(message.ttl ? { ttl: message.ttl } : {}) }))
           ),
           signal: AbortSignal.timeout(10000),
         });
@@ -46,7 +46,7 @@ function createPushSender({ fetchImpl = fetch, webpush = null, vapid = null, exp
       await Promise.all(
         web.map(async (t) => {
           try {
-            await webpush.sendNotification(t.subscription, payload, { TTL: 24 * 3600, urgency: "high" });
+            await webpush.sendNotification(t.subscription, payload, { TTL: message.ttl || 24 * 3600, urgency: "high" });
             delivered++;
           } catch (err) {
             if (err.statusCode === 404 || err.statusCode === 410) dead.push(t.token);

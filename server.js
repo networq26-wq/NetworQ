@@ -16,6 +16,8 @@ const { startEventsCrawler } = require("./api/eventsCrawler");
 const { createTtsRouter, productionDeps: ttsDeps } = require("./api/tts");
 const { createNotifyHookRouter, productionDeps: notifyDeps } = require("./api/notifyHook");
 const { createProspectRouter, productionDeps: prospectDeps } = require("./api/prospect");
+const { createIceRouter, productionDeps: iceDeps, STUN } = require("./api/ice");
+const { createTranscribeRouter, productionDeps: transcribeDeps } = require("./api/transcribe");
 const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
@@ -58,21 +60,26 @@ app.use((req, res, next) => {
 });
 
 // ── Rate limits (per IP; per-user daily caps live in increment_ai_usage) ──────
-const limiter = (windowMs, limit) =>
+const limiter = (windowMs, limit, skip) =>
   rateLimit({
     windowMs,
     limit,
+    ...(skip ? { skip } : {}),
     standardHeaders: "draft-8",
     legacyHeaders: false,
     message: { error: "Too many requests. Please slow down and try again shortly." },
   });
-app.use("/api/", limiter(15 * 60 * 1000, 600));
+// The database webhook (all pushes/emails) comes from Supabase's shared IP and is protected by its
+// shared secret — never throttle it with the per-IP limit, or rings and messages would be dropped.
+app.use("/api/", limiter(15 * 60 * 1000, 600, (req) => req.originalUrl.startsWith("/api/hooks/")));
 app.use("/api/enrich", limiter(60 * 1000, 30));
 app.use(["/api/ai", "/api/groq", "/api/claude"], limiter(60 * 1000, 60));
+app.use("/api/transcribe", limiter(60 * 1000, 20));
 app.use("/api/email", limiter(60 * 1000, 20));
 app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 app.use("/api/events", limiter(60 * 1000, 20));
 app.use("/api/tts", limiter(60 * 1000, 30));
+app.use("/api/calls", limiter(60 * 1000, 10));
 app.use(["/api/prospect", "/api/organization"], limiter(60 * 1000, 20));
 
 function parseEnvContent(content) {
@@ -130,8 +137,8 @@ app.use(
       // Allow requests with no origin (mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      // Always allow local development origins (localhost, 127.0.0.1, [::1])
-      if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)) {
+      // Local development origins (localhost, 127.0.0.1, [::1]) — never in production
+      if (process.env.NODE_ENV !== "production" && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin)) {
         return callback(null, true);
       }
 
@@ -145,13 +152,9 @@ app.use(
         return callback(null, true);
       }
 
-      // Allow any *.onrender.com, *.railway.app
-      if (/\.onrender\.com$/.test(origin) || /\.railway\.app$/.test(origin)) {
-        return callback(null, true);
-      }
-
       // Allow configured origins from .env
-      if (isAllowedOrigin(origin, process.env.ALLOWED_ORIGIN || defaultOrigins)) {
+      const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+      if (!(isLocal && process.env.NODE_ENV === "production") && isAllowedOrigin(origin, process.env.ALLOWED_ORIGIN || defaultOrigins)) {
         return callback(null, true);
       }
 
@@ -249,6 +252,16 @@ if (accountDeps) {
 const evDeps = eventsDeps();
 if (evDeps) app.use("/api", createEventsRouter(evDeps));
 else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
+
+// ── Voice typing (Whisper) ────────────────────────────────────────────────────
+const trDeps = transcribeDeps();
+if (trDeps) app.use("/api", createTranscribeRouter(trDeps));
+else app.post("/api/transcribe", (req, res) => res.status(503).json({ error: "Voice typing isn't available on this server." }));
+
+// ── Call relay settings (STUN always; TURN when configured) ────────────────────
+const iceDepsValue = iceDeps();
+if (iceDepsValue) app.use("/api", createIceRouter(iceDepsValue));
+else app.get("/api/calls/ice", (req, res) => res.json({ iceServers: STUN, relay: false }));
 
 // ── Dev-only Bluetooth simulator for the device preview (never in production) ──
 // Preview windows publish their current Radar token here and "hear" each other,

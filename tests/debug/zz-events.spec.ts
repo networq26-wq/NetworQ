@@ -1,0 +1,23 @@
+import { test, expect } from "@playwright/test";
+test("events look", async ({ page }) => {
+  test.setTimeout(200_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Events" }).click();
+  await page.waitForTimeout(4000);
+  await page.screenshot({ path: "qa-logs/events-1.png" });
+  await page.getByRole("listitem").nth(1).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "qa-logs/events-2.png" });
+  await page.getByRole("button", { name: /^Location:/ }).click();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: "qa-logs/events-3-location.png" });
+  await page.getByRole("radio", { name: /Hyderabad/ }).click().catch(() => page.getByRole("button", { name: "Close" }).click());
+  await page.getByRole("button", { name: "Pick a date" }).click();
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: "qa-logs/events-4-calendar.png" });
+  console.log("errors", JSON.stringify(errors));
+});

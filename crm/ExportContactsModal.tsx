@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { I } from "../ui/icons";
 
 export function ExportContactsModal({
   open,
@@ -191,7 +192,7 @@ export function ExportContactsModal({
               transition: "transform 0.15s ease",
             }}
           >
-            <span style={{ fontSize: 26 }}>📊</span>
+            <I.Contact size={24} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Universal CSV (Excel / Notion / Sheets)</div>
               <div style={{ fontSize: 12, color: textMuted }}>Standard spreadsheet with all tags, notes, and metadata</div>
@@ -216,7 +217,7 @@ export function ExportContactsModal({
               transition: "transform 0.15s ease",
             }}
           >
-            <span style={{ fontSize: 26 }}>📱</span>
+            <I.Phone size={24} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Apple & Android Contacts (vCard .vcf)</div>
               <div style={{ fontSize: 12, color: textMuted }}>Import directly into iPhone / Android phone address book</div>
@@ -241,7 +242,7 @@ export function ExportContactsModal({
               transition: "transform 0.15s ease",
             }}
           >
-            <span style={{ fontSize: 26 }}>🔵</span>
+            <I.Building size={24} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>Google Contacts CSV</div>
               <div style={{ fontSize: 12, color: textMuted }}>Pre-formatted for contacts.google.com import</div>
@@ -266,7 +267,7 @@ export function ExportContactsModal({
               transition: "transform 0.15s ease",
             }}
           >
-            <span style={{ fontSize: 26 }}>🟠</span>
+            <I.Briefcase size={24} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700 }}>HubSpot & CRM CSV</div>
               <div style={{ fontSize: 12, color: textMuted }}>Headers aligned for HubSpot and Salesforce lead import</div>

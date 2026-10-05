@@ -1,0 +1,27 @@
+import { test, expect } from "@playwright/test";
+test("new structure", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: "qa-logs/ia-1-people.png" });
+  await page.getByRole("button", { name: "Add a person" }).click();
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "qa-logs/ia-2-add-sheet.png" });
+  await page.keyboard.press("Escape").catch(() => {});
+  await page.locator("body").click({ position: { x: 200, y: 100 } });
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Messages", exact: true }).click();
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "qa-logs/ia-3-messages.png" });
+  await page.getByRole("button", { name: "Profile & Settings" }).first().click();
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: "qa-logs/ia-4-me.png" });
+  await page.screenshot({ path: "qa-logs/ia-4b-me-full.png", fullPage: true });
+  await page.getByRole("button", { name: /Card Finish and what you share/ }).click();
+  await page.waitForTimeout(900);
+  await page.screenshot({ path: "qa-logs/ia-5-card-settings.png" });
+  console.log("errors:", JSON.stringify(errors));
+});

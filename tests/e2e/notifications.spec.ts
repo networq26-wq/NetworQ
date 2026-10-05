@@ -15,7 +15,7 @@ test.describe("Notifications & blocking", () => {
     await expect(centre.getByText("Bob Iyer wants to connect")).toBeVisible();
     await expect(centre.getByText("Cara accepted your request")).toBeVisible();
     await centre.getByText("Bob Iyer wants to connect").click();
-    await expect(page.getByText(/Event Radar|Live at/).first()).toBeVisible();
+    await expect(page.getByRole("tablist", { name: "Radar mode" })).toBeVisible(); // landed on Radar
     expect(db.table("notifications").find((n) => n.id === "n1")!.read_at).toBeTruthy();
     await expect(page.getByRole("button", { name: "Notifications & Reminders" })).toBeVisible();
   });
@@ -73,6 +73,7 @@ test.describe("Notifications & blocking", () => {
     });
     await login(page, "asha@acme.test");
     await page.getByTitle("Profile & Settings").click();
+    await page.getByRole("button", { name: "Notifications", exact: true }).click(); // settings are sub-pages of Me
     const sw = page.getByRole("switch", { name: "Push notifications" });
     await expect(sw).toBeDisabled();
     await expect(page.getByText(/This browser can't receive notifications/)).toBeVisible();

@@ -1,5 +1,10 @@
 import { test, expect, login, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
 
+async function pickCity(page: import("@playwright/test").Page, name: string) {
+  await page.getByRole("button", { name: /^Location:/ }).click();
+  await page.getByRole("radiogroup", { name: "City" }).getByRole("radio", { name: new RegExp(`^${name}`) }).click();
+}
+
 async function openEvents(page: import("@playwright/test").Page) {
   if (isMobileProject()) await page.getByRole("button", { name: "Events", exact: true }).last().click();
   else await page.getByRole("complementary").getByRole("button", { name: /^Events Hub/ }).click();
@@ -21,19 +26,20 @@ test.describe("Events Hub (real events only)", () => {
   test("importing an event link adds a card with its source and official link", async ({ page, db }) => {
     await login(page, "asha@acme.test");
     await openEvents(page);
+    await page.getByRole("button", { name: "Add an event" }).first().click(); // header + empty-state both offer it
     await page.getByLabel("Event or calendar link").fill("https://lu.ma/ai-builders-hyd");
     await page.getByRole("button", { name: "Add event" }).click();
     await expect(page.getByText("Added 1 event.")).toBeVisible();
     const list = page.getByRole("list", { name: "Upcoming events" });
     await expect(list.getByRole("heading", { name: "AI Builders Night Hyderabad" })).toBeVisible();
-    await expect(list.getByText("Source: lu.ma")).toBeVisible();
-    await expect(list.getByRole("link", { name: "Event page ↗" })).toHaveAttribute("href", "https://lu.ma/ai-builders-hyd");
+    await expect(list.getByRole("link", { name: "Event page on lu.ma" })).toHaveAttribute("href", "https://lu.ma/ai-builders-hyd");
     expect(db.table("public_events")).toHaveLength(1);
   });
 
   test("links without event data are rejected with guidance", async ({ page }) => {
     await login(page, "asha@acme.test");
     await openEvents(page);
+    await page.getByRole("button", { name: "Add an event" }).first().click(); // header + empty-state both offer it
     await page.getByLabel("Event or calendar link").fill("https://blog.example.com/post");
     await page.getByRole("button", { name: "Add event" }).click();
     await expect(page.getByText("We couldn't find event details on that page.")).toBeVisible();
@@ -53,18 +59,28 @@ test.describe("Events Hub (real events only)", () => {
     await expect(list.getByText("Verified")).toHaveCount(1);
     await expect(list.getByText("Finance & Web3")).toBeVisible();
 
-    await page.getByLabel("City").selectOption("Bengaluru");
+    await pickCity(page, "Bengaluru");
     await expect(list.getByRole("listitem")).toHaveCount(1);
-    await page.getByLabel("City").selectOption("All India");
+    await pickCity(page, "All India");
     await expect(list.getByRole("listitem")).toHaveCount(2);
-    await page.getByLabel("City").selectOption("Worldwide");
+    await pickCity(page, "Worldwide");
     await expect(list.getByText("London AI Summit")).toBeVisible();
     await expect(list.getByRole("listitem")).toHaveCount(1);
-    await page.getByLabel("City").selectOption("All");
+    await pickCity(page, "All cities");
 
-    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "This month" }).click();
+    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "This week" }).click();
     await expect(page.getByText("London AI Summit")).toHaveCount(0);
-    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "Any time" }).click();
+    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "All", exact: true }).click();
+
+    // Any exact day from the calendar
+    await page.getByRole("button", { name: "Pick a date" }).click();
+    const in40 = new Date(Date.now() + 40 * day);
+    const dayButton = page.getByRole("button", { name: new RegExp(`^${in40.toLocaleDateString("en-US", { weekday: "long" })}, ${in40.toLocaleDateString("en-US", { month: "long" })} ${in40.getDate()}.*has events`) });
+    for (let i = 0; i < 3 && !(await dayButton.count()); i++) await page.getByRole("button", { name: "Next month" }).click();
+    await dayButton.click();
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    await expect(list.getByText("London AI Summit")).toBeVisible();
+    await page.getByRole("group", { name: "Filter by date" }).getByRole("button", { name: "All", exact: true }).click();
 
     const cats = page.getByRole("group", { name: "Filter by category" });
     await expect(cats.getByRole("button", { name: "All · 3" })).toBeVisible();

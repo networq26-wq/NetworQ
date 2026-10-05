@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { I, SuccessCheck, Skeleton } from "./ui/icons";
 import { supabase } from "./supabase";
 import { EventRadar, type ListedEventInput } from "./radar/EventRadar";
-import { SettingsScreen } from "./settings/SettingsScreen";
+import { SettingsScreen, type SettingsSection } from "./settings/SettingsScreen";
 import { apiBase, createAccountApi } from "./settings/accountApi";
 import { PasswordInput } from "./ui/PasswordInput";
 import { EventsHub } from "./events/EventsHub";
@@ -14,11 +15,19 @@ import { CameraCapture } from "./scanner/CameraCapture";
 import { ProspectComposer } from "./prospect/ProspectComposer";
 import { OutreachTimeline } from "./prospect/OutreachTimeline";
 import { createProspectApi } from "./prospect/prospectApi";
-import { DigitalPass } from "./pass/DigitalPass";
+import { MeScreen } from "./me/MeScreen";
+import { CardSettings } from "./pass/CardPass";
+import { MessagesScreen } from "./messages/MessagesScreen";
+import { LiquidGlass } from "quick-liquid/react";
 import { parseContactQr } from "./pass/vcard";
+import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
+import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
+import { ComingUp } from "./people/ComingUp";
+import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
+import { useVoiceRecorder } from "./voice/useVoiceRecorder";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
@@ -31,7 +40,8 @@ const AI_PROXY =
   process.env.EXPO_PUBLIC_AI_PROXY_URL ||
   (typeof window !== "undefined"
     ? window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-      ? (window.location.port === "8081" ? "http://localhost:3001/api/ai" : "/api/ai")
+      ? // Expo dev servers (8081, 8082…, 19006) can't answer /api — the local API runs on 3001
+        (/^(80[89]\d|19006)$/.test(window.location.port) ? "http://localhost:3001/api/ai" : "/api/ai")
       : window.location.hostname.includes("networq.co.in") || window.location.hostname.includes("onrender.com")
         ? "/api/ai"
         : "https://www.networq.co.in/api/ai"
@@ -46,104 +56,25 @@ const GOOGLE_SIGNIN_AVAILABLE = !IS_NATIVE_WEBVIEW || NATIVE_GOOGLE_AUTH;
 const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
 installSignOutHook(supabase);
 
-// ── CONFETTI PARTICLE SYSTEM ──────────────────────────────────────────────────
-interface ConfettiParticle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  color: string;
-  rotation: number;
-  vRot: number;
-  alpha: number;
-  shape: "circle" | "rect" | "star";
+// ── SUCCESS FEEDBACK ──────────────────────────────────────────────────────────
+// Routine successes (saved, sent, downloaded) get a light haptic tick; the toast carries the ✓.
+// (Replaces a full-screen confetti burst that fired on every save.)
+function successFeedback() {
+  haptic(15);
 }
 
-let activeConfetti: ConfettiParticle[] = [];
-let confettiAnimId: number | null = null;
-
-function triggerConfetti(originX = window.innerWidth / 2, originY = window.innerHeight / 2) {
-  if (typeof window === "undefined") return;
-  const colors = ["#6366F1", "#8B5CF6", "#06B6D4", "#10B981", "#F59E0B", "#EC4899", "#3B82F6"];
-  const count = 65;
-  const shapes: ("circle" | "rect" | "star")[] = ["circle", "rect", "star"];
-
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.5;
-    const speed = 4 + Math.random() * 8;
-    activeConfetti.push({
-      x: originX,
-      y: originY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 4,
-      size: 5 + Math.random() * 6,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      rotation: Math.random() * Math.PI * 2,
-      vRot: (Math.random() - 0.5) * 0.2,
-      alpha: 1,
-      shape: shapes[Math.floor(Math.random() * shapes.length)],
-    });
-  }
-
-  const canvas = document.getElementById("networq-confetti-canvas") as HTMLCanvasElement | null;
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-
-  if (confettiAnimId) cancelAnimationFrame(confettiAnimId);
-
-  const loop = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = activeConfetti.length - 1; i >= 0; i--) {
-      const p = activeConfetti[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.22;
-      p.vx *= 0.98;
-      p.rotation += p.vRot;
-      p.alpha -= 0.015;
-
-      if (p.alpha <= 0 || p.y > canvas.height + 20) {
-        activeConfetti.splice(i, 1);
-        continue;
-      }
-
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.fillStyle = p.color;
-
-      if (p.shape === "circle") {
-        ctx.beginPath();
-        ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (p.shape === "rect") {
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-      } else {
-        ctx.beginPath();
-        for (let s = 0; s < 5; s++) {
-          ctx.lineTo(Math.cos(((18 + s * 72) * Math.PI) / 180) * p.size, -Math.sin(((18 + s * 72) * Math.PI) / 180) * p.size);
-          ctx.lineTo(Math.cos(((54 + s * 72) * Math.PI) / 180) * (p.size / 2), -Math.sin(((54 + s * 72) * Math.PI) / 180) * (p.size / 2));
-        }
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    if (activeConfetti.length > 0) {
-      confettiAnimId = requestAnimationFrame(loop);
-    } else {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      confettiAnimId = null;
-    }
-  };
-  confettiAnimId = requestAnimationFrame(loop);
+// "Today", "Yesterday", "In 3 days", "12 Sep" — for real dates on a contact
+function relativeDay(value: string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return "—";
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(d) - day(new Date())) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === -1) return "Yesterday";
+  if (diff === 1) return "Tomorrow";
+  if (diff < 0 && diff > -7) return `${-diff} days ago`;
+  if (diff > 0 && diff < 7) return `In ${diff} days`;
+  return d.toLocaleDateString([], { day: "numeric", month: "short", year: d.getFullYear() === new Date().getFullYear() ? undefined : "numeric" });
 }
 
 // ── VCARD (.VCF) GENERATOR ───────────────────────────────────────────────────
@@ -182,7 +113,7 @@ function downloadVCard(contact: {
   a.download = `${(contact.name || "contact").toLowerCase().replace(/\s+/g, "_")}.vcf`;
   a.click();
   URL.revokeObjectURL(url);
-  triggerConfetti();
+  successFeedback();
 }
 
 // ── APPLE CALENDAR (.ICS) GENERATOR ───────────────────────────────────────────
@@ -232,115 +163,24 @@ interface IconProps {
 }
 
 const Icons = {
+  // The official Q mark (your artwork, not a redraw) with the scan beam moving inside the Q's opening.
+  // White artwork is used when asked for a white mark (on purple/dark buttons).
   Logo: ({
     size = 28,
     style,
     color,
-    gradient = false,
     scanning = true,
   }: IconProps & { color?: string; gradient?: boolean; scanning?: boolean }) => {
-    const brandColor = color || "#7C3AED";
+    const white = !!color && /^#?f{3,6}$/i.test(color.replace("#", ""));
     return (
-      <svg
-        width={size}
-        height={Math.round((size * 551) / 548)}
-        viewBox="0 0 548 551"
-        fill="none"
-        style={{ overflow: "visible", display: "inline-block", verticalAlign: "middle", ...style }}
-      >
-        <defs>
-          <linearGradient id="qPurpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8B5CF6" />
-            <stop offset="100%" stopColor="#6D28D9" />
-          </linearGradient>
-
-          <linearGradient id="qLaserGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="rgba(192, 132, 252, 0)" />
-            <stop offset="25%" stopColor="#C084FC" />
-            <stop offset="50%" stopColor="#FFFFFF" />
-            <stop offset="75%" stopColor="#A78BFA" />
-            <stop offset="100%" stopColor="rgba(167, 139, 250, 0)" />
-          </linearGradient>
-
-          <linearGradient id="qBeamWash" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgba(168, 85, 247, 0)" />
-            <stop offset="60%" stopColor="rgba(139, 92, 246, 0.25)" />
-            <stop offset="100%" stopColor="rgba(109, 40, 217, 0.4)" />
-          </linearGradient>
-
-          <filter id="qLaserGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-
-          <clipPath id="qInnerCavityClip">
-            <rect x="115" y="115" width="284" height="88" rx="8" />
-            <rect x="115" y="284" width="264" height="88" rx="8" />
-          </clipPath>
-        </defs>
-
-        {/* Left bracket (Capture) - exact PDF vector */}
-        <path
-          d="M 115.08 352.76 C 115.08 363.63, 123.89 372.44, 134.76 372.44 L 216 372.44 L 216 487.53 L 107.59 487.53 C 48.17 487.53, 0 439.36, 0 379.94 L 0 107.57 C 0 48.17, 48.17 0, 107.59 0 L 216 0 L 216 115.08 L 134.76 115.08 C 123.89 115.08, 115.08 123.87, 115.08 134.74 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#7C3AED")}
-        />
-        {/* Right bracket with Q tail (Continuity) - exact PDF vector */}
-        <path
-          d="M 468.55 467.77 L 548.05 550.87 L 426.92 550.87 L 365.37 487.53 L 298.01 413.36 L 260.86 372.44 L 379.27 372.44 C 390.12 372.44, 398.93 363.63, 398.93 352.76 L 398.93 134.74 C 398.93 123.87, 390.12 115.08, 379.27 115.08 L 298.01 115.08 L 298.01 0 L 406.43 0 C 465.85 0, 514.01 48.17, 514.01 107.57 L 514.01 379.94 C 514.01 416.22, 496.05 448.31, 468.55 467.77 Z"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#6D28D9")}
-        />
-        {/* Center connector bar (Connection) - exact PDF vector */}
-        <rect
-          x="115.08"
-          y="202.75"
-          width="283.85"
-          height="82.01"
-          fill={gradient ? "url(#qPurpleGrad)" : (color || "#7C3AED")}
-        />
-
-        {/* ── SCANNER BEAM INSIDE THE Q CAVITY ── */}
-        {scanning && (
-          <g clipPath="url(#qInnerCavityClip)">
-            {/* Trailing beam wash */}
-            <rect x="110" y="115" width="290" height="34" fill="url(#qBeamWash)">
-              <animate attributeName="y" values="115;338;115" dur="2.2s" repeatCount="indefinite" />
-            </rect>
-
-            {/* Glowing laser scanning bar */}
-            <line
-              x1="115"
-              y1="118"
-              x2="399"
-              y2="118"
-              stroke="url(#qLaserGrad)"
-              strokeWidth="7"
-              strokeLinecap="round"
-              filter="url(#qLaserGlow)"
-            >
-              <animate attributeName="y1" values="118;366;118" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="y2" values="118;366;118" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.75;1;0.75" dur="2.2s" repeatCount="indefinite" />
-            </line>
-
-            {/* Radar scanner ripple blips inside Q apertures */}
-            <circle cx="257" cy="159" r="6" fill="#C084FC" opacity="0.6">
-              <animate attributeName="r" values="3;34;3" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.8;0;0.8" dur="2.2s" repeatCount="indefinite" />
-            </circle>
-            <circle cx="247" cy="328" r="6" fill="#8B5CF6" opacity="0.6">
-              <animate attributeName="r" values="3;30;3" dur="2.2s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.7;0;0.7" dur="2.2s" repeatCount="indefinite" />
-            </circle>
-          </g>
-        )}
-      </svg>
+      <span style={{ position: "relative", display: "inline-block", width: size, height: Math.round((size * 258) / 256), verticalAlign: "middle", flexShrink: 0, ...style }}>
+        <img src={white ? "/brand/networq-q-white.png" : "/brand/networq-q.png"} alt="" aria-hidden draggable={false} style={{ width: "100%", height: "100%", display: "block" }} />
+        {scanning && <span className="nq-qscan" aria-hidden style={{ left: "21.6%", width: "49.8%", top: "21.9%", height: "44.6%" }}><i /></span>}
+      </span>
     );
   },
   FileText: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
       <polyline points="14 2 14 8 20 8" />
       <line x1="16" y1="13" x2="8" y2="13" />
@@ -349,7 +189,7 @@ const Icons = {
     </svg>
   ),
   User: ({ size = 18, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
@@ -376,22 +216,14 @@ const Icons = {
       <line x1="17" y1="9" x2="23" y2="15" />
     </svg>
   ),
-  Wordmark: ({ size = 26, isDark = false, style }: { size?: number; isDark?: boolean; style?: React.CSSProperties; scanning?: boolean }) => {
-    const src = isDark ? "/networq-logo-dark.png" : "/networq-logo.png";
+  // The official NetworQ wordmark (your artwork). Dark mode uses the white version. The beam scans inside the Q.
+  Wordmark: ({ size = 26, isDark = false, style, scanning = true }: { size?: number; isDark?: boolean; style?: React.CSSProperties; scanning?: boolean }) => {
+    const h = Math.round(size * 1.05);
     return (
-      <img
-        src={src}
-        alt="NetworQ"
-        style={{
-          height: size,
-          width: "auto",
-          objectFit: "contain",
-          userSelect: "none",
-          display: "inline-block",
-          verticalAlign: "middle",
-          ...style,
-        }}
-      />
+      <span role="img" aria-label="NetworQ" style={{ position: "relative", display: "inline-block", height: h, width: Math.round((h * 957) / 192), flexShrink: 0, userSelect: "none", lineHeight: 0, ...style }}>
+        <img src={isDark ? "/brand/networq-wordmark-white.png" : "/brand/networq-wordmark.png"} alt="" aria-hidden draggable={false} style={{ height: "100%", width: "100%", display: "block" }} />
+        {scanning && <span className="nq-qscan" aria-hidden style={{ left: "84.4%", width: "9.9%", top: "21.9%", height: "44.6%" }}><i /></span>}
+      </span>
     );
   },
   Home: ({ size = 16, color = "currentColor", style }: IconProps) => (
@@ -459,7 +291,7 @@ const Icons = {
     </svg>
   ),
   Plus: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="12" y1="5" x2="12" y2="19" />
       <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
@@ -614,13 +446,13 @@ const Icons = {
     </svg>
   ),
   ArrowRight: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="5" y1="12" x2="19" y2="12" />
       <polyline points="12 5 19 12 12 19" />
     </svg>
   ),
   ChevronRight: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <polyline points="9 18 15 12 9 6" />
     </svg>
   ),
@@ -631,12 +463,12 @@ const Icons = {
     </svg>
   ),
   Check: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <polyline points="20 6 9 17 4 12" />
     </svg>
   ),
   Close: ({ size = 16, color = "currentColor", style }: IconProps) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
@@ -778,6 +610,7 @@ async function sendEmailViaServer(payload: {
   body: string;
   fromName?: string;
   replyTo?: string;
+  ics?: string; // optional calendar invite attachment
 }) {
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
@@ -794,6 +627,7 @@ async function sendEmailViaServer(payload: {
         body: payload.body,
         from_name: payload.fromName,
         reply_to: payload.replyTo,
+        ...(payload.ics ? { ics: payload.ics } : {}),
       }),
     });
   } catch (netErr: any) {
@@ -826,11 +660,6 @@ function downscaleImage(dataUrl: string, maxSide = 1280, quality = 0.8): Promise
 }
 
 // Jitsi Meet rooms are created on first join, so a random room name is a real, working link
-function genMeetLink() {
-  const chars = "abcdefghijkmnpqrstuvwxyz23456789";
-  const seg = (n: number) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
-  return `https://meet.jit.si/NetworQ-${seg(4)}-${seg(4)}-${seg(4)}`;
-}
 
 function avatar(name?: string, isDark = false) {
   return {
@@ -941,14 +770,15 @@ function generateExecutiveFollowUp(fromUser: any, toContact: any, customAngle?: 
   const firstName = (toContact?.name || "there").split(" ")[0];
   const myName = fromUser?.name || "Me";
   const myCompany = fromUser?.company ? ` at ${fromUser.company}` : "";
-  const event = toContact?.event ? ` at ${toContact.event}` : "";
+  const evName = toContact?.event && !/^nearby$/i.test(String(toContact.event).trim()) ? toContact.event : "";
+  const event = evName ? ` at ${evName}` : "";
   const notes = toContact?.reference ? ` I really enjoyed our discussion regarding ${toContact.reference}.` : "";
   const angle = customAngle ? ` Specifically, I wanted to follow up on ${customAngle}.` : "";
 
   const subject = `Great connecting with you${event}`;
   const body = `Hi ${firstName},
 
-It was a pleasure meeting you${event ? ` at ${toContact.event}` : " recently"}.${notes}${angle}
+It was a pleasure meeting you${event || " recently"}.${notes}${angle}
 
 I wanted to follow up and see how things are progressing with ${toContact?.company || "your team's priorities"}. I would love to find time for a brief 15-minute conversation to explore mutual collaboration.
 
@@ -996,73 +826,59 @@ function loadGISScript(): Promise<void> {
   });
 }
 
-async function createCalendarEvent({
-  title,
-  description,
-  date,
-  time,
-  attendeeEmail,
-}: {
-  title: string;
-  description: string;
-  date: string;
-  time: string;
-  attendeeEmail: string;
-}): Promise<{ meetLink: string; eventLink: string }> {
-  await loadGISScript();
-  if (!(window as any).google?.accounts?.oauth2) {
-    throw new Error("Google Calendar is unavailable in this browser.");
-  }
+// Google Meet links can only be created through Google Calendar, which needs the user's consent.
+// requestCalendarToken MUST be called synchronously inside the tap handler, otherwise browsers
+// block the Google pop-up. GIS must already be loaded (preloaded when the meeting sheet opens).
+const GOOGLE_MEET_AVAILABLE =
+  !IS_NATIVE_WEBVIEW && !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
+
+function requestCalendarToken(): Promise<string> {
   return new Promise((resolve, reject) => {
-    const client = (window as any).google.accounts.oauth2.initTokenClient({
+    const oauth2 = (window as any).google?.accounts?.oauth2;
+    if (!oauth2) return reject(new Error("Google sign-in didn't load. Check your connection, or paste a meeting link instead."));
+    const timer = setTimeout(() => reject(new Error("Google didn't respond. Try again, or paste a meeting link instead.")), 120_000);
+    const client = oauth2.initTokenClient({
       client_id: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID,
       scope: "https://www.googleapis.com/auth/calendar.events",
-      callback: async (resp: any) => {
-        if (resp.error) {
-          reject(new Error(resp.error_description || resp.error));
-          return;
-        }
-        try {
-          const start = new Date(`${date}T${time || "10:00"}`);
-          const end = new Date(start.getTime() + 60 * 60 * 1000);
-          const res = await fetch(
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all",
-            {
-              method: "POST",
-              headers: { Authorization: `Bearer ${resp.access_token}`, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                summary: title,
-                description,
-                start: { dateTime: start.toISOString() },
-                end: { dateTime: end.toISOString() },
-                attendees: [{ email: attendeeEmail }],
-                conferenceData: {
-                  createRequest: {
-                    requestId: `networq-${Date.now()}`,
-                    conferenceSolutionKey: { type: "hangoutsMeet" },
-                  },
-                },
-              }),
-            }
-          );
-          if (!res.ok) {
-            const err = await res.json();
-            reject(new Error(err.error?.message || `Calendar API error ${res.status}`));
-            return;
-          }
-          const event = await res.json();
-          const meetLink =
-            event.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === "video")?.uri ||
-            event.hangoutLink ||
-            "";
-          resolve({ meetLink, eventLink: event.htmlLink || "" });
-        } catch (e: any) {
-          reject(e);
-        }
+      callback: (resp: any) => {
+        clearTimeout(timer);
+        if (resp.error || !resp.access_token) reject(new Error(resp.error_description || "Google Calendar access wasn't granted."));
+        else resolve(resp.access_token);
+      },
+      // Pop-up blocked or closed: fail clearly instead of hanging on "Sending…"
+      error_callback: (err: any) => {
+        clearTimeout(timer);
+        reject(new Error(err?.type === "popup_closed" ? "The Google window was closed before access was granted." : "Your browser blocked the Google window. Allow pop-ups for this site, or paste a meeting link instead."));
       },
     });
     client.requestAccessToken({ prompt: "" });
   });
+}
+
+// Creates the event in the organiser's Google Calendar with a Meet link; Google emails the invite.
+async function createGoogleMeetEvent(token: string, opts: { title: string; description: string; start: Date; minutes: number; attendeeEmail: string }) {
+  const end = new Date(opts.start.getTime() + opts.minutes * 60_000);
+  const res = await fetch("https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      summary: opts.title,
+      description: opts.description,
+      start: { dateTime: opts.start.toISOString() },
+      end: { dateTime: end.toISOString() },
+      attendees: [{ email: opts.attendeeEmail }],
+      conferenceData: { createRequest: { requestId: `networq-${Date.now()}`, conferenceSolutionKey: { type: "hangoutsMeet" } } },
+      reminders: { useDefault: true },
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    if (res.status === 403) throw new Error("Google Calendar isn't enabled for NetworQ yet. Paste a meeting link instead.");
+    throw new Error(json.error?.message || `Google Calendar error ${res.status}`);
+  }
+  const meetLink = json.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === "video")?.uri || json.hangoutLink || "";
+  if (!meetLink) throw new Error("Google created the event but no Meet link. Check that Google Meet is enabled for your account.");
+  return { meetLink, eventLink: json.htmlLink || "" };
 }
 
 function dbToContact(row: any) {
@@ -1081,6 +897,7 @@ function dbToContact(row: any) {
     reminderDate: row.reminder_date,
     image: row.image,
     addedAt: row.added_at,
+    linkedUserId: row.linked_user_id || null, // set when you connected on Radar — enables in-app messaging
     reminderDone: row.reminder_done,
     emailSent: row.email_sent,
     meetLink: row.meet_link,
@@ -1244,7 +1061,7 @@ function CommandPalette({
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: "flex", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, gap: 10 }}>
-          <Icons.Search size={18} color="#6366F1" />
+          <Icons.Search size={18} color="#8B5CF6" />
           <input
             autoFocus
             placeholder="Type a command or search contacts… (Esc to exit)"
@@ -1257,10 +1074,10 @@ function CommandPalette({
               outline: "none",
               fontSize: 15,
               color: isDark ? "#ffffff" : "#0f172a",
-              fontFamily: "'DM Sans', sans-serif",
+              
             }}
           />
-          <span style={{ fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
             ESC
           </span>
         </div>
@@ -1288,13 +1105,13 @@ function CommandPalette({
                   padding: "10px 14px",
                   borderRadius: 10,
                   cursor: "pointer",
-                  background: isSel ? (isDark ? "#4F46E5" : "#6366F1") : "transparent",
+                  background: isSel ? (isDark ? "#6D28D9" : "#8B5CF6") : "transparent",
                   color: isSel ? "#ffffff" : isDark ? "#f8fafc" : "#0f172a",
                   fontSize: 13,
                   fontWeight: 600,
                 }}
               >
-                <ActIcon size={16} color={isSel ? "#ffffff" : "#6366F1"} />
+                <ActIcon size={16} color={isSel ? "#ffffff" : "#8B5CF6"} />
                 <span>{a.label}</span>
               </div>
             );
@@ -1378,7 +1195,7 @@ function NetworQApp() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
-  const [tab, setTab] = useState<"contacts" | "events" | "scan" | "qr" | "radar" | "add" | "settings">("contacts");
+  const [tab, setTab] = useState<"contacts" | "messages" | "events" | "scan" | "qr" | "radar" | "add" | "settings" | "me">("contacts");
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
@@ -1387,7 +1204,19 @@ function NetworQApp() {
   const [openTarget] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
     const t = new URLSearchParams(window.location.search).get("open");
-    return t && ["radar", "contacts", "events", "settings"].includes(t) ? t : null;
+    return t && ["radar", "contacts", "events", "settings", "chat", "call"].includes(t) ? t : null;
+  });
+  // ?open=chat&with=<user id> (from a message push notification)
+  const [openChatWith] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const w = new URLSearchParams(window.location.search).get("with");
+    return w && /^[0-9a-f-]{36}$/i.test(w) ? w : null;
+  });
+  // ?open=call&call=<call id> (from an incoming-call push)
+  const [openCallId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const c = new URLSearchParams(window.location.search).get("call");
+    return c && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
   });
   const [inviteCode] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -1451,12 +1280,46 @@ function NetworQApp() {
   const [outreachKey, setOutreachKey] = useState(0);
   const [meetModal, setMeetModal] = useState<any>(null);
   const [bulkEmailModalOpen, setBulkEmailModalOpen] = useState(false);
+  // Select several people, then email or message them all at once
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [groupMessageOpen, setGroupMessageOpen] = useState(false);
+  useEffect(() => {
+    if (tab !== "contacts") { setSelectMode(false); setSelectedIds(new Set()); }
+  }, [tab]);
   const [bulkDrafts, setBulkDrafts] = useState<any[]>([]);
   const [bulkSending, setBulkSending] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [meetDetails, setMeetDetails] = useState({ date: "", time: "", notes: "" });
   const [meetSent, setMeetSent] = useState(false);
   const [meetSending, setMeetSending] = useState(false);
+  // Opening the meeting sheet: suggest tomorrow 10:00 so it's one tap to send (easy to change)
+  useEffect(() => {
+    if (!meetModal) return;
+    setMeetDetails((d) => {
+      if (d.date && d.time) return d;
+      const t = new Date(Date.now() + 86400000);
+      const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+      return { ...d, date: d.date || day, time: d.time || "10:00" };
+    });
+  }, [meetModal]);
+  // How the video link is made: Google Meet (website, via Google Calendar), a pasted link, or a free Jitsi room
+  // Default to what always works: your saved meeting link, else a free video room. Google Meet stays one tap away.
+  const [meetMode, setMeetMode] = useState<"google" | "paste" | "jitsi">(() => {
+    try {
+      if (localStorage.getItem("networq.meet.link")) return "paste";
+    } catch {}
+    return "jitsi";
+  });
+  const [meetLinkInput, setMeetLinkInput] = useState(() => {
+    try {
+      return localStorage.getItem("networq.meet.link") || "";
+    } catch {
+      return "";
+    }
+  });
+  const [meetDuration, setMeetDuration] = useState(30);
+  const [meetResult, setMeetResult] = useState<{ link: string; via: "google" | "email"; ics?: string } | null>(null);
   const [remindersOpen, setRemindersOpen] = useState(true);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepBrief, setPrepBrief] = useState<string | null>(null);
@@ -1488,7 +1351,6 @@ function NetworQApp() {
   const [aiOpen, setAiOpen] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiListening, setAiListening] = useState(false);
   const [voiceReplyEnabled, setVoiceReplyEnabled] = useState(false);
   const [isSpeakingReply, setIsSpeakingReply] = useState(false);
   const [voicePersona, setVoicePersona] = useState<"siri" | "jarvis">("siri");
@@ -1501,7 +1363,6 @@ function NetworQApp() {
     },
   ]);
   const aiScrollRef = useRef<HTMLDivElement | null>(null);
-  const speechRecRef = useRef<any>(null);
 
   useEffect(() => {
     if (aiOpen) {
@@ -1647,74 +1508,41 @@ VOICE & ASSISTANT DIRECTIVES:
       }
     } catch (e: any) {
       console.warn("AI Assistant error:", e);
-      const fallbackReply = `I've analyzed your network. ${e.message ? `(Notice: ${e.message})` : ""}. How can I assist you with your contacts, roles, or follow-ups?`;
+      // Say plainly that no answer was produced — never a canned reply that looks like one
+      const reason = e?.message || "The AI assistant isn't available right now.";
       setAiMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: fallbackReply,
+          content: `I couldn't answer that just now. ${reason}`,
           time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
-      if (wasSpoken || voiceReplyEnabled) {
-        playJarvisVoice(fallbackReply);
-      }
     } finally {
       setAiLoading(false);
     }
   };
 
-  const toggleMicListening = () => {
-    if (typeof window === "undefined") return;
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast("Speech recognition is not supported in this browser. Please type your message.", "info");
-      return;
+  // AI mic: record → Whisper on our server → send (works in the Android app, unlike browser speech recognition)
+  const aiVoice = useVoiceRecorder({
+    supabase,
+    apiBaseUrl: apiBase(AI_PROXY),
+    onText: (text) => {
+      setVoiceReplyEnabled(true);
+      setAiInput(text);
+      sendAiQuery(text, true);
+    },
+  });
+  const aiListening = aiVoice.state === "recording";
+  useEffect(() => {
+    if (aiVoice.state === "error" && aiVoice.error) {
+      showToast(aiVoice.error, "error");
+      aiVoice.clearError();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiVoice.state, aiVoice.error]);
+  const toggleMicListening = () => (aiListening ? aiVoice.stop() : aiVoice.start());
 
-    if (aiListening && speechRecRef.current) {
-      speechRecRef.current.stop();
-      setAiListening(false);
-      return;
-    }
-
-    try {
-      const rec = new SpeechRecognition();
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.lang = "en-US";
-
-      rec.onstart = () => {
-        setAiListening(true);
-        setVoiceReplyEnabled(true);
-      };
-
-      rec.onresult = (ev: any) => {
-        const transcript = ev.results?.[0]?.[0]?.transcript;
-        if (transcript) {
-          setAiInput(transcript);
-          sendAiQuery(transcript, true);
-        }
-      };
-
-      rec.onerror = (ev: any) => {
-        setAiListening(false);
-        if (ev.error !== "no-speech") {
-          showToast(`Voice input: ${ev.error}`, "info");
-        }
-      };
-
-      rec.onend = () => {
-        setAiListening(false);
-      };
-
-      speechRecRef.current = rec;
-      rec.start();
-    } catch (err: any) {
-      console.warn("Speech start failed:", err);
-      setAiListening(false);
-    }
-  };
 
   const toggleSpeechPlayback = () => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -1736,6 +1564,9 @@ VOICE & ASSISTANT DIRECTIVES:
     async (userId: string, userEmail?: string) => {
       loadedUserRef.current = userId;
       reattachPush(supabase, apiBase(AI_PROXY)); // this device had push on → attach it to this account
+      // Signed in from the login screen: show the loading screen instead of a frozen login form
+      setScreen((cur) => (cur === "login" || cur === "check_email" ? "splash" : cur));
+      setSplashProgress((p) => Math.max(p, 92));
       setContactsLoading(true);
       try {
         const [profileRes, contactsRes] = await Promise.all([
@@ -1795,7 +1626,8 @@ VOICE & ASSISTANT DIRECTIVES:
       } catch (err: any) {
         loadedUserRef.current = null;
         console.error("Failed to load user data:", err);
-        showToast(err.message || "Failed to load profile", "error");
+        setScreen((cur) => (cur === "splash" ? "login" : cur)); // never strand the user on the loading screen
+        showToast("Couldn't load your account. Check your connection and try again.", "error");
       } finally {
         setContactsLoading(false);
       }
@@ -1870,7 +1702,16 @@ VOICE & ASSISTANT DIRECTIVES:
 
   useEffect(() => {
     if (screen !== "app" || !openTarget) return;
-    setTab(openTarget as typeof tab);
+    if (openTarget === "call") {
+      // let the call layer mount and subscribe first
+      if (openCallId) setTimeout(() => openCall(openCallId), 600);
+    } else if (openTarget === "chat") {
+      if (openChatWith) {
+        setChatPartner({ id: openChatWith, name: "Message" });
+        setChatEvent(null);
+        setChatOpen(true);
+      }
+    } else setTab(openTarget as typeof tab);
     try {
       window.history.replaceState(null, "", window.location.pathname);
     } catch {
@@ -1901,6 +1742,17 @@ VOICE & ASSISTANT DIRECTIVES:
     notif.markRead([n.id]);
     setNotifOpen(false);
     const screen = n.data?.screen;
+    if (screen === "call" && n.data?.call_id) {
+      openCall(n.data.call_id); // still ringing → Accept / Decline; otherwise "That call has ended"
+      return;
+    }
+    if (screen === "chat" && n.data?.from_user) {
+      // Message notification → open that conversation
+      setChatPartner({ id: n.data.from_user, name: n.title });
+      setChatEvent(null);
+      setChatOpen(true);
+      return;
+    }
     if (screen === "radar" || screen === "contacts" || screen === "events" || screen === "settings") setTab(screen);
   };
 
@@ -1931,6 +1783,16 @@ VOICE & ASSISTANT DIRECTIVES:
   // Closes the top-most overlay first, then walks back through visited tabs.
   const tabHistory = useRef<string[]>([]);
   const navigatingBack = useRef(false);
+  // Camera opened straight from a home shortcut: closing it goes back to where you were, not to an empty Scan page
+  const cameraFromShortcut = useRef(false);
+  const closeCamera = () => {
+    setLiveCameraOpen(false);
+    if (cameraFromShortcut.current && !scanPreview) {
+      cameraFromShortcut.current = false;
+      navigatingBack.current = true;
+      setTab((tabHistory.current.pop() as typeof tab) || "contacts");
+    }
+  };
   const lastTab = useRef(tab);
   useEffect(() => {
     if (lastTab.current !== tab) {
@@ -1942,14 +1804,29 @@ VOICE & ASSISTANT DIRECTIVES:
 
   const backState = useRef<() => boolean>(() => false);
   backState.current = () => {
-    // Sheets/dialogs inside feature screens close on Escape
-    const openDialog = document.querySelector('[role="dialog"][aria-modal="true"]');
-    if (openDialog) {
+    if ((window as any).__networqCallBusy) return true; // back never drops a live call
+    // Topmost open sheet/dialog (incl. ones inside feature screens): press its own Close/Back button,
+    // otherwise send Escape. Back always closes what's on top first.
+    const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).filter((d) => d.offsetParent !== null || getComputedStyle(d).position === "fixed");
+    const top = dialogs[dialogs.length - 1];
+    if (top) {
+      const close = top.querySelector<HTMLElement>('button[aria-label="Close"], button[aria-label^="Close "], button[aria-label="Back"], button[aria-label^="Back to"], button[aria-label="Cancel"], button[aria-label="Done"]');
+      if (close) {
+        close.click();
+        return true;
+      }
+      top.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      // Only if Escape didn't close it, close it through app state — never a second step back
+      setTimeout(() => top.isConnected && stateBack(), 80);
       return true;
     }
+    return stateBack();
+  };
+  const stateBack = (): boolean => {
     if (notifOpen) return setNotifOpen(false), true;
-    if (liveCameraOpen) return setLiveCameraOpen(false), true;
+    if (liveCameraOpen) return closeCamera(), true;
     if (batchScannerOpen) return setBatchScannerOpen(false), true;
     if (networkMapOpen) return setNetworkMapOpen(false), true;
     if (introductionsOpen) return setIntroductionsOpen(false), true;
@@ -1966,6 +1843,9 @@ VOICE & ASSISTANT DIRECTIVES:
     if (modal) return setModal(null), setPrepBrief(null), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
+    if (tab === "me" && meSection) return setMeSection(null), true;
+    if (groupMessageOpen) return setGroupMessageOpen(false), true;
+    if (selectMode) return setSelectMode(false), setSelectedIds(new Set()), true;
     if (screen === "signup" || screen === "forgot_password") return setScreen("login"), true;
     const prev = tabHistory.current.pop();
     if (screen === "app" && prev) {
@@ -1980,10 +1860,82 @@ VOICE & ASSISTANT DIRECTIVES:
     }
     return false;
   };
+  // Back via browser history too: while you're anywhere but the People home, keep one history step
+  // on the stack. The phone's back (Android app, mobile Chrome, desktop browser) pops it → we step back
+  // one screen → if you're still not home, the step is put back. At home there's no step, so back leaves.
+  const ignorePop = useRef(false);
+  const isDeep = () =>
+    screen === "app" &&
+    (tab !== "contacts" || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
+      daySummaryOpen || globalSearchOpen || voiceDebriefOpen || nfcWriterOpen || exportContactsOpen || chatOpen || copilotOpen || !!composer ||
+      !!meetModal || bulkEmailModalOpen || !!modal || commandOpen || aiOpen || groupMessageOpen ||
+      (typeof document !== "undefined" && !!document.querySelector('[role="dialog"]')));
+  const pushedStep = useRef(false); // a step this page load added (a leftover from before a reload is never "ours")
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const deep = isDeep();
+    const marked = !!window.history.state?.nqBack;
+    if (deep && !marked) {
+      window.history.pushState({ ...(window.history.state || {}), nqBack: 1 }, "");
+      pushedStep.current = true;
+    } else if (!deep && marked) {
+      if (pushedStep.current) {
+        pushedStep.current = false;
+        ignorePop.current = true; // we're home again: drop our step quietly
+        window.history.back();
+      } else {
+        // left over from before a reload / sign-out: just clear the marker, never navigate
+        const { nqBack, ...rest } = window.history.state || {};
+        window.history.replaceState(rest, "");
+      }
+    }
+  });
+  useEffect(() => {
+    const onPop = () => {
+      if (ignorePop.current) {
+        ignorePop.current = false;
+        return;
+      }
+      backState.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   useEffect(() => {
     (window as any).__networqHandleBack = () => backState.current();
     return () => {
       delete (window as any).__networqHandleBack;
+    };
+  }, []);
+
+  // Always run the newest version: when the app comes back to the screen (Android keeps it alive for
+  // days), check whether a newer build is live and refresh — never during a call or while typing.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const mine = () => (document.querySelector('script[src*="/_expo/static/js/web/index-"]') as HTMLScriptElement | null)?.src.split("/").pop() || "";
+    let checking = false;
+    const check = async () => {
+      if (document.visibilityState !== "visible" || checking) return;
+      const current = mine();
+      if (!current) return; // dev server
+      checking = true;
+      try {
+        const html = await fetch(`/?v=${Date.now()}`, { cache: "no-store" }).then((r) => r.text());
+        const live = (html.match(/\/_expo\/static\/js\/web\/(index-[a-f0-9]+\.js)/) || [])[1];
+        const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+        if (live && live !== current && !(window as any).__networqCallBusy && !typing) window.location.reload();
+      } catch {
+        /* offline — try next time */
+      } finally {
+        checking = false;
+      }
+    };
+    document.addEventListener("visibilitychange", check);
+    const t = setInterval(check, 10 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", check);
+      clearInterval(t);
     };
   }, []);
 
@@ -2097,7 +2049,7 @@ VOICE & ASSISTANT DIRECTIVES:
         const { error: profileErr } = await supabase.from("profiles").upsert({ id: data.user.id, ...profileFields });
         if (profileErr) throw profileErr;
 
-        triggerConfetti();
+        successFeedback();
         await loadUserData(data.user.id, form.email);
       }
     } catch (err: any) {
@@ -2125,7 +2077,7 @@ VOICE & ASSISTANT DIRECTIVES:
         bio: form.bio,
       });
       if (error) throw error;
-      triggerConfetti();
+      successFeedback();
       await loadUserData(currentUser.id, currentUser.email);
     } catch (err: any) {
       setAuthMsg({ text: err.message || "Failed to save profile.", type: "error" });
@@ -2209,7 +2161,7 @@ VOICE & ASSISTANT DIRECTIVES:
           // A NetworQ profile QR fills the form instantly, with no AI call
           const qr = await readProfileQr(e.target.result);
           if (qr) {
-            triggerConfetti();
+            successFeedback();
             setAddForm((f) => ({ ...f, ...qr }));
             setAddStep("preview");
             setTab("add");
@@ -2249,7 +2201,7 @@ VOICE & ASSISTANT DIRECTIVES:
           }
 
           if (cardData) {
-            triggerConfetti();
+            successFeedback();
             setAddForm((f) => ({
               ...f,
               name: cardData.name || "",
@@ -2327,7 +2279,7 @@ VOICE & ASSISTANT DIRECTIVES:
       setAddStep("form");
       setTab("contacts");
       setModal(newContact);
-      triggerConfetti();
+      successFeedback();
       showToast("Contact saved successfully!", "success");
     } catch (err: any) {
       console.error("saveContact exception:", err);
@@ -2429,16 +2381,16 @@ VOICE & ASSISTANT DIRECTIVES:
     try {
       const prompt = `Prepare a concise executive networking dossier on ${contact.name} (${contact.title || ""} at ${contact.company || ""}) for ${currentUser?.name} (${currentUser?.role} at ${currentUser?.company}).
 Include:
-1. 🎯 Strategic Talking Points (2 bullets)
-2. 💡 Potential Synergy / Collaboration Angle
-3. ☕ High-impact conversation starter questions.
+1. Strategic Talking Points (2 bullets)
+2. Potential Synergy / Collaboration Angle
+3. High-impact conversation starter questions.
 Keep it punchy, sharp, and directly actionable.`;
       const brief = await callAI([{ role: "user", content: prompt }], "You are a top-tier executive networking strategist.", {
         max_tokens: 500,
         action: "chat",
       });
       setPrepBrief(brief);
-      triggerConfetti();
+      successFeedback();
     } catch (err: any) {
       showToast(err.message || "Failed to generate briefing.", "error");
     } finally {
@@ -2480,83 +2432,96 @@ Keep it punchy, sharp, and directly actionable.`;
     recognition.start();
   };
 
+  useEffect(() => {
+    if (!meetModal) return;
+    setMeetResult(null);
+    if (GOOGLE_MEET_AVAILABLE) loadGISScript(); // so the Google window can open instantly on tap
+  }, [meetModal]);
+
   const sendMeeting = async () => {
     if (!meetModal?.email) {
       showToast("This contact has no email address.", "error");
       return;
     }
+    const start = new Date(`${meetDetails.date}T${meetDetails.time}`);
+    if (isNaN(start.getTime())) return showToast("Pick a date and time.", "error");
+    if (start.getTime() < Date.now() - 5 * 60_000) return showToast("That time is in the past.", "error");
+    // Google: ask for consent right now, inside the tap, before any await (or the pop-up is blocked)
+    const tokenPromise = meetMode === "google" ? requestCalendarToken() : null;
     setMeetSending(true);
     try {
-      const meetDateStr = meetDetails.date + " " + meetDetails.time;
+      const title = `${currentUser?.name || "NetworQ"} <> ${meetModal.name}`;
+      const agenda = meetDetails.notes?.trim() || "";
       let link = "";
-      const useGCal =
-        !!process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID &&
-        process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== "your_google_client_id";
+      let via: "google" | "email" = "email";
+      let ics: string | undefined;
 
-      let calendarInviteSent = false;
-      if (useGCal) {
-        try {
-          const result = await createCalendarEvent({
-            title: `Meeting with ${meetModal.name}`,
-            description: meetDetails.notes || `Scheduled via NetworQ by ${currentUser?.name}`,
-            date: meetDetails.date,
-            time: meetDetails.time,
-            attendeeEmail: meetModal.email,
-          });
-          link = result.meetLink;
-          calendarInviteSent = true;
-        } catch (calErr: any) {
-          console.warn("Calendar invite failed, falling back to email invite:", calErr?.message);
+      if (tokenPromise) {
+        const token = await tokenPromise;
+        const ev = await createGoogleMeetEvent(token, { title, description: agenda || `Scheduled with NetworQ`, start, minutes: meetDuration, attendeeEmail: meetModal.email });
+        link = ev.meetLink;
+        via = "google"; // Google emails the invite (with Accept / Decline) and adds it to both calendars
+      } else {
+        const chosen = meetMode === "jitsi" ? jitsiRoom() : normaliseMeetingLink(meetLinkInput);
+        if (!chosen) throw new Error("Paste a valid meeting link (for example https://meet.google.com/abc-defg-hij).");
+        link = chosen;
+        if (meetMode === "paste") {
+          try {
+            localStorage.setItem("networq.meet.link", chosen);
+          } catch {}
         }
-      }
-
-      if (!calendarInviteSent || !link) {
-        link = link || genMeetLink();
-        const messageBody = [
-          `Hi ${meetModal.name},`,
-          "",
-          `I'd like to schedule a meeting with you.`,
-          "",
-          `Date: ${meetDetails.date}`,
-          `Time: ${meetDetails.time}`,
-          `Video call: ${link}`,
-          meetDetails.notes ? `\nAgenda:\n${meetDetails.notes}` : "",
-          "",
-          `Looking forward to connecting!`,
-          "",
-          currentUser?.name,
-        ].join("\n");
-
+        ics = buildInvite({
+          uid: `${Date.now()}-${Math.random().toString(36).slice(2)}@networq.co.in`,
+          start,
+          durationMinutes: meetDuration,
+          title,
+          description: agenda,
+          link,
+          organizerName: currentUser?.name || "NetworQ member",
+          organizerEmail: currentUser?.email || "noreply@networq.co.in",
+          attendeeName: meetModal.name,
+          attendeeEmail: meetModal.email,
+        });
+        const when = start.toLocaleString([], { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
         await sendEmailViaServer({
           to: meetModal.email,
-          subject: `Meeting invite from ${currentUser?.name} — ${meetDetails.date} at ${meetDetails.time}`,
-          body: messageBody,
+          subject: `Invitation: ${title} — ${when}`,
+          body: [
+            `Hi ${(meetModal.name || "").split(" ")[0] || "there"},`,
+            "",
+            `I've set up a ${meetDuration}-minute call for us.`,
+            "",
+            `When: ${when}`,
+            `Join: ${link}`,
+            agenda ? `\nAgenda:\n${agenda}` : "",
+            "",
+            "The calendar invite is attached — tap Accept to add it to your calendar.",
+            "",
+            currentUser?.name || "",
+          ].join("\n"),
           fromName: currentUser?.name || "",
           replyTo: currentUser?.email || "",
+          ics,
         });
       }
 
+      const meetDateStr = `${meetDetails.date} ${meetDetails.time}`;
       await supabase.from("meetings").insert({
         user_id: currentUser?.id,
         contact_id: meetModal.id,
         meet_link: link,
         meet_date: meetDetails.date,
         meet_time: meetDetails.time,
-        notes: meetDetails.notes || null,
+        notes: agenda || null,
       });
       await supabase.from("contacts").update({ meet_link: link, meet_date: meetDateStr }).eq("id", meetModal.id);
       setContacts((prev) => prev.map((c) => (c.id === meetModal.id ? { ...c, meetLink: link, meetDate: meetDateStr } : c)));
+      setMeetResult({ link, via, ics });
       setMeetSent(true);
-      triggerConfetti();
-      showToast(calendarInviteSent ? `Calendar invite sent to ${meetModal.email}` : `Meeting invite sent to ${meetModal.email}`, "success");
-      setTimeout(() => {
-        setMeetModal(null);
-        setMeetSent(false);
-        setMeetDetails({ date: "", time: "", notes: "" });
-      }, 2000);
+      successFeedback();
     } catch (err: any) {
       console.error("Meeting invite error:", err);
-      showToast(err?.text || err?.message || "Failed to send invite.", "error");
+      showToast(err?.message || "Couldn't send the invite.", "error");
     } finally {
       setMeetSending(false);
     }
@@ -2574,7 +2539,7 @@ Keep it punchy, sharp, and directly actionable.`;
     const updated = contacts.map((c) => (c.id === id ? { ...c, reminderDone: newVal } : c));
     setContacts(updated);
     if (modal?.id === id) setModal(updated.find((c) => c.id === id));
-    if (newVal) triggerConfetti();
+    if (newVal) successFeedback();
   };
 
   const deleteContact = async (id: string) => {
@@ -2635,13 +2600,21 @@ Keep it punchy, sharp, and directly actionable.`;
     a.download = `networq-contacts-${today}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    triggerConfetti();
+    successFeedback();
   };
 
   const accountApi = useMemo(() => createAccountApi(supabase, apiBase(AI_PROXY)), []);
   const prospectApi = useMemo(() => createProspectApi(supabase, apiBase(AI_PROXY)), []);
 
-  const openProfileModal = () => setTab("settings");
+  const [meSection, setMeSection] = useState<SettingsSection | null>(null);
+  const openProfileModal = () => {
+    setMeSection(null);
+    setTab("me");
+  };
+  // Old destinations now live inside Me (card + grouped settings)
+  useEffect(() => {
+    if (tab === "settings" || tab === "qr") setTab("me");
+  }, [tab]);
 
   const handleSignedOut = useCallback(
     (message?: string) => {
@@ -2680,14 +2653,14 @@ Keep it punchy, sharp, and directly actionable.`;
     return "Other";
   }, []);
 
-  const openBulkFollowUpModal = () => {
-    const withEmail = effectiveContacts.filter((c) => c.email);
+  const openBulkFollowUpModal = (picked?: any[]) => {
+    const withEmail = (picked || effectiveContacts).filter((c) => c.email);
     if (!withEmail.length) {
-      showToast("No contacts with email addresses available.", "error");
+      showToast(picked ? "None of the people you picked have an email address." : "No contacts with email addresses available.", "error");
       return;
     }
     const unemailed = withEmail.filter((c) => !c.emailSent);
-    const targets = unemailed.length > 0 ? unemailed : withEmail;
+    const targets = picked ? withEmail : unemailed.length > 0 ? unemailed : withEmail;
 
     const drafts = targets.map((c) => {
       const draft = generateExecutiveFollowUp(currentUser, c);
@@ -2707,10 +2680,17 @@ Keep it punchy, sharp, and directly actionable.`;
     setBulkSending(true);
     let sentCount = 0;
     let failedCount = 0;
+    let unsavedCount = 0;
+    // The server allows 20 emails a minute; pace big batches so none get refused
+    const pending = bulkDrafts.filter((d) => d.status !== "sent").length;
+    const gapMs = pending > 18 ? 3300 : 0;
+    let first = true;
 
     for (let i = 0; i < bulkDrafts.length; i++) {
       const draft = bulkDrafts[i];
       if (draft.status === "sent") continue;
+      if (!first && gapMs) await new Promise((r) => setTimeout(r, gapMs));
+      first = false;
 
       setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sending" } : d)));
 
@@ -2723,10 +2703,17 @@ Keep it punchy, sharp, and directly actionable.`;
           fromName: currentUser?.name || "",
           replyTo: currentUser?.email || "",
         });
+        // The email went out; remember it so the next follow-up run doesn't email them again
+        let saved = true;
         if (draft.contact.id) {
-          await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
+          const { error: saveErr } = await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
+          if (saveErr) {
+            saved = false;
+            console.warn("Couldn't record follow-up as sent for", draft.contact.name, saveErr.message);
+          }
         }
-        setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
+        if (saved) setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
+        else unsavedCount++;
         setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sent" } : d)));
         sentCount++;
       } catch (err: any) {
@@ -2736,8 +2723,10 @@ Keep it punchy, sharp, and directly actionable.`;
       }
     }
     setBulkSending(false);
-    if (sentCount > 0) triggerConfetti();
-    if (failedCount === 0) {
+    if (sentCount > 0) successFeedback();
+    if (failedCount === 0 && unsavedCount > 0) {
+      showToast(`Sent ${sentCount}. ${unsavedCount} couldn't be marked as sent — check your connection.`, "error");
+    } else if (failedCount === 0) {
       showToast(`Sent ${sentCount} follow-up email${sentCount === 1 ? "" : "s"}.`, "success");
     } else {
       showToast(`Sent ${sentCount}, failed ${failedCount}. Failed emails can be retried.`, "error");
@@ -2753,10 +2742,10 @@ Keep it punchy, sharp, and directly actionable.`;
 
   const greetingText = useMemo(() => {
     const hr = new Date().getHours();
-    if (hr < 12) return "Good morning,";
-    if (hr < 18) return "Good afternoon,";
-    return "Good evening,";
-  }, []);
+    const first = (currentUser?.name || "").trim().split(/\s+/)[0];
+    const part = hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+    return first ? `${part}, ${first}` : part;
+  }, [currentUser?.name]);
 
   const selectedContact = useMemo(() => {
     return effectiveContacts.find((c) => c.id === selectedContactId) || effectiveContacts[0] || null;
@@ -2777,6 +2766,8 @@ Keep it punchy, sharp, and directly actionable.`;
     return Math.min(99, base + emailsCount + meetsCount);
   }, [effectiveContacts]);
 
+  // Same rule as "Who's next": follow-ups due, plus people met recently but not emailed
+  const waitingCount = useMemo(() => pickNext(effectiveContacts, today, Infinity).length, [effectiveContacts, today]);
   const filtered = useMemo(() => {
     return effectiveContacts
       .filter(
@@ -2913,13 +2904,60 @@ Keep it punchy, sharp, and directly actionable.`;
     }
     
     button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
-    button:not(:disabled):active, [role="button"]:active { opacity: 0.6; transform: scale(0.98); transition: opacity 0.08s, transform 0.08s; }
+    /* Press feedback: a slight physical "give", not a fade (100 ms in, 180 ms out) */
+    button, [role="button"] { transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease, color 0.18s ease; }
+    button:not(:disabled):active, [role="button"]:active { transform: scale(0.97); opacity: 0.88; transition-duration: 0.1s; }
+    button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid #7C3AED; outline-offset: 2px; }
+    input, textarea, select { transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease; }
     button:disabled { cursor: default; }
 
     @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── Motion system (iOS-like springs; all off with "Reduce motion") ── */
+    @keyframes nqScreenIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes nqSheetUp { from { transform: translateY(100%); } to { transform: none; } }
+    @keyframes nqSheetRight { from { transform: translateX(100%); } to { transform: none; } }
+    @keyframes nqPop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+    @keyframes nqToastIn { from { opacity: 0; transform: translate(-50%, 12px) scale(0.96); } to { opacity: 1; transform: translate(-50%, 0) scale(1); } }
+    @keyframes nqShimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+    @keyframes nqFade { from { opacity: 0.55; } to { opacity: 1; } }
+    /* Tab switches are frequent (HIG motion.md): a 180 ms opacity settle, no movement. Opacity only, so fixed overlays inside stay full-screen. */
+    .nq-screen { animation: nqFade 0.18s ease-out backwards; }
+    .nq-backdrop { animation: fadeIn 0.2s ease both; }
+    .nq-sheet-up { animation: nqSheetUp 0.34s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+    .nq-sheet-right { animation: nqSheetRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+    .nq-pop { animation: nqPop 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    .nq-tab-icon { display: inline-flex; }
+    .nq-tab-icon { transition: transform 0.18s ease-out; } .nq-tab-icon.is-active { transform: translateY(-1px); }
+    .nq-stagger > * { animation: nqScreenIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+    .nq-stagger > *:nth-child(2) { animation-delay: 25ms; } .nq-stagger > *:nth-child(3) { animation-delay: 50ms; }
+    .nq-stagger > *:nth-child(n+4) { animation-delay: 75ms; }
+    /* Sideways strips (chips, Coming up): swipe, but never show a scrollbar line */
+    .nq-chips { scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+    .nq-chips::-webkit-scrollbar { display: none; width: 0; height: 0; background: transparent; }
+    .nq-skeleton { background: linear-gradient(90deg, ${isDark ? "#1C1C1E 25%, #2C2C2E 50%, #1C1C1E 75%" : "#ECECF0 25%, #F7F7FA 50%, #ECECF0 75%"}); background-size: 200% 100%; animation: nqShimmer 1.4s linear infinite; border-radius: 12px; }
+    @keyframes nqDraw { to { stroke-dashoffset: 0; } }
+    .nq-success-disc { transform-origin: 32px 32px; animation: nqPop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    .nq-success-tick { stroke-dasharray: 44; stroke-dashoffset: 44; animation: nqDraw 0.36s 0.16s ease-out forwards; }
+    .nq-badge { animation: nqPop 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+    @keyframes nqScan { 0% { transform: translateY(6%); } 50% { transform: translateY(92%); } 100% { transform: translateY(6%); } }
+    .nq-scanline { position: absolute; left: 5%; right: 5%; top: 0; height: 100%; pointer-events: none; animation: nqScan 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .nq-scanline::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; border-radius: 2px; background: linear-gradient(90deg, transparent, #C4B5FD, transparent); box-shadow: 0 0 14px 2px rgba(167, 139, 250, 0.55); }
+    .nq-qscan { position: absolute; overflow: hidden; pointer-events: none; border-radius: 2px; }
+    .nq-qscan > i { position: absolute; left: 0; right: 0; top: 0; height: 100%; animation: nqQScan 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+    .nq-qscan > i::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 60%; background: linear-gradient(180deg, rgba(113, 93, 252, 0), rgba(113, 93, 252, 0.28)); }
+    .nq-qscan > i::after { content: ""; position: absolute; left: -10%; right: -10%; top: 0; height: max(1.5px, 8%); border-radius: 2px; background: linear-gradient(90deg, rgba(94, 53, 245, 0), #715DFC 25%, #E9E4FF 50%, #715DFC 75%, rgba(94, 53, 245, 0)); box-shadow: 0 0 6px 1px rgba(94, 53, 245, 0.55); }
+    @keyframes nqQScan { 0% { transform: translateY(0); } 50% { transform: translateY(100%); } 100% { transform: translateY(0); } }
+    @keyframes nqSpinOnce { to { transform: rotate(360deg); } }
+    .nq-spin { animation: nqSpinOnce 0.9s linear infinite; }
+    img.nq-fade { opacity: 0; transition: opacity 0.3s ease; } img.nq-fade.is-loaded { opacity: 1; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
+    }
+
+    input.nq-search-input:focus { border-color: transparent !important; box-shadow: none !important; }
     input:focus, textarea:focus, select:focus {
       border-color: #7C3AED !important;
       box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22) !important;
@@ -2969,7 +3007,7 @@ Keep it punchy, sharp, and directly actionable.`;
         boxSizing: "border-box" as const,
         background: themeStyles.bg,
         color: themeStyles.text,
-        fontFamily: "'Poppins', -apple-system, BlinkMacSystemFont, sans-serif",
+        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif",
         position: "relative" as const,
         overflowX: "hidden" as const,
       },
@@ -3061,21 +3099,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <style>{CSS}</style>
         {renderBackgroundOrbs()}
         <div style={{ textAlign: "center", zIndex: 1, animation: "fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)", padding: 24 }}>
-          {/* Prominent Signature Purple Logo with Laser Scanner inside Q */}
-          <div
-            style={{
-              margin: "0 auto 24px",
-              display: "inline-flex",
-              padding: 22,
-              borderRadius: 32,
-              background: isDark ? "rgba(124, 58, 237, 0.1)" : "rgba(124, 58, 237, 0.06)",
-              border: isDark ? "1px solid rgba(124, 58, 237, 0.25)" : "1px solid rgba(124, 58, 237, 0.18)",
-              boxShadow: "0 24px 48px rgba(124, 58, 237, 0.16)",
-            }}
-          >
-            <Icons.Logo size={88} color="#7C3AED" scanning={true} />
-          </div>
-
+          {/* Splash: the official wordmark alone, with the beam scanning inside the Q */}
           <div style={{ margin: "0 auto 10px" }}>
             <Icons.Wordmark size={44} isDark={isDark} scanning={true} />
           </div>
@@ -3097,7 +3121,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   height: "100%",
                   width: `${splashProgress}%`,
                   borderRadius: 980,
-                  background: "linear-gradient(90deg, #7C3AED, #6366F1, #A78BFA)",
+                  background: "linear-gradient(90deg, #7C3AED, #8B5CF6, #A78BFA)",
                   transition: "width 0.25s ease-out",
                   boxShadow: "0 0 12px rgba(124, 58, 237, 0.6)",
                 }}
@@ -3131,10 +3155,10 @@ Keep it punchy, sharp, and directly actionable.`;
         {renderBackgroundOrbs()}
         <div style={{ width: "100%", maxWidth: 440, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ ...S.card, textAlign: "center", padding: 36 }}>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(99, 102, 241, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-              <Icons.Mail size={26} color="#6366F1" />
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(124, 58, 237, 0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+              <Icons.Mail size={26} color="#8B5CF6" />
             </div>
-            <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
+            <h2 style={{ fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
               A confirmation link was sent to <strong style={{ color: themeStyles.text }}>{form.email}</strong>. Open the link to activate your workspace.
             </p>
@@ -3155,7 +3179,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 480, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Complete Profile</div>
+            <div style={{ fontSize: 28 }}>Complete Profile</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>
               Set up your professional card details
             </div>
@@ -3270,7 +3294,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Create New Password</div>
+            <div style={{ fontSize: 28 }}>Create New Password</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>Enter your updated password</div>
           </div>
           <div style={S.card}>
@@ -3313,7 +3337,7 @@ Keep it punchy, sharp, and directly actionable.`;
         <div style={{ width: "100%", maxWidth: 400, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28 }}>Account Recovery</div>
+            <div style={{ fontSize: 28 }}>Account Recovery</div>
             <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>We'll send a password recovery email</div>
           </div>
           <div style={S.card}>
@@ -3719,11 +3743,6 @@ Keep it punchy, sharp, and directly actionable.`;
       <style>{CSS}</style>
       {renderBackgroundOrbs()}
 
-      {/* Confetti Overlay Canvas */}
-      <canvas
-        id="networq-confetti-canvas"
-        style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }}
-      />
 
       {/* Cmd + K Command Palette */}
       <CommandPalette
@@ -3783,6 +3802,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Wordmark size={24} isDark={isDark} />
                 <span
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     fontSize: 10,
                     fontWeight: 700,
                     color: isDark ? "#A78BFA" : "#7C3AED",
@@ -3814,6 +3834,14 @@ Keep it punchy, sharp, and directly actionable.`;
                       setSearchQ("");
                     },
                     isActive: tab === "contacts" && selectedRole === "all",
+                  },
+                  {
+                    id: "messages",
+                    label: "Messages",
+                    icon: I.Mail,
+                    count: notif.items.filter((n) => n.type === "message" && !n.read_at).length || undefined,
+                    onClick: () => setTab("messages"),
+                    isActive: tab === "messages",
                   },
                   {
                     id: "roles",
@@ -3869,6 +3897,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     {item.count !== undefined && (
                       <span
                         style={{
+                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                           fontSize: 11,
                           fontWeight: 600,
                           padding: "1px 6px",
@@ -3908,7 +3937,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     icon: Icons.Radar,
                     onClick: () => {
                       setTab("radar");
-                      triggerConfetti();
+                      successFeedback();
                     },
                     isActive: tab === "radar",
                   },
@@ -3920,11 +3949,11 @@ Keep it punchy, sharp, and directly actionable.`;
                     isActive: tab === "events",
                   },
                   {
-                    id: "qr",
-                    label: "Digital Pass",
-                    icon: Icons.QrCode,
-                    onClick: () => setTab("qr"),
-                    isActive: tab === "qr",
+                    id: "me",
+                    label: "Me",
+                    icon: I.User,
+                    onClick: () => { setMeSection(null); setTab("me"); },
+                    isActive: tab === "me",
                   },
                   {
                     id: "add",
@@ -4083,6 +4112,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <button
                   onClick={() => setCommandOpen(true)}
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     position: "absolute",
                     right: 8,
                     top: "50%",
@@ -4141,7 +4171,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     cursor: "pointer",
                   }}
                 >
-                  <span style={{ fontSize: 16 }}>🕸️</span>
+                  <I.Network size={18} />
                 </button>
               )}
 
@@ -4165,7 +4195,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <Icons.Bell size={isMobile ? 18 : 16} />
                 {notif.unread > 0 ? (
-                  <span aria-hidden="true" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                  <span aria-hidden="true" key={notif.unread} className="nq-badge" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
                     {notif.unread > 9 ? "9+" : notif.unread}
                   </span>
                 ) : (
@@ -4173,16 +4203,6 @@ Keep it punchy, sharp, and directly actionable.`;
                 )}
               </button>
 
-              {isMobile && (
-                <button
-                  onClick={() => setAiOpen(true)}
-                  title="AI Assistant"
-                  aria-label="AI Assistant"
-                  style={{ width: 44, height: 44, borderRadius: 12, border: "none", background: "rgba(124,58,237,0.12)", color: "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
-                >
-                  <Icons.Sparkles size={20} color="#7C3AED" />
-                </button>
-              )}
 
               {!isMobile && (
               <button
@@ -4232,8 +4252,12 @@ Keep it punchy, sharp, and directly actionable.`;
                   padding: "4px 8px",
                   borderRadius: 8,
                 }}
+                aria-current={tab === "me" ? "page" : undefined}
               >
+                {/* Ring shows you're on your profile & settings (the only way in — no duplicate tab) */}
+                <span style={{ display: "inline-flex", borderRadius: 20, boxShadow: tab === "me" ? "0 0 0 2px #7C3AED" : "none", transition: "box-shadow 0.18s ease" }}>
                 <ContactAvatar name={currentUser?.name} image={currentUser?.avatar_url || currentUser?.photo} size={32} radius={16} isDark={isDark} />
+                </span>
                 {!isMobile && (
                   <div style={{ textAlign: "left" }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: themeStyles.text, lineHeight: 1.2 }}>
@@ -4264,8 +4288,10 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
           </header>
 
-          {/* MAIN CONTENT CONTAINER */}
+          {/* MAIN CONTENT CONTAINER — re-keyed per tab so each screen animates in */}
           <div
+            key={tab}
+            className="nq-screen"
             style={{
               flex: 1,
               paddingTop: isMobile ? 16 : 28,
@@ -4306,139 +4332,101 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {tab === "contacts" && (
           <div>
-            {/* ── BRAND DASHBOARD BANNER (Brand Identity Guideline Page 12) ── */}
-            <div
-              style={{
-                ...themeStyles.glassCard,
-                borderRadius: 20,
-                padding: isMobile ? "18px 20px" : "24px 30px",
-                marginBottom: 20,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                position: "relative",
-                overflow: "hidden",
-                border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#E5E5EA"}`,
-                background: isDark ? "#161617" : "#FFFFFF",
-              }}
-            >
-              <div>
-                <h1 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: isMobile ? 22 : 30, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.02em" }}>
-                  {greetingText}
-                </h1>
-                <p style={{ color: themeStyles.textMuted, fontSize: isMobile ? 13 : 14, marginTop: 4, fontWeight: 500, margin: "6px 0 0" }}>
-                  Stronger relationships build brighter opportunities.
-                </p>
-              </div>
-              {!isMobile && (
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.15em", color: isDark ? "#A78BFA" : "#7C3AED", textTransform: "uppercase" }}>
-                    PEOPLE · POSSIBILITIES · PROGRESS
-                  </div>
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4 }}>
-                    Meaningful connections for a brighter tomorrow
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* ── GREETING: plain text, no box; one live line says what needs you today ── */}
+            <header style={{ margin: isMobile ? "4px 2px 16px" : "4px 2px 20px" }}>
+              <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.025em", lineHeight: 1.15 }}>
+                {greetingText}
+              </h1>
+              <p style={{ color: themeStyles.textMuted, fontSize: 15, margin: "6px 0 0", fontWeight: 400 }}>
+                {contactsLoading
+                  ? "Loading your people…"
+                  : waitingCount
+                    ? `${waitingCount} ${waitingCount === 1 ? "person is" : "people are"} waiting to hear from you`
+                    : effectiveContacts.length
+                      ? "You're all caught up."
+                      : "Scan your first card to get started."}
+              </p>
+            </header>
 
-            {/* ── KPI METRICS CARDS (Brand Identity Guideline Page 12) ── */}
+            {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
             <div
+              role="group"
+              aria-label="At a glance"
               style={{
                 display: "grid",
-                gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, minmax(0, 1fr))",
-                gap: 14,
-                marginBottom: 24,
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                background: isDark ? "#1C1C1E" : "#FFFFFF",
+                border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                borderRadius: 18,
+                padding: "14px 0",
+                marginBottom: 20,
               }}
             >
               {[
-                { count: effectiveContacts.length, label: "People", icon: Icons.Users, color: isDark ? "#A78BFA" : "#7C3AED", bg: isDark ? "rgba(167, 139, 250, 0.12)" : "#EBF5FF" },
-                { count: dueReminders.length, label: "Follow-ups", icon: Icons.Calendar, color: "#34C759", bg: isDark ? "rgba(52, 199, 89, 0.12)" : "#EAFBF0" },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities", icon: Icons.Trending, color: "#FF9F0A", bg: isDark ? "rgba(255, 159, 10, 0.12)" : "#FFF8ED" },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Introductions", icon: Icons.Handshake, color: "#BF5AF2", bg: isDark ? "rgba(191, 90, 242, 0.12)" : "#F8EFFF" },
-              ].map((m) => (
-                <div
-                  key={m.label}
-                  style={{
-                    ...themeStyles.glassCard,
-                    borderRadius: 16,
-                    padding: isMobile ? "14px" : "16px 20px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    minWidth: 0,
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 26, fontWeight: 800, fontFamily: "'Poppins', sans-serif", color: themeStyles.text, lineHeight: 1.1 }}>
-                      {m.count}
-                    </div>
-                    <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {m.label}
-                    </div>
+                { count: effectiveContacts.length, label: "People" },
+                { count: waitingCount, label: "To follow up", accent: waitingCount > 0 },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
+              ].map((m, i) => (
+                <div key={m.label} style={{ textAlign: "center", minWidth: 0, padding: "0 4px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
+                    {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
                   </div>
-                  <div
-                    style={{
-                      width: isMobile ? 36 : 42,
-                      height: isMobile ? 36 : 42,
-                      borderRadius: 12,
-                      background: m.bg,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      flexShrink: 0,
-                    }}
-                  >
-                    <m.icon size={20} color={m.color} />
-                  </div>
+                  <div style={{ fontSize: "clamp(10px, 3vw, 12px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
                 </div>
               ))}
             </div>
 
-            {/* ── MOBILE HERO BANNER (Brand Identity Guideline Page 9) ── */}
-            {isMobile && (
-              <div
-                style={{
-                  ...themeStyles.glassCard,
-                  background: isDark ? "#1C1C1E" : "#FFFFFF",
-                  borderRadius: 20,
-                  padding: 18,
-                  marginBottom: 20,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E5EA"}`,
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: themeStyles.text, fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
-                    Build Relationships That Matter
-                  </div>
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 4, fontWeight: 500 }}>
-                    Connect. Collaborate. Grow.
-                  </div>
-                </div>
+            {/* ── QUICK ACTIONS: round icons with short labels — all five fit in one row (Radar lives in the bottom bar) ── */}
+            <section aria-label="Quick actions" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, marginBottom: 28, maxWidth: isMobile ? undefined : 480 }}>
+              {[
+                { label: "Scan", full: "Scan a card", icon: Icons.Camera, primary: true, act: () => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); } },
+                { label: "Type", full: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+                { label: "Voice", full: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
+                { label: "My QR", full: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
+                { label: "Follow up", full: "Follow-ups", icon: I.Mail, act: () => openBulkFollowUpModal() },
+              ].map((q) => (
                 <button
-                  onClick={() => { setTab("add"); setAddStep("form"); }}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "50%",
-                    background: isDark ? "#A78BFA" : "#7C3AED",
-                    color: "#fff",
-                    border: "none",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    boxShadow: "0 2px 8px rgba(124, 58, 237, 0.25)",
-                  }}
+                  key={q.label}
+                  onClick={q.act}
+                  aria-label={q.full}
+                  className="btn-press"
+                  style={{ border: "none", background: "none", padding: "4px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: themeStyles.text, minWidth: 0 }}
                 >
-                  <Icons.ArrowRight size={16} color="#fff" />
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: q.primary ? "#7C3AED" : isDark ? "#1C1C1E" : "#FFFFFF",
+                      color: q.primary ? "#FFFFFF" : isDark ? "#C4B5FD" : "#7C3AED",
+                      border: q.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                      boxShadow: q.primary ? "0 6px 16px -6px rgba(124,58,237,0.55)" : "none",
+                    }}
+                  >
+                    <q.icon size={22} color="currentColor" />
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2, whiteSpace: "nowrap" }}>{q.label}</span>
                 </button>
-              </div>
+              ))}
+            </section>
+
+            {!contactsLoading && (
+              <WhoNext
+                people={effectiveContacts}
+                today={today}
+                isDark={isDark}
+                onOpen={(c) => setModal(c)}
+                onEmail={(c) => openEmail(c)}
+                onMessage={(c) => { setChatPartner({ id: c.linkedUserId, name: c.name, avatar_url: c.photo || null }); setChatEvent(null); setChatOpen(true); }}
+              />
             )}
+
+            <ComingUp supabase={supabase} isDark={isDark} onOpenEvents={() => setTab("events")} />
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
@@ -4454,40 +4442,42 @@ Keep it punchy, sharp, and directly actionable.`;
                   }}
                 >
                   <div>
-                    <h2 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 24, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                      Recent People
+                    <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
+                      Your people
                     </h2>
-                    <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4 }}>
+                    <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 2 }}>
                       {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
                     </div>
                   </div>
+                  {!contactsLoading && filtered.length > 0 && (
+                    <button
+                      onClick={() => { setSelectMode((m) => !m); setSelectedIds(new Set()); }}
+                      aria-pressed={selectMode}
+                      style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 16, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "0 4px", alignSelf: "center" }}
+                    >
+                      {selectMode ? "Cancel" : "Select"}
+                    </button>
+                  )}
 
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
-                <div style={{ position: "relative", flex: isMobile ? "1 1 100%" : "none" }}>
-                  <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
-                    <Icons.Search size={15} />
+              {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
+                {/* Product search pill — same look as Events */}
+                <div style={{ flex: isMobile ? "1 1 0" : "1 1 220px", minWidth: 0, display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "0 6px 0 16px", boxSizing: "border-box", borderRadius: 16, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` }}>
+                  <span aria-hidden style={{ color: themeStyles.textMuted, display: "flex" }}>
+                    <I.Search size={18} />
                   </span>
                   <input
-                    placeholder="Search by name, company, role…"
+                    placeholder="Search people"
+                    aria-label="Search people"
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
-                    style={{ ...S.input, width: isMobile ? "100%" : 240, paddingLeft: 38, fontSize: 13 }}
+                    className="nq-search-input"
+                    style={{ flex: 1, minWidth: 0, minHeight: 44, border: "none", outline: "none", background: "transparent", color: themeStyles.text, fontSize: 16, fontFamily: "inherit", padding: 0, boxShadow: "none" }}
                   />
                   {searchQ && (
-                    <span
-                      onClick={() => setSearchQ("")}
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        cursor: "pointer",
-                        color: themeStyles.textMuted,
-                        display: "flex",
-                      }}
-                    >
-                      <Icons.Close size={15} />
-                    </span>
+                    <button onClick={() => setSearchQ("")} aria-label="Clear search" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                      <I.X size={14} />
+                    </button>
                   )}
                 </div>
 
@@ -4498,6 +4488,8 @@ Keep it punchy, sharp, and directly actionable.`;
                       background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
                       borderRadius: 10,
                       padding: 3,
+                      height: 40,
+                      boxSizing: "border-box",
                     }}
                   >
                     {[
@@ -4527,92 +4519,98 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
                 )}
 
+                {!isMobile && (
                 <button
                   style={{
                     ...S.btn,
                     fontSize: 13,
-                    padding: "9px 15px",
+                    padding: "0 16px",
+                    minHeight: isMobile ? 44 : 40,
+                    flex: isMobile ? "1 1 auto" : undefined,
                     background: isDark ? "#A78BFA" : "#7C3AED",
                   }}
-                  onClick={openBulkFollowUpModal}
+                  onClick={() => openBulkFollowUpModal()}
                   title="Generate & Dispatch Automated Follow-ups"
                 >
                   <Icons.Mail size={14} />
-                  <span>{isMobile ? "Follow-ups" : "⚡ 1-Click Follow-ups"}</span>
+                  <span>{isMobile ? "Follow-ups" : "1-Click Follow-ups"}</span>
                 </button>
+                )}
 
                 {!contactsLoading && contacts.length > 0 && (
                   <button
-                    style={{ ...S.btnOutline, fontSize: 13, padding: "9px 14px" }}
+                    style={{ ...S.btnOutline, fontSize: 13, padding: 0, width: 52, minHeight: 52, borderRadius: 16 }}
                     onClick={exportCSV}
+                    aria-label={`Export ${filtered.length} contacts`}
                     title={`Export ${filtered.length} contacts`}
                   >
-                    <Icons.Download size={14} />
-                    {!isMobile && <span>Export ({filtered.length})</span>}
+                    <Icons.Download size={16} />
                   </button>
                 )}
 
-                <button
-                  style={{ ...S.btn, fontSize: 13, padding: "9px 16px" }}
-                  onClick={() => {
-                    setTab("add");
-                    setAddStep("form");
-                    setScanPreview(null);
-                  }}
-                >
-                  <Icons.Plus size={15} />
-                  <span>{isMobile ? "Add" : "Add Contact"}</span>
-                </button>
               </div>
             </div>
 
-            {/* Apple Segmented Roles Filter Chips */}
-            <div style={{ marginBottom: 16, overflowX: "auto", paddingBottom: 2 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
-                  borderRadius: 10,
-                  padding: 3,
-                  gap: 3,
-                }}
-              >
-                {[
-                  { id: "all", label: "All Roles" },
-                  { id: "founders", label: "Founders" },
-                  { id: "investors", label: "Investors" },
-                  { id: "executives", label: "Executives" },
-                  { id: "engineers", label: "Engineers" },
-                  { id: "designers", label: "Designers" },
-                  { id: "consultants", label: "Consultants" },
-                ].map(({ id, label }) => {
-                  const active = selectedRole.toLowerCase() === id.toLowerCase();
-                  return (
-                    <button
-                      key={id}
-                      onClick={() => setSelectedRole(id)}
-                      style={{
-                        border: "none",
-                        borderRadius: 8,
-                        padding: "6px 14px",
-                        fontSize: 12,
-                        fontWeight: active ? 600 : 500,
-                        cursor: "pointer",
-                        background: active ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent",
-                        color: active
-                          ? isDark ? "#FFFFFF" : "#1D1D1F"
-                          : isDark ? "#86868B" : "#6E6E73",
-                        boxShadow: active ? "0 1px 3px rgba(0,0,0,0.12)" : "none",
-                        transition: "all 0.15s ease",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            {/* One filter row: who they are (roles), then your own tags — scrolls sideways */}
+            {(() => {
+              const chipStyle = (active: boolean) => ({
+                    flex: "0 0 auto",
+                    scrollSnapAlign: "start",
+                    minHeight: 34,
+                    padding: "0 14px",
+                    borderRadius: 17,
+                    border: active ? "1px solid transparent" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
+                    background: active ? (isDark ? "#FFFFFF" : "#1C1C1E") : isDark ? "#1C1C1E" : "#FFFFFF",
+                    color: active ? (isDark ? "#1C1C1E" : "#FFFFFF") : themeStyles.text,
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap" as const,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    transition: "background 0.15s ease, color 0.15s ease",
+                  });
+              return (
+                <div
+                  role="group"
+                  aria-label="Filter people"
+                  className="nq-chips"
+                  style={{ display: "flex", gap: 8, overflowX: "auto", scrollbarWidth: "none", marginBottom: 16, padding: "2px 0", margin: isMobile ? "0 -16px 16px" : "0 0 16px", paddingLeft: isMobile ? 16 : 0, paddingRight: isMobile ? 16 : 0, scrollPaddingLeft: isMobile ? 16 : 0, scrollSnapType: "x proximity" } as React.CSSProperties}
+                >
+                  {[
+                    { id: "all", label: "All" },
+                    { id: "founders", label: "Founders" },
+                    { id: "investors", label: "Investors" },
+                    { id: "executives", label: "Executives" },
+                    { id: "engineers", label: "Engineers" },
+                    { id: "designers", label: "Designers" },
+                    { id: "consultants", label: "Consultants" },
+                  ].map(({ id, label }) => {
+                    const active = selectedRole.toLowerCase() === id;
+                    return (
+                      <button key={id} aria-pressed={active} onClick={() => setSelectedRole(id)} style={chipStyle(active)}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {!contactsLoading && allTags.length > 0 && (
+                    <span aria-hidden style={{ flex: "0 0 1px", alignSelf: "stretch", margin: "6px 2px", background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)" }} />
+                  )}
+                  {!contactsLoading &&
+                    allTags.map((tag) => {
+                      const active = selectedTag === tag;
+                      return (
+                        <button key={`tag-${tag}`} aria-pressed={active} aria-label={`Tag ${tag}`} onClick={() => setSelectedTag(active ? null : tag)} style={chipStyle(active)}>
+                          <span style={{ opacity: 0.55 }}>#</span>
+                          {tag}
+                          {active && <Icons.Close size={12} />}
+                        </button>
+                      );
+                    })}
+                </div>
+              );
+            })()}
 
             {/* Reminders Banner */}
             {!contactsLoading && dueReminders.length > 0 && (
@@ -4672,6 +4670,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           </div>
                           <span
                             style={{
+                              display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                               background: overdue ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
                               color: overdue ? "#ef4444" : "#f59e0b",
                               borderRadius: 6,
@@ -4706,47 +4705,19 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             )}
 
-            {/* Tag Filter Pills */}
-            {!contactsLoading && allTags.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16, alignItems: "center" }}>
-                <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 4 }}>
-                  Filter:
-                </span>
-                {allTags.map((tag) => {
-                  const tc = tagColor(tag, isDark);
-                  const active = selectedTag === tag;
-                  return (
-                    <span
-                      key={tag}
-                      onClick={() => setSelectedTag(active ? null : tag)}
-                      style={{
-                        background: active ? (isDark ? "#A78BFA" : "#7C3AED") : tc.bg,
-                        color: active ? "#ffffff" : tc.color,
-                        border: `1px solid ${active ? "transparent" : tc.border}`,
-                        borderRadius: 14,
-                        padding: "4px 12px",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        transition: "all 0.15s ease",
-                      }}
-                    >
-                      <span>{tag}</span>
-                      {active && <Icons.Close size={12} />}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-
             {/* Contacts Table / Cards */}
             {contactsLoading ? (
-              <div style={{ ...S.card, textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ width: 36, height: 36, border: `3px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.2)"}`, borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 14px" }} />
-                <div style={{ color: themeStyles.textMuted, fontSize: 13 }}>Loading relationships…</div>
+              <div role="status" aria-label="Loading contacts" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} style={{ ...S.card, padding: 16, display: "flex", alignItems: "center", gap: 14 }}>
+                    <Skeleton w={44} h={44} r={22} />
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8 }}>
+                      <Skeleton w={`${55 - i * 6}%`} h={14} />
+                      <Skeleton w={`${38 + i * 5}%`} h={11} />
+                    </div>
+                    <Skeleton w={56} h={24} r={12} />
+                  </div>
+                ))}
               </div>
             ) : filtered.length === 0 ? (
               <div style={{ ...S.card, textAlign: "center", padding: "50px 20px" }}>
@@ -4846,6 +4817,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                     {c.title && <span style={{ fontSize: 11, color: themeStyles.textMuted }}>{c.title}</span>}
                                     <span
                                       style={{
+                                        display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                         fontSize: 10,
                                         fontWeight: 500,
                                         padding: "2px 7px",
@@ -4861,7 +4833,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 </div>
                               </div>
                             </td>
-                            <td style={{ padding: "12px 16px", fontWeight: 500 }}>
+                            <td style={{ padding: "12px 16px", fontWeight: 500, whiteSpace: "nowrap" }}>
                               {c.company || <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
@@ -4877,20 +4849,20 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>
                               )}
                             </td>
-                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 12 }}>
+                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 12, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                               {c.phone || <span style={{ opacity: 0.4 }}>—</span>}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
                               {c.event && (
                                 <span
                                   style={{
-                                    background: isDark ? "rgba(99, 102, 241, 0.15)" : "rgba(99, 102, 241, 0.1)",
+                                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
+                                    background: isDark ? "rgba(124, 58, 237, 0.15)" : "rgba(124, 58, 237, 0.1)",
                                     color: "#818cf8",
                                     borderRadius: 6,
                                     padding: "2px 8px",
                                     fontSize: 11,
                                     fontWeight: 600,
-                                    display: "inline-block",
                                     marginBottom: 3,
                                   }}
                                 >
@@ -4905,6 +4877,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                       <span
                                         key={t}
                                         style={{
+                                          display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                           background: tc.bg,
                                           color: tc.color,
                                           borderRadius: 6,
@@ -4959,8 +4932,51 @@ Keep it punchy, sharp, and directly actionable.`;
                   </table>
                 </div>
               </div>
+            ) : isMobile || selectMode ? (
+              /* Phone (and select mode everywhere): one grouped list — photo, name, what they do; email & meet one tap away. Edit lives inside the contact. */
+              <ul aria-label="People" className="nq-stagger" style={{ listStyle: "none", margin: selectMode ? "0 0 170px" : isMobile ? "0 0 72px" : 0, padding: 0, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, overflow: "hidden" }}>
+                {filtered.map((c, i) => {
+                  const due = c.reminder && c.reminderDate && !c.reminderDone && c.reminderDate <= today;
+                  const sub = [c.title, c.company].filter(Boolean).join(" · ") || getContactRoleCategory(c);
+                  const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                  return (
+                    <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none", background: selectMode && selectedIds.has(c.id) ? (isDark ? "rgba(167,139,250,0.10)" : "rgba(124,58,237,0.05)") : "transparent" }}>
+                      <button
+                        onClick={() => selectMode ? setSelectedIds((prev) => { const n = new Set(prev); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n; }) : setModal(c)}
+                        aria-label={selectMode ? `Select ${c.name}` : `Open ${c.name}`}
+                        aria-pressed={selectMode ? selectedIds.has(c.id) : undefined}
+                        style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}
+                      >
+                        {selectMode && (
+                          <span aria-hidden style={{ width: 24, height: 24, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selectedIds.has(c.id) ? "#7C3AED" : "transparent", border: selectedIds.has(c.id) ? "none" : `1.5px solid ${isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.25)"}`, color: "#FFF", transition: "background 0.15s ease" }}>
+                            {selectedIds.has(c.id) && <I.Check size={15} strokeWidth={2.6} />}
+                          </span>
+                        )}
+                        <ContactAvatar contact={c} size={44} radius={22} isDark={isDark} />
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 16, fontWeight: 600, color: themeStyles.text }}>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
+                            {due && <span title={c.reminderDate < today ? "Follow-up overdue" : "Follow-up due today"} style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: c.reminderDate < today ? "#FF3B30" : "#FF9F0A" }} />}
+                          </span>
+                          <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+                        </span>
+                      </button>
+                      {!selectMode && (
+                        <>
+                          <button onClick={() => openEmail(c)} aria-label={`Email ${c.name}`} className="btn-press" style={iconBtn}>
+                            <Icons.Mail size={18} />
+                          </button>
+                          <button onClick={() => { setMeetModal(c); setMeetSent(false); }} aria-label={`Meet ${c.name}`} className="btn-press" style={iconBtn}>
+                            <Icons.Calendar size={18} />
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
                 {filtered.map((c) => {
                   const av = avatar(c.name);
                   return (
@@ -4988,6 +5004,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             </span>
                             <span
                               style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                                 fontSize: 10,
                                 fontWeight: 500,
                                 padding: "2px 7px",
@@ -5078,7 +5095,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Poppins', sans-serif", color: themeStyles.text }}>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: themeStyles.text }}>
                       {selectedContact.name}
                     </div>
                     <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, fontWeight: 500 }}>
@@ -5169,16 +5186,16 @@ Keep it punchy, sharp, and directly actionable.`;
               {activeDetailTab === "overview" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <p style={{ fontSize: 13, color: themeStyles.textMuted, lineHeight: 1.5, margin: 0 }}>
-                    {selectedContact.bio || selectedContact.notes || "Designing intuitive experiences that bring people and ideas closer."}
+                    {selectedContact.bio || [selectedContact.title, selectedContact.company].filter(Boolean).join(" at ") || "No details yet."}
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius: 12, padding: "10px 12px" }}>
                       <div style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
-                        <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Last connected
+                        <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Added
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
-                        {selectedContact.lastConnected || "3 days ago"}
+                        {selectedContact.addedAt ? relativeDay(selectedContact.addedAt) : "—"}
                       </div>
                     </div>
 
@@ -5187,20 +5204,22 @@ Keep it punchy, sharp, and directly actionable.`;
                         <Icons.Calendar size={12} color="#10B981" /> Next follow-up
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
-                        {selectedContact.followUpDue || "In 2 days"}
+                        {selectedContact.reminderDate && !selectedContact.reminderDone ? relativeDay(selectedContact.reminderDate) : <span style={{ color: themeStyles.textMuted, fontWeight: 500 }}>Not set</span>}
                       </div>
                     </div>
                   </div>
 
                   <div>
                     <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-                      Shared Interests
+                      Tags
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {(selectedContact.sharedInterests || selectedContact.tags || ["Product", "Design", "Startups"]).map((tag: string) => (
+                      {(selectedContact.tags || []).length === 0 && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>No tags yet</span>}
+                      {(selectedContact.tags || []).map((tag: string) => (
                         <span
                           key={tag}
                           style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                             background: isDark ? "rgba(255, 255, 255, 0.06)" : "rgba(0, 0, 0, 0.04)",
                             color: isDark ? "#AEAEB2" : "#6E6E73",
                             border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"}`,
@@ -5221,7 +5240,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       Notes
                     </div>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 12, color: themeStyles.text, lineHeight: 1.5 }}>
-                      {selectedContact.notes || "Great conversation about the future of collaborative tools."}
+                      {selectedContact.reference || selectedContact.notes || <span style={{ color: themeStyles.textMuted }}>No notes yet. Add them from Edit contact.</span>}
                     </div>
                   </div>
                 </div>
@@ -5233,22 +5252,29 @@ Keep it punchy, sharp, and directly actionable.`;
                     <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                       Relationship Stages
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, textAlign: "center" }}>
-                      <div style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ✓ MEET
-                      </div>
-                      <div style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ✓ REMEMBER
-                      </div>
-                      <div style={{ background: isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.12)", color: isDark ? "#A78BFA" : "#7C3AED", borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
-                        ➔ RECONNECT
-                      </div>
-                    </div>
+                    {(() => {
+                      // Real stages from the contact record: met (saved), remembered (has notes/tags), reconnected (follow-up sent)
+                      const stages = [
+                        { label: "Met", done: true },
+                        { label: "Remembered", done: !!(selectedContact.reference || selectedContact.notes || (selectedContact.tags || []).length) },
+                        { label: "Reconnected", done: !!selectedContact.emailSent },
+                      ];
+                      return (
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, textAlign: "center" }}>
+                          {stages.map((st) => (
+                            <div key={st.label} style={{ background: st.done ? "rgba(52, 199, 89, 0.15)" : isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: st.done ? "#34C759" : themeStyles.textMuted, borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
+                              {st.done && <I.Check size={12} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: "-2px" }} />}
+                              {st.label}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }}>
-                    <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Connection Health</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED" }}>{selectedContact.momentum || 88}/100 · High Engagement</span>
+                    <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Follow-up email</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: selectedContact.emailSent ? "#34C759" : themeStyles.textMuted }}>{selectedContact.emailSent ? "Sent" : "Not sent yet"}</span>
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -5260,9 +5286,12 @@ Keep it punchy, sharp, and directly actionable.`;
                       <span>Schedule 1:1</span>
                     </button>
                     <button
+                      disabled={!selectedContact.linkedUserId}
+                      title={selectedContact.linkedUserId ? "Message" : "Connect on Radar to message each other in NetworQ"}
                       onClick={() => {
+                        if (!selectedContact.linkedUserId) return;
                         setChatPartner({
-                          id: selectedContact.user_id || selectedContact.id,
+                          id: selectedContact.linkedUserId,
                           name: selectedContact.name,
                           avatar_url: selectedContact.avatar,
                           role: selectedContact.role,
@@ -5273,7 +5302,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       }}
                       style={{ ...S.btnSm, flex: 1, padding: "8px 12px", background: "rgba(124, 58, 237, 0.15)", color: "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}
                     >
-                      <span>💬</span>
+                      <I.Mail size={13} />
                       <span>Message</span>
                     </button>
                     <button
@@ -5289,33 +5318,40 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {activeDetailTab === "notes" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <textarea
-                    defaultValue={selectedContact.notes || ""}
-                    placeholder="Log conversation context or key takeaways…"
-                    style={{ ...S.input, minHeight: 90, fontSize: 12, resize: "vertical" }}
-                  />
-                  <button
-                    onClick={() => openEmail(selectedContact)}
-                    style={{ ...S.btnSm, background: "linear-gradient(135deg, #7C43F8, #6D35F5)", color: "#fff", padding: "8px 14px" }}
-                  >
-                    <Icons.Sparkles size={13} />
-                    <span>AI Follow-Up Assistant</span>
-                  </button>
+                  <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.5, minHeight: 64, color: selectedContact.reference || selectedContact.notes ? themeStyles.text : themeStyles.textMuted }}>
+                    {selectedContact.reference || selectedContact.notes || "No notes yet."}
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={() => openEdit(selectedContact)} style={{ ...S.btnSmOut, padding: "8px 14px" }}>
+                      <Icons.Edit size={13} />
+                      <span>Edit notes</span>
+                    </button>
+                    <button onClick={() => openEmail(selectedContact)} style={{ ...S.btnSm, padding: "8px 14px" }}>
+                      <Icons.Sparkles size={13} />
+                      <span>Write follow-up</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {activeDetailTab === "opportunities" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <div style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}` }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text }}>Product Design Advisory</div>
-                    <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 3 }}>Potential advisory alignment for collaborative software tool stack.</div>
+              {activeDetailTab === "opportunities" && (() => {
+                const opps = (selectedContact.tags || []).filter((t: string) => /opportunity|client|deal|investor|partner|lead/i.test(t));
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {opps.length ? (
+                      opps.map((t: string) => (
+                        <div key={t} style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}`, fontSize: 13, fontWeight: 600 }}>
+                          {t}
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ textAlign: "center", padding: "18px 8px", color: themeStyles.textMuted, fontSize: 13, lineHeight: 1.5 }}>
+                        No opportunities yet. Tag this contact "opportunity", "client", "deal" or "partner" to track it here.
+                      </div>
+                    )}
                   </div>
-                  <div style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}` }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text }}>Tech & Design Meetup Host</div>
-                    <div style={{ fontSize: 12, color: themeStyles.textMuted, marginTop: 3 }}>Co-hosting community session during next tech week.</div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           )}
         </div>
@@ -5358,23 +5394,56 @@ Keep it punchy, sharp, and directly actionable.`;
           />
         )}
 
-        {/* ── SETTINGS TAB ── */}
-        {tab === "settings" && currentUser && (
-          <SettingsScreen
-            supabase={supabase}
-            account={accountApi}
-            currentUser={currentUser}
+        {/* ── ME: card + grouped settings ── */}
+        {tab === "me" && currentUser && (
+          <MeScreen
+            user={{ ...currentUser, avatar_url: currentUser?.avatar_url || currentUser?.photo }}
             isDark={isDark}
+            section={meSection}
+            onOpenSection={setMeSection}
             showToast={showToast}
-            onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
-            onSignedOut={handleSignedOut}
-            onExportContacts={exportCSV}
-            onToggleTheme={toggleTheme}
-            prospectApi={prospectApi}
-            apiBaseUrl={apiBase(AI_PROXY)}
-            onSignOut={async () => {
-              await supabase.auth.signOut();
-              handleSignedOut();
+            tools={[
+              { label: "AI Copilot", hint: "Advisors for intros, pitches and follow-ups", icon: I.Sparkles, onClick: () => setCopilotOpen(true) },
+              { label: "Networking day summary", hint: "Who you met today and what to do next", icon: I.Calendar, onClick: () => setDaySummaryOpen(true) },
+              { label: "Network map", hint: "See how your contacts connect", icon: I.Network, onClick: () => setNetworkMapOpen(true) },
+            ]}
+            renderSection={(section) => (
+              <SettingsScreen
+                section={section}
+                cardSettings={<CardSettings user={currentUser} isDark={isDark} onEditProfile={() => setMeSection("profile")} onWriteNfc={() => setNfcWriterOpen(true)} />}
+                supabase={supabase}
+                account={accountApi}
+                currentUser={currentUser}
+                isDark={isDark}
+                showToast={showToast}
+                onProfileUpdated={(patch) => setCurrentUser((u: any) => ({ ...u, ...patch }))}
+                onSignedOut={handleSignedOut}
+                onExportContacts={exportCSV}
+                onToggleTheme={toggleTheme}
+                prospectApi={prospectApi}
+                apiBaseUrl={apiBase(AI_PROXY)}
+                onSignOut={async () => {
+                  await supabase.auth.signOut();
+                  handleSignedOut();
+                }}
+              />
+            )}
+          />
+        )}
+
+        {/* ── MESSAGES ── */}
+        {tab === "messages" && currentUser && (
+          <MessagesScreen
+            supabase={supabase}
+            userId={currentUser.id}
+            contacts={effectiveContacts}
+            inviterName={currentUser?.name || ""}
+            isDark={isDark}
+            onOpenRadar={() => setTab("radar")}
+            onOpenChat={(p) => {
+              setChatPartner(p);
+              setChatEvent(null);
+              setChatOpen(true);
             }}
           />
         )}
@@ -5411,98 +5480,30 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
             <CameraCapture
               open={liveCameraOpen}
-              onClose={() => setLiveCameraOpen(false)}
-              onCapture={(f) => handleFile(f)}
-              onFallback={() => cameraFileRef.current?.click()}
+              onClose={closeCamera}
+              onCapture={(f) => { cameraFromShortcut.current = false; handleFile(f); }}
+              onFallback={() => { cameraFromShortcut.current = false; cameraFileRef.current?.click(); }}
             />
 
-            {/* ── LAZY VOICE DEBRIEF HERO BANNER (Instant Voice Debrief) ── */}
-            <div
-              onClick={() => setVoiceDebriefOpen(true)}
-              style={{
-                borderRadius: 20,
-                padding: "20px 22px",
-                background: isDark
-                  ? "linear-gradient(135deg, rgba(124, 58, 237, 0.22) 0%, rgba(99, 102, 241, 0.15) 100%)"
-                  : "linear-gradient(135deg, rgba(124, 58, 237, 0.08) 0%, rgba(167, 139, 250, 0.12) 100%)",
-                border: `1.5px solid ${isDark ? "rgba(167, 139, 250, 0.35)" : "rgba(124, 58, 237, 0.25)"}`,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 16,
-                boxShadow: isDark
-                  ? "0 4px 20px rgba(0, 0, 0, 0.3)"
-                  : "0 4px 18px rgba(124, 58, 237, 0.08)",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: 54,
-                  height: 54,
-                  borderRadius: 27,
-                  background: "linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  boxShadow: "0 0 20px rgba(124, 58, 237, 0.4)",
-                  fontSize: 24,
-                }}
-              >
-                🎙️
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
-                    Lazy Voice Debrief
-                  </span>
-                  <span
-                    style={{
-                      background: "rgba(124, 58, 237, 0.15)",
-                      color: isDark ? "#C4B5FD" : "#7C3AED",
-                      fontSize: 10,
-                      fontWeight: 800,
-                      padding: "2px 8px",
-                      borderRadius: 999,
-                      letterSpacing: "0.04em",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    ⚡ AI Auto-CRM
-                  </span>
+            {/* ── SCAN TIPS: three things that make the AI read a card right first time ── */}
+            <div role="note" aria-label="Scan tips" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 18, padding: "14px 0" }}>
+              {[
+                { icon: Icons.Sparkles, text: "Good light" },
+                { icon: Icons.Scan, text: "Fill the frame" },
+                { icon: Icons.Camera, text: "Hold still" },
+              ].map((x, i) => (
+                <div key={x.text} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "0 6px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                  <x.icon size={20} color={isDark ? "#C4B5FD" : "#7C3AED"} />
+                  <span style={{ fontSize: 13, color: themeStyles.textMuted, textAlign: "center" }}>{x.text}</span>
                 </div>
-                <p style={{ margin: 0, fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45 }}>
-                  Speak for 10s after meeting someone. AI extracts details, sets your follow-up reminder, and pre-drafts the email!
-                </p>
-              </div>
-              <button
-                type="button"
-                style={{
-                  background: "#7C3AED",
-                  color: "#FFF",
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "8px 14px",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  cursor: "pointer",
-                }}
-              >
-                Tap to Speak
-              </button>
+              ))}
             </div>
 
             {/* ── SCANNER TILES GRID ── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
               {([
-                { key: "scan", label: "SCAN NOW", sub: "Live camera scan", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
-                { key: "upload", label: "UPLOAD CARD", sub: "Photo or multi-drop", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
-                { key: "nfc", label: "WRITE NFC CARD", sub: "Program smart sticker", icon: Icons.Scan, primary: false, act: () => setNfcWriterOpen(true) },
-                { key: "batch", label: "BATCH SCAN (25)", sub: "Multi-card queue", icon: Icons.Users, primary: false, act: () => { setBatchInitialFiles([]); setBatchScannerOpen(true); } },
+                { key: "scan", label: "Scan", sub: "Use camera", icon: Icons.Camera, primary: true, act: () => setLiveCameraOpen(true) },
+                { key: "upload", label: "Upload", sub: "From photos", icon: Icons.Upload, primary: false, act: () => fileRef.current?.click() },
               ] as const).map((b) => (
                 <button
                   key={b.key}
@@ -5554,15 +5555,31 @@ Keep it punchy, sharp, and directly actionable.`;
               ))}
             </div>
 
+            {/* Secondary tools stay one tap away without crowding the two main choices */}
+            <div style={{ display: "flex", justifyContent: "center", gap: 4, marginTop: 14, flexWrap: "wrap" }}>
+              {[
+                { label: "Batch scan up to 25 cards", icon: I.Zap, act: () => { setBatchInitialFiles([]); setBatchScannerOpen(true); } },
+                { label: "Write NFC card", icon: I.Contact, act: () => setNfcWriterOpen(true) },
+              ].map((l) => (
+                <button key={l.label} onClick={l.act} style={{ background: "transparent", border: "none", color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 12px", minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <l.icon size={15} />
+                  {l.label}
+                </button>
+              ))}
+            </div>
+
             {(scanning || scanPreview || scanErr) && (
               <div style={{ ...S.card, textAlign: "center" }}>
                 {scanPreview && (
-                  <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, borderRadius: 12, maxWidth: "100%", marginBottom: scanning || scanErr ? 14 : 0 }} />
+                  <div className="nq-pop" style={{ position: "relative", display: "inline-block", maxWidth: "100%", borderRadius: 12, overflow: "hidden", marginBottom: scanning || scanErr ? 14 : 0 }}>
+                    <img src={scanPreview} alt="Card preview" style={{ maxHeight: 200, maxWidth: "100%", display: "block", filter: scanning ? "saturate(0.85) brightness(0.92)" : "none", transition: "filter 0.3s ease" }} />
+                    {scanning && <span className="nq-scanline" aria-hidden />}
+                  </div>
                 )}
                 {scanning && (
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
-                    <span style={{ width: 18, height: 18, border: "2px solid rgba(124,58,237,0.25)", borderTopColor: isDark ? "#A78BFA" : "#7C3AED", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                    Reading card…
+                  <div role="status" style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
+                    Reading the card…
+                    <div style={{ color: themeStyles.textMuted, fontWeight: 400, fontSize: 12, marginTop: 4 }}>Usually takes a few seconds</div>
                   </div>
                 )}
                 {scanErr && (
@@ -5577,164 +5594,65 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             )}
 
-            {/* ── RECENT SCANS & QUICK CRM ACTIONS TRAY ── */}
-            <div style={{ ...S.card, display: "flex", flexDirection: "column", gap: 14 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: themeStyles.text }}>
-                    Recent Scans & Captured
-                  </h3>
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: isDark ? "rgba(255,255,255,0.08)" : "#E5E5EA", color: themeStyles.textMuted }}>
-                    {contacts.length}
-                  </span>
-                </div>
-                <button
-                  onClick={() => setExportContactsOpen(true)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: isDark ? "#A78BFA" : "#7C3AED",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "4px 8px",
-                  }}
-                >
-                  <span>📥</span> Export CRM
-                </button>
+            {/* ── RECENTLY ADDED: same grouped list as People, so it reads the same everywhere ── */}
+            <section aria-label="Recently added">
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, margin: "8px 4px 10px" }}>
+                <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, letterSpacing: "-0.02em", color: themeStyles.text }}>
+                  Recently added
+                  {contacts.length > 0 && <span style={{ marginLeft: 8, fontSize: 15, fontWeight: 500, color: themeStyles.textMuted }}>{contacts.length}</span>}
+                </h3>
+                {contacts.length > 0 && (
+                  <button onClick={() => setExportContactsOpen(true)} style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, minHeight: 32 }}>
+                    Export
+                  </button>
+                )}
               </div>
 
               {contacts.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 12px", color: themeStyles.textMuted }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>📇</div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, marginBottom: 4 }}>
-                    No scanned cards yet
+                <div style={{ background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, textAlign: "center", padding: "28px 20px", color: themeStyles.textMuted }}>
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}><I.Contact size={30} /></div>
+                  <div style={{ fontWeight: 600, fontSize: 16, color: themeStyles.text, marginBottom: 4 }}>No cards yet</div>
+                  <div style={{ fontSize: 14, lineHeight: 1.45, maxWidth: 300, margin: "0 auto 16px" }}>
+                    Scan a card with your camera, or record a short voice note after meeting someone.
                   </div>
-                  <div style={{ fontSize: 12, maxWidth: 320, margin: "0 auto 14px" }}>
-                    Scan a card with your camera or try our 10-second Lazy Voice Debrief after meeting someone.
-                  </div>
-                  <button
-                    onClick={() => setVoiceDebriefOpen(true)}
-                    style={{
-                      background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)",
-                      border: `1px solid ${isDark ? "rgba(167, 139, 250, 0.3)" : "rgba(124, 58, 237, 0.3)"}`,
-                      color: isDark ? "#C4B5FD" : "#7C3AED",
-                      padding: "8px 16px",
-                      borderRadius: 10,
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    🎙️ Test Lazy Voice Debrief
+                  <button onClick={() => setVoiceDebriefOpen(true)} style={{ minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <I.Mic size={18} /> Record a voice note
                   </button>
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {contacts.slice(0, 5).map((c) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 12,
-                        padding: 10,
-                        borderRadius: 14,
-                        background: isDark ? "rgba(255,255,255,0.03)" : "#F9FAFB",
-                        border: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#E5E5EA"}`,
-                      }}
-                    >
-                      <div
-                        onClick={() => setModal(c)}
-                        style={{
-                          width: 40,
-                          height: 40,
-                          borderRadius: 20,
-                          background: "#7C3AED",
-                          color: "#FFF",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 700,
-                          fontSize: 14,
-                          flexShrink: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {(c.name || "U")[0].toUpperCase()}
-                      </div>
-                      <div onClick={() => setModal(c)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {c.name || "Unnamed"}
-                        </div>
-                        <div style={{ fontSize: 12, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                          {[c.role, c.company].filter(Boolean).join(" · ") || "Scanned Contact"}
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                        <button
-                          onClick={() => openEmail(c, "Networking follow-up")}
-                          title="Draft AI Follow-up Email"
-                          aria-label={`Draft follow-up email to ${c.name}`}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
-                            color: themeStyles.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          ✉️ Follow-up
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, overflow: "hidden" }}>
+                  {contacts.slice(0, 5).map((c, i) => {
+                    const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                    return (
+                      <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                        <button onClick={() => setModal(c)} aria-label={`Open ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                          <ContactAvatar contact={c} size={44} radius={22} isDark={isDark} />
+                          <span style={{ flex: 1, minWidth: 0 }}>
+                            <span style={{ display: "block", fontSize: 16, fontWeight: 600, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
+                            <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {[c.title || c.role, c.company].filter(Boolean).join(" · ") || "Added from a card"}
+                            </span>
+                          </span>
                         </button>
-                        <button
-                          onClick={() => setMeetModal(c)}
-                          title="Schedule Follow-up Reminder"
-                          aria-label={`Schedule reminder for ${c.name}`}
-                          style={{
-                            padding: "6px 10px",
-                            borderRadius: 8,
-                            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E5EA"}`,
-                            background: isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF",
-                            color: themeStyles.text,
-                            fontSize: 12,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          📅 Meet
+                        <button onClick={() => openEmail(c, "Networking follow-up")} aria-label={`Email ${c.name}`} className="btn-press" style={iconBtn}>
+                          <I.Mail size={18} />
                         </button>
-                      </div>
-                    </div>
-                  ))}
+                        <button onClick={() => { setMeetModal(c); setMeetSent(false); }} aria-label={`Meet ${c.name}`} className="btn-press" style={iconBtn}>
+                          <I.Calendar size={18} />
+                        </button>
+                      </li>
+                    );
+                  })}
                   {contacts.length > 5 && (
-                    <button
-                      onClick={() => setTab("contacts")}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: isDark ? "#A78BFA" : "#7C3AED",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        padding: "6px 0",
-                        textAlign: "center",
-                      }}
-                    >
-                      View all {contacts.length} contacts in CRM →
-                    </button>
+                    <li style={{ borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}>
+                      <button onClick={() => setTab("contacts")} style={{ all: "unset", boxSizing: "border-box", width: "100%", minHeight: 48, display: "flex", alignItems: "center", justifyContent: "center", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                        See all {contacts.length}
+                      </button>
+                    </li>
                   )}
-                </div>
+                </ul>
               )}
-            </div>
+            </section>
 
             {/* Fallback inputs */}
             <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={(e: any) => { handleFile(e.target.files[0]); e.target.value = ""; }} />
@@ -5760,20 +5678,11 @@ Keep it punchy, sharp, and directly actionable.`;
         )}
 
         {/* ── 3D MY QR PASS TAB ── */}
-        {tab === "qr" && (
-          <DigitalPass
-            user={currentUser}
-            isDark={isDark}
-            showToast={showToast}
-            onEditProfile={() => setTab("settings")}
-            onWriteNfc={() => setNfcWriterOpen(true)}
-          />
-        )}
 
         {/* ── ADD CONTACT TAB ── */}
         {tab === "add" && (
           <div style={{ maxWidth: 620, margin: "0 auto" }}>
-            <h2 style={{ fontFamily: "'Poppins', sans-serif", fontSize: 28, marginBottom: 4 }}>
+            <h2 style={{ fontSize: 28, marginBottom: 4 }}>
               {editingContact ? "Edit Contact" : addStep === "form" ? "New Contact" : "Review Extracted Info"}
             </h2>
             <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
@@ -5885,7 +5794,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         padding: 0,
                       }}
                     >
-                      ⚡ Enrich Intel
+                      <I.Sparkles size={12} style={{ marginRight: 3, verticalAlign: "-2px" }} />Enrich
                     </button>
                   </div>
                   <input
@@ -5981,7 +5890,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       ...S.btnSmOut,
                       fontSize: 11,
                       color: isRecordingVoice ? "#ef4444" : "#6366f1",
-                      borderColor: isRecordingVoice ? "#ef4444" : "rgba(99, 102, 241, 0.3)",
+                      borderColor: isRecordingVoice ? "#ef4444" : "rgba(124, 58, 237, 0.3)",
                       background: isRecordingVoice ? "rgba(239, 68, 68, 0.1)" : "transparent",
                     }}
                   >
@@ -6102,7 +6011,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <ContactAvatar contact={modal} size={50} radius={14} isDark={isDark} />
                 <div>
-                  <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 24 }}>{modal.name}</div>
+                  <div style={{ fontSize: 24 }}>{modal.name}</div>
                   <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 1 }}>
                     {[modal.title, modal.company].filter(Boolean).join(" · ")}
                   </div>
@@ -6148,7 +6057,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     cursor: "pointer",
                   }}
                 >
-                  {prepLoading ? "Analyzing…" : prepBrief ? "Re-generate" : "Generate Brief ⚡"}
+                  {prepLoading ? "Analyzing…" : prepBrief ? "Re-generate" : "Generate brief"}
                 </button>
               </div>
 
@@ -6197,7 +6106,7 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
 
             {modal.event && (
-              <div style={{ background: "rgba(99, 102, 241, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+              <div style={{ background: "rgba(124, 58, 237, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, color: "#818cf8", letterSpacing: "0.06em", textTransform: "uppercase" }}>EVENT</span>
                 <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2 }}>{modal.event}</div>
               </div>
@@ -6210,7 +6119,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   {(modal.tags || []).map((t: string) => {
                     const tc = tagColor(t, isDark);
                     return (
-                      <span key={t} style={{ background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>
+                      <span key={t} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>
                         {t}
                       </span>
                     );
@@ -6328,7 +6237,7 @@ Keep it punchy, sharp, and directly actionable.`;
           onSent={(id) => {
             setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, emailSent: true } : c)));
             setOutreachKey((k) => k + 1);
-            triggerConfetti();
+            successFeedback();
           }}
         />
       )}
@@ -6354,17 +6263,40 @@ Keep it punchy, sharp, and directly actionable.`;
         >
           <div style={{ ...S.card, maxWidth: 460, width: "100%", maxHeight: "min(90dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", animation: "fadeUp 0.2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Schedule Meeting</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>Schedule a call</div>
               <button aria-label="Close" onClick={() => setMeetModal(null)} style={{ ...S.btnSmOut, padding: "5px 8px" }}>
                 <Icons.Close size={15} />
               </button>
             </div>
 
-            {meetSent ? (
-              <div style={{ textAlign: "center", padding: "32px 0" }}>
-                <Icons.CheckCircle size={44} style={{ margin: "0 auto 10px" }} />
-                <div style={{ fontFamily: "'Poppins', sans-serif", fontSize: 22 }}>Invite Sent</div>
-                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13 }}>Meeting invite delivered to {meetModal.email}</div>
+            {meetSent && meetResult ? (
+              <div style={{ textAlign: "center", padding: "20px 0 4px" }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><SuccessCheck size={60} /></div>
+                <div style={{ fontSize: 20, fontWeight: 700 }}>Invite sent</div>
+                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13, lineHeight: 1.45 }}>
+                  {meetResult.via === "google"
+                    ? `Google Calendar emailed ${meetModal.email} an invite with the Meet link. It's in your calendar too.`
+                    : `${meetModal.email} got an email with the link and a calendar invite to accept.`}
+                </div>
+                <div style={{ margin: "16px 0 0", padding: "10px 12px", borderRadius: 12, background: themeStyles.subtleBg, fontSize: 13, wordBreak: "break-all", textAlign: "left" }}>{meetResult.link}</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
+                  <button style={{ ...S.btnSmOut, padding: "9px 14px" }} onClick={() => { navigator.clipboard?.writeText(meetResult.link).then(() => showToast("Link copied.", "success"), () => {}); }}>Copy link</button>
+                  {meetResult.ics && (
+                    <button
+                      style={{ ...S.btnSmOut, padding: "9px 14px" }}
+                      onClick={() => {
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(new Blob([meetResult.ics!], { type: "text/calendar" }));
+                        a.download = "networq-meeting.ics";
+                        a.click();
+                        URL.revokeObjectURL(a.href);
+                      }}
+                    >
+                      Add to my calendar
+                    </button>
+                  )}
+                  <button style={{ ...S.btnSm, padding: "9px 16px" }} onClick={() => { setMeetModal(null); setMeetSent(false); setMeetDetails({ date: "", time: "", notes: "" }); }}>Done</button>
+                </div>
               </div>
             ) : (
               <>
@@ -6390,8 +6322,48 @@ Keep it punchy, sharp, and directly actionable.`;
                     placeholder="Key discussion topics…"
                   />
                 </div>
-                <div style={{ background: "rgba(99, 102, 241, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 16, fontSize: 12 }}>
-                  <span style={{ color: "#818cf8", fontWeight: 700 }}>Video meeting link attached automatically</span>
+                <label style={S.label}>Length</label>
+                <div role="radiogroup" aria-label="Meeting length" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+                  {[15, 30, 45, 60].map((m) => (
+                    <button key={m} role="radio" aria-checked={meetDuration === m} onClick={() => setMeetDuration(m)} style={{ flex: 1, minHeight: 40, borderRadius: 10, border: `1px solid ${meetDuration === m ? "#7C3AED" : themeStyles.tableRowBorder}`, background: meetDuration === m ? "rgba(124,58,237,0.1)" : "transparent", color: meetDuration === m ? "#7C3AED" : themeStyles.text, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                      {m} min
+                    </button>
+                  ))}
+                </div>
+                <label style={S.label}>Video link</label>
+                <div role="radiogroup" aria-label="Video link" style={{ display: "flex", padding: 3, borderRadius: 12, background: themeStyles.subtleBg, marginBottom: 10 }}>
+                  {([
+                    ...(GOOGLE_MEET_AVAILABLE ? [{ k: "google", l: "Google Meet" }] : []),
+                    { k: "paste", l: "Paste link" },
+                    { k: "jitsi", l: "Free room" },
+                  ] as const).map((o) => (
+                    <button key={o.k} role="radio" aria-checked={meetMode === o.k} onClick={() => setMeetMode(o.k as any)} style={{ flex: 1, minHeight: 36, borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: meetMode === o.k ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent", color: meetMode === o.k ? themeStyles.text : themeStyles.textMuted, boxShadow: meetMode === o.k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
+                  {meetMode === "google" ? (
+                    <>
+                      Google asks you to allow NetworQ to add events to your calendar, then creates a Meet link and emails the invite.{" "}
+                      <span style={{ color: themeStyles.text }}>If Google says “Access blocked”, choose <b>Free room</b> or <b>Paste link</b> instead.</span>
+                    </>
+                  ) : meetMode === "paste" ? (
+                    <>
+                      <input
+                        aria-label="Meeting link"
+                        style={{ ...S.input, marginBottom: 6 }}
+                        inputMode="url"
+                        autoCapitalize="none"
+                        placeholder="https://meet.google.com/abc-defg-hij"
+                        value={meetLinkInput}
+                        onChange={(e) => setMeetLinkInput(e.target.value)}
+                      />
+                      Your Google Meet, Zoom or Teams link — we'll remember it for next time.
+                    </>
+                  ) : (
+                    "Creates a free Jitsi video room. The first person to open it may be asked to sign in once."
+                  )}
                 </div>
                 <button
                   style={{ ...S.btn, width: "100%", opacity: !meetDetails.date || !meetDetails.time || meetSending ? 0.6 : 1 }}
@@ -6399,7 +6371,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   disabled={!meetDetails.date || !meetDetails.time || meetSending}
                 >
                   <Icons.Calendar size={14} />
-                  <span>{meetSending ? "Sending…" : "Send Calendar Invite"}</span>
+                  <span>{meetSending ? (meetMode === "google" ? "Waiting for Google…" : "Sending…") : "Send invite"}</span>
                 </button>
               </>
             )}
@@ -6411,7 +6383,8 @@ Keep it punchy, sharp, and directly actionable.`;
 
       {/* ── IPHONE FLOATING CURVED GLASS DOCK ── */}
       {isMobile && (
-        <div
+        <nav
+          aria-label="Main navigation"
           style={{
             position: "fixed",
             bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)",
@@ -6420,29 +6393,23 @@ Keep it punchy, sharp, and directly actionable.`;
             maxWidth: 440,
             margin: "0 auto",
             height: 64,
-            background: isDark ? "rgba(18, 18, 24, 0.86)" : "rgba(255, 255, 255, 0.88)",
-            backdropFilter: "blur(28px) saturate(190%)",
-            WebkitBackdropFilter: "blur(28px) saturate(190%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
             zIndex: 200,
             borderRadius: 36,
-            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.16)" : "rgba(0, 0, 0, 0.08)"}`,
-            boxShadow: isDark
-              ? "0 16px 36px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.12)"
-              : "0 16px 36px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255,255,255,0.8)",
-            padding: "4px 8px",
-            boxSizing: "border-box",
+            boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.55)" : "0 16px 36px rgba(60, 30, 120, 0.16)",
           }}
         >
+          {/* Liquid glass is only the surface (HIG liquid-glass.md: floating control layer); NetworQ owns layout & layering */}
+          <LiquidGlass
+            // Tuned for legibility over busy content: heavy frost, thin refractive rim, no colour fringing
+            config={{ material: "thick", blur: 14, saturation: 1.6, tintOpacity: isDark ? 0.42 : 0.55, tint: isDark ? "28, 28, 34" : "255, 255, 255", refractionStrength: 9, bezelWidth: 16, chromaticAberration: 0, edgeHighlight: 0.7, specularStrength: 0.18, borderRadius: 36, quality: "medium", appearance: isDark ? "dark" : "light", elevation: 0 }}
+            style={{ width: "100%", height: "100%", borderRadius: 36 }}
+          >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "4px 8px", boxSizing: "border-box", width: "100%" }}>
           {[
-            { t: "contacts", icon: Icons.Users, label: "Contacts" },
-            { t: "events", icon: Icons.Calendar, label: "Events" },
+            { t: "contacts", icon: Icons.Users, label: "People" },
+            { t: "messages", icon: I.Mail, label: "Messages" },
             { t: "radar", icon: Icons.Radar, label: "Radar" },
-            { t: "scan", icon: Icons.Scan, label: "Scan" },
-            { t: "qr", icon: Icons.QrCode, label: "Pass" },
-            { t: "add", icon: Icons.Plus, label: "Add" },
+            { t: "events", icon: Icons.Calendar, label: "Events" },
           ].map(({ t, icon: MobileIcon, label }) => {
             const active = tab === t;
             return (
@@ -6469,18 +6436,23 @@ Keep it punchy, sharp, and directly actionable.`;
                   gap: 3,
                   border: "none",
                   background: active
-                    ? (isDark ? "rgba(99, 102, 241, 0.2)" : "rgba(99, 102, 241, 0.12)")
+                    ? (isDark ? "rgba(167, 139, 250, 0.18)" : "rgba(124, 58, 237, 0.1)")
                     : "transparent",
                   borderRadius: 22,
                   height: 52,
                   cursor: "pointer",
-                  color: active ? (isDark ? "#818CF8" : "#4F46E5") : themeStyles.textMuted,
+                  color: active ? (isDark ? "#C4B5FD" : "#7C3AED") : themeStyles.textMuted,
                   position: "relative",
                   transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
                 }}
               >
-                <MobileIcon size={18} color="currentColor" />
+                <span className={`nq-tab-icon${active ? " is-active" : ""}`}>
+                  <MobileIcon size={20} color="currentColor" />
+                </span>
                 <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
+                {t === "messages" && notif.items.some((n) => n.type === "message" && !n.read_at) && (
+                  <span aria-label="Unread messages" className="nq-badge" style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 9, height: 9, borderRadius: 5, background: "#FF3B30", boxShadow: "0 0 0 2px rgba(255,255,255,0.9)" }} />
+                )}
                 {t === "contacts" && dueReminders.length > 0 && (
                   <span
                     style={{
@@ -6505,7 +6477,89 @@ Keep it punchy, sharp, and directly actionable.`;
               </button>
             );
           })}
-        </div>
+          </div>
+          </LiquidGlass>
+        </nav>
+      )}
+
+      {/* ── AI: a quiet floating button; the assistant slides up as a bottom sheet ── */}
+      {isMobile && screen === "app" && !aiOpen && !(tab === "contacts" && selectMode) && (tab === "contacts" || tab === "events" || tab === "messages") && (
+        <button
+          onClick={() => setAiOpen(true)}
+          aria-label="AI Assistant"
+          title="AI Assistant"
+          className="nq-pop"
+          style={{
+            position: "fixed",
+            right: "max(18px, calc(var(--safe-right, 0px) + 18px))",
+            bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 90px)",
+            width: 52,
+            height: 52,
+            borderRadius: 26,
+            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(124,58,237,0.16)"}`,
+            background: isDark ? "rgba(28,28,30,0.86)" : "rgba(255,255,255,0.92)",
+            backdropFilter: "blur(16px) saturate(180%)",
+            WebkitBackdropFilter: "blur(16px) saturate(180%)",
+            color: "#7C3AED",
+            zIndex: 190,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: isDark ? "0 10px 24px rgba(0,0,0,0.5)" : "0 10px 24px rgba(60, 30, 120, 0.16)",
+            cursor: "pointer",
+          }}
+        >
+          <Icons.Sparkles size={22} color={isDark ? "#C4B5FD" : "#7C3AED"} />
+        </button>
+      )}
+
+      {/* ── SELECT MODE BAR: act on everyone you ticked ── */}
+      {tab === "contacts" && selectMode && (() => {
+        const picked = filtered.filter((c) => selectedIds.has(c.id));
+        const allOn = filtered.length > 0 && picked.length === filtered.length;
+        const withEmail = picked.filter((c) => c.email).length;
+        const onApp = picked.filter((c) => c.linkedUserId).length;
+        const barBtn = (enabled: boolean, primary = false): React.CSSProperties => ({ flex: 1, minWidth: 0, minHeight: 48, borderRadius: 14, border: "none", background: primary ? "#7C3AED" : isDark ? "#2C2C2E" : "#F2F2F7", color: primary ? "#FFFFFF" : themeStyles.text, fontSize: 15, fontWeight: 600, cursor: enabled ? "pointer" : "default", opacity: enabled ? 1 : 0.45, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, whiteSpace: "nowrap" });
+        return (
+          <div role="toolbar" aria-label="Selected people" className="nq-sheet-up" style={{ position: "fixed", left: 12, right: 12, bottom: isMobile ? "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 88px)" : 24, maxWidth: 560, margin: "0 auto", zIndex: 210, background: isDark ? "rgba(28,28,30,0.96)" : "rgba(255,255,255,0.97)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`, borderRadius: 22, padding: 12, boxShadow: "0 12px 32px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px 10px" }}>
+              <span style={{ fontSize: 15, fontWeight: 600 }}>{picked.length ? `${picked.length} selected` : "Tap people to select"}</span>
+              <button onClick={() => setSelectedIds(allOn ? new Set() : new Set(filtered.map((c) => c.id)))} style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", minHeight: 32, padding: 0 }}>
+                {allOn ? "Clear" : `Select all ${filtered.length}`}
+              </button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button disabled={!withEmail} onClick={() => openBulkFollowUpModal(picked)} style={barBtn(!!withEmail, true)}>
+                <Icons.Mail size={16} /> Email{withEmail ? ` ${withEmail}` : ""}
+              </button>
+              <button disabled={!onApp} onClick={() => setGroupMessageOpen(true)} style={barBtn(!!onApp)}>
+                <I.Mail size={16} /> Message{onApp ? ` ${onApp}` : ""}
+              </button>
+            </div>
+            {picked.length > 0 && (picked.length > withEmail || picked.length > onApp) && (
+              <div style={{ fontSize: 12, color: themeStyles.textMuted, padding: "8px 4px 0", lineHeight: 1.4 }}>
+                {picked.length > withEmail && `${picked.length - withEmail} without email. `}
+                {picked.length > onApp && `${picked.length - onApp} not on NetworQ, so they can't get messages.`}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {groupMessageOpen && (
+        <GroupMessageSheet
+          supabase={supabase}
+          people={filtered.filter((c) => selectedIds.has(c.id))}
+          isDark={isDark}
+          onClose={() => setGroupMessageOpen(false)}
+          onDone={(sent, failed) => {
+            setGroupMessageOpen(false);
+            setSelectMode(false);
+            setSelectedIds(new Set());
+            successFeedback();
+            showToast(failed ? `Sent to ${sent}. ${failed} couldn't be sent.` : `Sent to ${sent} ${sent === 1 ? "person" : "people"}.`, failed ? "error" : "success");
+          }}
+        />
       )}
 
       {/* ── 1-CLICK BULK AUTOMATED FOLLOW-UPS MODAL ── */}
@@ -6540,41 +6594,18 @@ Keep it punchy, sharp, and directly actionable.`;
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <img
-                  src="/illustrations/Bulk-Action/Bulk-Action-1.svg"
-                  alt="Bulk Action"
-                  style={{
-                    width: 75,
-                    height: 38,
-                    objectFit: "contain",
-                    filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
-                  }}
-                />
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <h3 style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                      Automated Follow-ups
-                    </h3>
-                    <span
-                      style={{
-                        background: isDark ? "rgba(167, 139, 250, 0.15)" : "#EBF5FF",
-                        color: isDark ? "#A78BFA" : "#7C3AED",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                      }}
-                    >
-                      {bulkDrafts.length} ready
-                    </span>
-                  </div>
-                  <p style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 4, margin: 0 }}>
-                    Personalized follow-up drafts generated for all eligible contacts. Send all in 1-click or customize individually.
-                  </p>
+            {/* Header: title + count on one baseline, short plain description */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <h3 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Follow-up emails</h3>
+                  <span style={{ display: "inline-flex", alignItems: "center", height: 22, padding: "0 9px", borderRadius: 11, background: isDark ? "rgba(167,139,250,0.15)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 12, fontWeight: 600, lineHeight: 1 }}>
+                    {bulkDrafts.filter((d) => d.status !== "sent").length} to send
+                  </span>
                 </div>
+                <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.4, margin: "6px 0 0" }}>
+                  A personal draft for each person. Edit any, then send them all.
+                </p>
               </div>
 
               <button aria-label="Close"
@@ -6598,17 +6629,15 @@ Keep it punchy, sharp, and directly actionable.`;
                     padding: 14,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14, color: themeStyles.text }}>
-                        {d.contact.name}
-                        <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 400, marginLeft: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 15, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.name}</div>
+                      {(d.contact.title || d.contact.company) && (
+                        <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {[d.contact.title, d.contact.company].filter(Boolean).join(" · ")}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2 }}>
-                        {d.contact.email}
-                      </div>
+                        </div>
+                      )}
+                      <div style={{ fontSize: 13, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.email}</div>
                     </div>
 
                     <div>
@@ -6626,6 +6655,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           target="_blank"
                           rel="noreferrer"
                           style={{
+                            display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                             fontSize: 11,
                             color: themeStyles.textMuted,
                             textDecoration: "none",
@@ -6634,7 +6664,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             background: isDark ? "rgba(255,255,255,0.06)" : "#EBEBEF",
                           }}
                         >
-                          Mail App ↗
+                          Mail app ↗
                         </a>
                       )}
                     </div>
@@ -6684,10 +6714,10 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Send size={14} />
                 <span>
                   {bulkSending
-                    ? "Dispatching Follow-ups…"
+                    ? `Sending ${bulkDrafts.filter((d) => d.status === "sent").length + 1} of ${bulkDrafts.length}…`
                     : bulkDrafts.every((d) => d.status === "sent")
-                    ? "All Follow-ups Sent ✓"
-                    : `⚡ Send All via Email (1-Click · ${bulkDrafts.filter((d) => d.status !== "sent").length})`}
+                    ? "All sent"
+                    : (() => { const n = bulkDrafts.filter((d) => d.status !== "sent").length; return `Send ${n} email${n === 1 ? "" : "s"}`; })()}
                 </span>
               </button>
             </div>
@@ -6715,7 +6745,7 @@ Keep it punchy, sharp, and directly actionable.`;
               gap: 9,
               padding: "10px 18px",
               borderRadius: 980,
-              background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+              background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
               color: "#FFFFFF",
               border: "1px solid rgba(255, 255, 255, 0.25)",
               boxShadow: "0 10px 28px rgba(124, 58, 237, 0.35)",
@@ -6735,26 +6765,28 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* Floating Assistant Window */}
+      {aiOpen && isMobile && <div className="nq-backdrop" onClick={() => setAiOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 1199, background: "rgba(0,0,0,0.32)" }} />}
       {aiOpen && (
         <div
+          className={isMobile ? "nq-sheet-up" : undefined}
           style={{
             position: "fixed",
-            // Phones: full-screen sheet above the tab bar; desktop: floating panel
-            top: isMobile ? 0 : undefined,
+            // Phones: bottom sheet (tap outside or swipe the grabber area to close); desktop: floating panel
+            top: undefined,
             left: isMobile ? 0 : undefined,
             bottom: isMobile ? 0 : "calc(var(--safe-bottom, 0px) + 26px)",
             right: isMobile ? 0 : "calc(var(--safe-right, 0px) + 28px)",
             width: isMobile ? "100%" : 390,
-            height: isMobile ? "100dvh" : 560,
-            maxHeight: isMobile ? "100dvh" : 600,
-            paddingTop: isMobile ? "var(--safe-top, env(safe-area-inset-top, 0px))" : 0,
+            height: isMobile ? "min(82dvh, 760px)" : 560,
+            maxHeight: isMobile ? "calc(100dvh - var(--safe-top, 0px) - 24px)" : 600,
+            paddingTop: isMobile ? 8 : 0,
             paddingBottom: isMobile ? "var(--safe-bottom, env(safe-area-inset-bottom, 0px))" : 0,
             paddingLeft: isMobile ? "var(--safe-left, env(safe-area-inset-left, 0px))" : 0,
             paddingRight: isMobile ? "var(--safe-right, env(safe-area-inset-right, 0px))" : 0,
             boxSizing: "border-box",
             zIndex: 1200,
-            borderRadius: isMobile ? 0 : 22,
-            background: isDark ? "rgba(22, 22, 23, 0.96)" : "rgba(255, 255, 255, 0.98)",
+            borderRadius: isMobile ? "28px 28px 0 0" : 22,
+            background: isDark ? "rgba(22, 22, 23, 0.98)" : "rgba(255, 255, 255, 0.99)",
             backdropFilter: "blur(25px)",
             WebkitBackdropFilter: "blur(25px)",
             border: isDark ? "1px solid rgba(124, 58, 237, 0.3)" : "1px solid rgba(124, 58, 237, 0.2)",
@@ -6764,9 +6796,10 @@ Keep it punchy, sharp, and directly actionable.`;
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            animation: "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+            animation: isMobile ? undefined : "fadeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
+          {isMobile && <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "#48484A" : "#D1D1D6", margin: "0 auto 4px", flexShrink: 0 }} />}
           {/* Assistant Header */}
           <div
             style={{
@@ -6797,6 +6830,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <span style={{ fontSize: 14, fontWeight: 700, color: themeStyles.text }}>NetworQ Assistant</span>
                   <span
                     style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                       fontSize: 10,
                       fontWeight: 700,
                       color: isDark ? "#A78BFA" : "#7C3AED",
@@ -6842,10 +6876,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 onClick={() => {
                   setAiOpen(false);
                   voicePlayer.stop();
-                  if (aiListening && speechRecRef.current) {
-                    speechRecRef.current.stop();
-                    setAiListening(false);
-                  }
+                  aiVoice.cancel();
                 }}
                 title="Close"
                 aria-label="Close"
@@ -6864,7 +6895,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   fontWeight: 600,
                 }}
               >
-                ✕
+                <I.X size={18} />
               </button>
             </div>
           </div>
@@ -6874,7 +6905,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <div
               style={{
                 padding: "6px 16px",
-                background: "linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(99, 102, 241, 0.15))",
+                background: "linear-gradient(90deg, rgba(124, 58, 237, 0.15), rgba(124, 58, 237, 0.15))",
                 borderBottom: "1px solid rgba(124, 58, 237, 0.2)",
                 display: "flex",
                 alignItems: "center",
@@ -6971,7 +7002,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     padding: "10px 14px",
                     borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                     background: m.role === "user"
-                      ? "linear-gradient(135deg, #7C3AED, #6366F1)"
+                      ? "linear-gradient(135deg, #7C3AED, #8B5CF6)"
                       : isDark
                       ? "#242426"
                       : "#F0F0F2",
@@ -7062,6 +7093,11 @@ Keep it punchy, sharp, and directly actionable.`;
             )}
 
             {/* Listening Wave Banner */}
+            {aiVoice.state === "transcribing" && (
+              <div role="status" style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(124, 58, 237, 0.08)", fontSize: 13, fontWeight: 600, color: "#7C3AED" }}>
+                Writing down what you said…
+              </div>
+            )}
             {aiListening && (
               <div
                 style={{
@@ -7077,7 +7113,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 10px #EF4444" }} />
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#7C3AED" }}>
-                  Listening… Speak your prompt now
+                  {aiVoice.heard || aiVoice.elapsed < 3500 ? "Listening… tap the mic again when you're done" : "We can't hear you yet — speak closer to the phone"}
                 </div>
               </div>
             )}
@@ -7156,7 +7192,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "linear-gradient(135deg, #7C3AED, #6366F1)",
+                background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
                 color: "#FFFFFF",
                 opacity: !aiInput.trim() || aiLoading ? 0.45 : 1,
                 boxShadow: !aiInput.trim() || aiLoading ? "none" : "0 4px 14px rgba(124, 58, 237, 0.3)",
@@ -7230,17 +7266,19 @@ Keep it punchy, sharp, and directly actionable.`;
           contacts={contacts}
           isDark={isDark}
           onSendIntroRequest={async (connectorId, targetName, targetCompany, note) => {
-            await supabase.from("connection_requests").insert({
-              from_user: currentUser?.id,
-              to_user: connectorId,
-              status: "pending",
-            });
+            // A real ask: a drafted email to your mutual contact, opened in your mail app to review and send
+            const connector = contacts.find((c) => c.id === connectorId);
+            if (!connector?.email) throw new Error(`${connector?.name || "This contact"} has no email address. Add one to ask for an intro.`);
+            const first = (connector.name || "").split(" ")[0] || "there";
+            const target = targetCompany ? `${targetName} at ${targetCompany}` : targetName;
+            const body = `Hi ${first},\n\nWould you be open to introducing me to ${target}?${note ? `\n\n${note}` : ""}\n\nHappy to send a short blurb you can forward. Thanks!\n\n${currentUser?.name || ""}`;
+            window.location.href = `mailto:${encodeURIComponent(connector.email)}?subject=${encodeURIComponent(`Intro to ${targetName}?`)}&body=${encodeURIComponent(body)}`;
           }}
           showToast={showToast}
         />
       )}
 
-      {/* ── NETWORKING DAY SUMMARY (Part 40) ── */}
+      {/* ── NETWORKING DAY SUMMARY ── */}
       {daySummaryOpen && (
         <NetworkingDaySummaryModal
           open={daySummaryOpen}
@@ -7249,12 +7287,10 @@ Keep it punchy, sharp, and directly actionable.`;
           isDark={isDark}
           callAI={callAI}
           onScheduleReminder={async (cId, d, n) => {
-            await supabase.from("reminders").insert({
-              user_id: currentUser?.id,
-              contact_id: cId,
-              due_date: d,
-              note: n,
-            });
+            // Sets the contact's follow-up reminder (emailed + pushed by the reminder engine when due)
+            const { error } = await supabase.from("contacts").update({ reminder: n || "Follow up", reminder_date: d, reminder_done: false }).eq("id", cId);
+            if (error) throw new Error("Couldn't save the reminder. Please try again.");
+            setContacts((prev) => prev.map((c) => (c.id === cId ? { ...c, reminder: n || "Follow up", reminderDate: d, reminderDone: false } : c)));
           }}
           onDraftEmail={(c) => {
             setDaySummaryOpen(false);
@@ -7264,7 +7300,7 @@ Keep it punchy, sharp, and directly actionable.`;
         />
       )}
 
-      {/* ── GLOBAL PROFESSIONAL SEARCH (Part 60) ── */}
+      {/* ── GLOBAL SEARCH ── */}
       {globalSearchOpen && (
         <GlobalSearchModal
           open={globalSearchOpen}
@@ -7292,7 +7328,7 @@ Keep it punchy, sharp, and directly actionable.`;
           currentUser={currentUser}
           isDark={isDark}
           showToast={showToast}
-          apiBaseUrl={AI_PROXY}
+          apiBaseUrl={apiBase(AI_PROXY)}
           onContactCreated={(c) => {
             setContacts((prev) => [dbToContact(c), ...prev]);
             showToast(`${c.name || "Contact"} saved to your CRM!`, "success");
@@ -7320,6 +7356,11 @@ Keep it punchy, sharp, and directly actionable.`;
           isDark={isDark}
           showToast={showToast}
         />
+      )}
+
+      {/* ── CALLS: ring anywhere; voice & video ── */}
+      {screen === "app" && currentUser?.id && (
+        <CallLayer supabase={supabase} me={{ id: currentUser.id, name: currentUser.name }} apiBaseUrl={apiBase(AI_PROXY)} showToast={showToast} />
       )}
 
       {/* ── REALTIME IN-APP CHAT & EVENT ROOM MESSAGING ── */}
@@ -7372,9 +7413,11 @@ Keep it punchy, sharp, and directly actionable.`;
             fontSize: 13,
             fontWeight: 700,
             zIndex: 600,
-            animation: "fadeUp 0.25s ease",
+            animation: "nqToastIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both",
             boxShadow: "0 8px 25px rgba(0,0,0,0.25)",
-            whiteSpace: "nowrap",
+            maxWidth: "calc(100vw - 32px)",
+            width: "max-content",
+            lineHeight: 1.35,
             display: "flex",
             alignItems: "center",
             gap: 8,

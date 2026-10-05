@@ -1,0 +1,20 @@
+import { test, expect } from "@playwright/test";
+test("logo everywhere", async ({ page }) => {
+  test.setTimeout(200_000);
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/");
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: "qa-logs/logo-1-login.png" });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: "qa-logs/logo-2-header.png", clip: { x: 0, y: 0, width: 393, height: 80 } });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.getByRole("button", { name: "Profile & Settings" }).first().click();
+  await page.getByRole("button", { name: /^Appearance/ }).click();
+  const sw = page.getByRole("switch", { name: "Dark mode" });
+  if ((await sw.getAttribute("aria-checked")) !== "true") await sw.click();
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: "qa-logs/logo-3-dark.png", clip: { x: 0, y: 0, width: 393, height: 80 } });
+  await sw.click();
+});

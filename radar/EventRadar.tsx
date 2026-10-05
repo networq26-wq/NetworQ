@@ -1,6 +1,7 @@
 // Event Radar screen: join/create an event, live radar, nearby list,
 // consent-based connection requests and privacy controls.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { I, Skeleton } from "../ui/icons";
 import QRCode from "qrcode";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { RadarCanvas } from "./RadarCanvas";
@@ -200,7 +201,7 @@ export function EventRadar({
 
   const radarBody = (
     <>
-          <StatusBanner t={t} status={radar.status} mode={radar.mode} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
+          <StatusBanner t={t} status={radar.status} mode={radar.mode} nearby={scope === "nearby"} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
 
           {radar.incoming.length > 0 && (
             <section style={card} aria-label="Connection requests">
@@ -235,22 +236,20 @@ export function EventRadar({
             </section>
           )}
 
+          {/* In a browser on Nearby there's no radar to draw — skip the empty card (the list below explains) */}
+          {!(radar.settings?.radar_on && radar.mode === "web" && scope === "nearby" && !radar.hiddenCount) && (
           <section style={{ ...card, padding: 16 }}>
             {radar.settings?.radar_on ? (
               <>
-                <RadarCanvas
-                  people={radar.people}
-                  isDark={isDark}
-                  onSelect={setSelected}
-                  scanning={radar.status === "scanning" || radar.status === "scan_only" || radar.mode === "web"}
-                />
-                <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: "10px 0 0" }}>
-                  {radar.mode === "native"
-                    ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy."
-                    : scope === "nearby"
-                      ? "Proximity Radar active · Detecting NetworQ peers within range."
-                      : "Attendees active at this event in the last 15 minutes."}
-                </p>
+                {/* The live radar needs Bluetooth, which only the Android app has — browsers show a list instead */}
+                {radar.mode === "native" && (
+                  <RadarCanvas people={radar.people} isDark={isDark} onSelect={setSelected} scanning={radar.status === "scanning" || radar.status === "scan_only"} />
+                )}
+                {!(radar.mode === "web" && scope === "nearby") && (
+                  <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: radar.mode === "native" ? "10px 0 0" : 0 }}>
+                    {radar.mode === "native" ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy." : "Attendees active at this event in the last 15 minutes."}
+                  </p>
+                )}
                 {radar.hiddenCount > 0 && (
                   <p style={{ textAlign: "center", fontSize: 13, margin: "10px 0 0" }}>
                     {radar.hiddenCount} {radar.hiddenCount === 1 ? "person is" : "people are"} nearby. Turn on visibility to see who.
@@ -260,14 +259,15 @@ export function EventRadar({
             ) : (
               <div style={{ textAlign: "center", padding: "16px 12px" }}>
                 <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={false} />
-                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is in standby</div>
-                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on your radar beacon to discover professionals around you.</div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is off</div>
+                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on Radar to discover people around you.</div>
                 <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => radar.updateSettings({ radar_on: true })}>
-                  📡 Turn on Radar
+                  Turn on Radar
                 </button>
               </div>
             )}
           </section>
+          )}
 
           {radar.settings?.radar_on && (
             <NearbyList
@@ -292,8 +292,14 @@ export function EventRadar({
 
   if (events === null) {
     return (
-      <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">
-        Loading your events…
+      <div role="status" aria-label="Loading Radar" style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+        <Skeleton w="100%" h={40} r={12} style={{ maxWidth: 360, alignSelf: "center" }} />
+        <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          <Skeleton w="50%" h={22} />
+          <Skeleton w="80%" h={13} />
+          <Skeleton w="100%" h={48} r={12} />
+          <Skeleton w="100%" h={48} r={12} />
+        </div>
       </div>
     );
   }
@@ -303,26 +309,33 @@ export function EventRadar({
       <ScopeSwitch t={t} scope={scope} onChange={setScope} />
       {scope === "nearby" ? (
         nearby === undefined ? (
-          <div style={{ ...card, textAlign: "center", color: t.muted }} aria-busy="true">Loading radar…</div>
+          <div role="status" aria-label="Loading Nearby" style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+            <Skeleton w={72} h={72} r={36} />
+            <Skeleton w="55%" h={20} />
+            <Skeleton w="75%" h={13} />
+            <Skeleton w={220} h={48} r={12} />
+          </div>
         ) : !nearby ? (
           <>
             <section style={{ ...card, padding: 16 }}>
               <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
               <div style={{ textAlign: "center", padding: "16px 12px 6px" }}>
-                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Nearby Proximity Radar</div>
+                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Find people near you</div>
                 <div style={{ color: t.muted, fontSize: 14, maxWidth: 440, margin: "0 auto 16px", lineHeight: 1.5 }}>
-                  Discover NetworQ professionals within range — anywhere, no event code needed. Your device broadcasts a privacy-preserving ephemeral beacon.
+                  See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
                 </div>
                 <button
                   style={{ ...btn(t, "primary"), padding: "12px 28px", fontSize: 15 }}
                   disabled={busy}
                   onClick={() => setNearbyOn(true, true)}
                 >
-                  {busy ? "Activating Radar…" : "📡 Activate Nearby Radar"}
+                  {busy ? "Turning on…" : "Turn on Nearby"}
                 </button>
+                <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 360, margin: "14px auto 0" }}>
+                  You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
+                </p>
               </div>
             </section>
-            <NearbyIntro t={t} card={card} busy={busy} onTurnOn={() => setNearbyOn(true, true)} />
           </>
         ) : (
           <>
@@ -347,15 +360,6 @@ export function EventRadar({
         )
       ) : !activeEvent ? (
         <>
-          <section style={{ ...card, padding: 16 }}>
-            <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
-            <div style={{ textAlign: "center", padding: "14px 12px 4px" }}>
-              <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 4 }}>Event Radar Room</div>
-              <div style={{ color: t.muted, fontSize: 13, maxWidth: 420, margin: "0 auto" }}>
-                Join an active event to discover fellow attendees on the radar and connect in real time.
-              </div>
-            </div>
-          </section>
           <NoEvent
             t={t}
             card={card}
@@ -442,7 +446,7 @@ export function EventRadar({
                   });
                 }}
               >
-                <span>💬</span> Message on NetworQ
+                <I.Mail size={15} /> Message on NetworQ
               </button>
             ) : (
               <ConnectButton t={t} status={radar.outgoing.get(selectedPerson.userId)} onConnect={() => radar.connect(selectedPerson.userId)} onCancel={() => radar.cancelRequest(selectedPerson.userId)} wide />
@@ -499,25 +503,6 @@ function ScopeSwitch({ t, scope, onChange }: { t: Theme; scope: "nearby" | "even
   );
 }
 
-function NearbyIntro({ t, card, busy, onTurnOn }: { t: Theme; card: React.CSSProperties; busy: boolean; onTurnOn: () => void }) {
-  return (
-    <section style={{ ...card, textAlign: "center", padding: "32px 20px" }} aria-label="Nearby">
-      <div aria-hidden style={{ width: 72, height: 72, borderRadius: 36, margin: "0 auto 16px", background: "rgba(124,58,237,0.12)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 40, height: 40, borderRadius: 20, border: `3px solid ${PURPLE}`, boxShadow: `0 0 0 8px rgba(124,58,237,0.15)` }} />
-      </div>
-      <h2 style={{ margin: "0 0 8px", fontSize: 22 }}>Find people near you</h2>
-      <p style={{ color: t.muted, fontSize: 14, lineHeight: 1.5, maxWidth: 360, margin: "0 auto 20px" }}>
-        See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
-      </p>
-      <button style={{ ...btn(t, "primary"), minWidth: 220 }} onClick={onTurnOn} disabled={busy}>
-        {busy ? "Turning on…" : "Turn on Nearby"}
-      </button>
-      <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 340, margin: "16px auto 0" }}>
-        You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
-      </p>
-    </section>
-  );
-}
 
 function btn(t: Theme, kind: "primary" | "ghost" | "danger"): React.CSSProperties {
   const base: React.CSSProperties = {
@@ -563,7 +548,7 @@ function DistanceChip({ t, person }: { t: Theme; person: RadarPerson }) {
 function ConnectButton({ t, status, onConnect, onCancel, wide }: { t: Theme; status?: string; onConnect: () => void; onCancel?: () => void; wide?: boolean }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const style = { ...btn(t, status ? "ghost" : "primary"), ...(wide ? { width: "100%", maxWidth: 320 } : {}) };
-  if (status === "accepted") return <button style={style} disabled>Connected ✓</button>;
+  if (status === "accepted") return <button style={style} disabled className="nq-pop"><I.Check size={15} strokeWidth={2.4} style={{ marginRight: 4, verticalAlign: "-3px" }} />Connected</button>;
   if (status === "declined") return <button style={style} disabled>Not available</button>;
   if (status === "pending")
     return (
@@ -590,7 +575,7 @@ function ConfirmLink({ t, label, confirmLabel, ariaLabel, onConfirm }: { t: Them
       onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
       onBlur={() => setArmed(false)}
       aria-label={armed ? `Confirm: ${ariaLabel}` : ariaLabel}
-      style={{ minHeight: 44, padding: "8px 10px", border: "none", background: "none", color: "#FF453A", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+      style={{ minHeight: 44, padding: "0 16px", borderRadius: 22, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 14, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
     >
       {armed ? confirmLabel : label}
     </button>
@@ -633,7 +618,10 @@ function NoEvent({
     <section style={card}>
       {!compact && (
         <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em" }}>Event Radar</div>
+          <div aria-hidden style={{ width: 64, height: 64, borderRadius: 32, margin: "4px auto 14px", display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(124,58,237,0.1)", color: "#7C3AED" }}>
+            <I.Target size={30} />
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em" }}>Event Radar</div>
           <div style={{ color: t.muted, fontSize: 15, marginTop: 6, maxWidth: 460, marginInline: "auto" }}>
             See who's around you at an event, with approximate distance. You choose who gets your contact details.
           </div>
@@ -652,9 +640,10 @@ function NoEvent({
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           autoCapitalize="characters"
-          style={{ ...input, flex: "1 1 200px", letterSpacing: "0.06em" }}
+          style={{ ...input, flex: "100 1 200px", letterSpacing: "0.06em" }}
         />
-        <button type="submit" style={btn(t, "primary")} disabled={busy || !code.trim()}>
+        {/* Grows to full width when it wraps under the field on narrow phones */}
+        <button type="submit" style={{ ...btn(t, "primary"), flex: "1 0 120px" }} disabled={busy || !code.trim()}>
           {busy ? "Joining…" : "Join event"}
         </button>
       </form>
@@ -762,7 +751,7 @@ function EventHeader({
             onClick={onOpenRoomChat}
             aria-label="Open Event Room Chat"
           >
-            <span>💬</span> Room Chat
+            <I.Mail size={15} /> Room chat
           </button>
         )}
         {event.join_code && (
@@ -791,8 +780,9 @@ const STATUS_COPY: Partial<Record<RadarStatus, { title: string; body: string; ac
   offline: { title: "You're offline", body: "Showing the last people seen. Radar resumes when you reconnect." },
 };
 
-function StatusBanner({ t, status, mode, onBluetooth, onRetry }: { t: Theme; status: RadarStatus; mode: "native" | "web"; onBluetooth: () => void; onRetry: () => void }) {
+function StatusBanner({ t, status, mode, nearby, onBluetooth, onRetry }: { t: Theme; status: RadarStatus; mode: "native" | "web"; nearby?: boolean; onBluetooth: () => void; onRetry: () => void }) {
   if (mode === "web" && status === "scanning") {
+    if (nearby) return null; // the Nearby list says it once
     return (
       <div role="status" style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 16, padding: "12px 16px", fontSize: 14 }}>
         <strong>Live distance works in the NetworQ Android app.</strong> <span style={{ color: t.muted }}>Here you can see who's at the event and connect.</span>
@@ -852,13 +842,13 @@ function NearbyList({
               ? "Looking for NetworQ people around you… They need Nearby on and Discoverable."
               : "Looking for attendees… Ask people near you to open Radar in NetworQ."
             : nearbyScope
-              ? "Open NetworQ in the Android app to find people around you over Bluetooth. Browsers can't use Bluetooth for this."
+              ? "Finding people around you uses Bluetooth, so it works in the NetworQ phone app. Open NetworQ on your phone to see who's nearby."
               : "No one else is active yet. Share the event code to invite people."}
         </div>
       ) : (
         <ul aria-label="Nearby attendees" style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 4 }}>
           {people.map((p) => (
-            <li key={p.userId} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", opacity: p.faded ? 0.55 : 1 }}>
+            <li key={p.userId} className="nq-pop" style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", opacity: p.faded ? 0.55 : 1, transition: "opacity 0.4s ease" }}>
               <button
                 onClick={() => onSelect(p.userId)}
                 style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, color: "inherit", cursor: "pointer", textAlign: "left" }}
@@ -929,13 +919,14 @@ function Sheet({ t, title, onClose, children }: { t: Theme; title: string; onClo
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "max(16px, calc(var(--safe-top, 0px) + 12px)) max(16px, calc(var(--safe-right, 0px) + 12px)) max(16px, calc(var(--safe-bottom, 0px) + 12px)) max(16px, calc(var(--safe-left, 0px) + 12px))", boxSizing: "border-box" }}>
+    <div onClick={onClose} className="nq-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "max(16px, calc(var(--safe-top, 0px) + 12px)) max(16px, calc(var(--safe-right, 0px) + 12px)) max(16px, calc(var(--safe-bottom, 0px) + 12px)) max(16px, calc(var(--safe-left, 0px) + 12px))", boxSizing: "border-box" }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        className="nq-sheet-up"
         onClick={(e) => e.stopPropagation()}
-        style={{ background: t.surface, color: t.text, borderRadius: 24, padding: 20, width: "100%", maxWidth: 440, maxHeight: "min(85dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", marginBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)", animation: "fadeUp 0.25s ease" }}
+        style={{ background: t.surface, color: t.text, borderRadius: 24, padding: 20, width: "100%", maxWidth: 440, maxHeight: "min(85dvh, calc(100dvh - var(--safe-top, 0px) - var(--safe-bottom, 0px) - 24px))", overflowY: "auto", marginBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)" }}
       >
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
           <button aria-label="Close" onClick={onClose} style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: t.raised, color: t.text, fontSize: 20, cursor: "pointer" }}>

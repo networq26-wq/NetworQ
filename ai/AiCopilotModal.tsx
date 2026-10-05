@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import { I } from "../ui/icons";
 
 export interface PersonaMask {
   id: string;
@@ -14,7 +15,7 @@ export const PERSONA_MASKS: PersonaMask[] = [
     id: "wingman",
     name: "Executive Wingman",
     tagline: "Instant icebreakers & contextual talking points",
-    avatar: "🎯",
+    avatar: "Target",
     systemPrompt: `You are the NetworQ Executive Wingman, an elite networking strategist and conversational consultant.
 Your role is to craft unforgettable, authentic, and high-impact icebreakers and strategic talking points based on someone's background, role, or company.
 Always provide:
@@ -32,7 +33,7 @@ Keep advice concise, energetic, and executive-ready.`,
     id: "closer",
     name: "Follow-up Closer",
     tagline: "High-converting 3-touch cadence emails",
-    avatar: "🤝",
+    avatar: "UserPlus",
     systemPrompt: `You are the NetworQ Follow-up Closer, specialized in turning fleeting event encounters into signed deals, partnerships, and active relationships.
 Provide a clear, 3-touch follow-up sequence:
 Touch 1 (Within 24 hours): Warm, value-first recap referencing specific discussion points.
@@ -49,7 +50,7 @@ Format clearly with Subject lines and ready-to-copy bodies.`,
     id: "strategist",
     name: "Radar Strategist",
     tagline: "Prioritize high-value event connections",
-    avatar: "📡",
+    avatar: "Network",
     systemPrompt: `You are the NetworQ Radar Strategist. You help professionals maximize their return on time (ROT) at conferences and networking events.
 When given a list of roles, industries, or goals, you analyze who to target, what value to offer them first, and how to structure a 2-hour event session for maximum relationship ROI.`,
     starterPrompts: [
@@ -62,7 +63,7 @@ When given a list of roles, industries, or goals, you analyze who to target, wha
     id: "pitch",
     name: "Pitch Refiner",
     tagline: "Crisp 30-second elevator pitch polishing",
-    avatar: "💡",
+    avatar: "Sparkles",
     systemPrompt: `You are the NetworQ Pitch Refiner. You distill complex careers, startups, and ideas into irresistible 15-second and 30-second elevator pitches.
 Eliminate jargon, highlight the unique emotional hook and measurable outcome, and leave the listener asking: 'How do you do that?'.`,
     starterPrompts: [
@@ -201,7 +202,7 @@ export function AiCopilotModal({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 24 }}>{selectedMask.avatar}</span>
+            <PersonaIcon name={selectedMask.avatar} size={24} />
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 800, fontSize: 16, color: isDark ? "#FFFFFF" : "#111827" }}>
@@ -209,6 +210,7 @@ export function AiCopilotModal({
                 </span>
                 <span
                   style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
                     background: "rgba(124, 58, 237, 0.15)",
                     color: isDark ? "#C4B5FD" : "#7C3AED",
                     fontSize: 10,
@@ -242,7 +244,7 @@ export function AiCopilotModal({
                 cursor: "pointer",
               }}
             >
-              {isSpeaking ? "🔊 Voice On" : "🔈 Voice Off"}
+              {isSpeaking ? "Voice on" : "Voice off"}
             </button>
 
             <button
@@ -257,7 +259,7 @@ export function AiCopilotModal({
                 padding: 4,
               }}
             >
-              ✕
+              <I.X size={18} />
             </button>
           </div>
         </div>
@@ -295,7 +297,7 @@ export function AiCopilotModal({
                   boxShadow: isSelected ? "0 2px 8px rgba(124, 58, 237, 0.25)" : "none",
                 }}
               >
-                <span>{m.avatar}</span>
+                <PersonaIcon name={m.avatar} size={18} />
                 <span>{m.name}</span>
               </button>
             );
@@ -363,7 +365,7 @@ export function AiCopilotModal({
                       gap: 4,
                     }}
                   >
-                    <span>📋</span> Copy response
+                    Copy response
                   </button>
                 )}
               </div>
@@ -483,4 +485,9 @@ export function AiCopilotModal({
       </div>
     </div>
   );
+}
+
+function PersonaIcon({ name, size }: { name: string; size: number }) {
+  const Icon = (I as any)[name] || I.Sparkles;
+  return <Icon size={size} />;
 }

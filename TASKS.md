@@ -85,3 +85,19 @@
 4. Mark as [x] complete
 5. Commit with descriptive message
 6. Move to next task
+
+
+## Phase 7: Communication & polish ✅ COMPLETE (2026-10-05)
+- [x] Messages inbox + New message picker; live chat with typing/read receipts
+- [x] Voice & video calls (ring anywhere + push, TURN-ready)
+- [x] Voice note rebuilt (Whisper) + AI mic in the Android app
+- [x] People home: Who's next, Coming up, Select & bulk email/message
+- [x] Events redesign (location sheet, calendar, card-style events)
+- [x] Me & settings sub-pages; premium card with logo + photo
+- [x] Back-button navigation everywhere; official logo everywhere
+
+## Phase 8: Next
+- [ ] Group calls + screen share (Jitsi or LiveKit)
+- [ ] Photos & files in chat
+- [ ] TURN relay account (owner) · iOS shell · Play Store listing
+- [ ] CSV/LinkedIn import · CRM sync · team workspaces · billing

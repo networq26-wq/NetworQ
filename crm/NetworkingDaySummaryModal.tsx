@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 interface NetworkingDaySummaryModalProps {
@@ -86,6 +87,7 @@ Keep it clear, actionable, and under 150 words.`;
 
   return (
     <div
+      className="nq-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -100,6 +102,7 @@ Keep it clear, actionable, and under 150 words.`;
       }}
     >
       <div
+        className="nq-pop"
         style={{
           width: "100%",
           maxWidth: 620,
@@ -126,7 +129,7 @@ Keep it clear, actionable, and under 150 words.`;
         >
           <div>
             <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800 }}>
-              📅 Networking Day Summary (Part 40)
+              Networking day summary
             </h3>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: isDark ? "#94A3B8" : "#64748B" }}>
               Consolidated intelligence and automated follow-up strategy.
@@ -136,7 +139,7 @@ Keep it clear, actionable, and under 150 words.`;
             onClick={onClose}
             style={{ background: "transparent", border: "none", color: isDark ? "#94A3B8" : "#64748B", fontSize: 20, cursor: "pointer" }}
           >
-            ✕
+            <I.X size={18} />
           </button>
         </div>
 
@@ -202,7 +205,7 @@ Keep it clear, actionable, and under 150 words.`;
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <span style={{ fontSize: 13, fontWeight: 800, color: "#7C3AED", textTransform: "uppercase" }}>
-                🤖 AI Follow-up Strategy
+                <I.Sparkles size={16} style={{ marginRight: 6 }} />AI follow-up strategy
               </span>
               <button
                 disabled={generating}
@@ -271,7 +274,7 @@ Keep it clear, actionable, and under 150 words.`;
                         cursor: "pointer",
                       }}
                     >
-                      ✉️ Draft Follow-up
+                      <I.Mail size={15} style={{ marginRight: 6 }} />Draft follow-up
                     </button>
                   )}
                 </div>

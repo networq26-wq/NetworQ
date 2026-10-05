@@ -37,8 +37,12 @@ function createNotifyHookRouter(deps) {
       if (!tokens.length) result.push = "no devices";
       else {
         const screen = n.data?.screen;
-        const url = `${deps.appUrl}/${screen ? `?open=${encodeURIComponent(screen)}` : ""}`;
-        const { delivered, dead } = await deps.push.send(tokens, { title: n.title, body: n.body || "", url, data: { notification_id: n.id, type: n.type, screen: screen || null } });
+        const withUser = (screen === "chat" || screen === "call") && n.data?.from_user ? `&with=${encodeURIComponent(n.data.from_user)}` : "";
+        const callId = screen === "call" && n.data?.call_id ? `&call=${encodeURIComponent(n.data.call_id)}` : "";
+        const url = `${deps.appUrl}/${screen ? `?open=${encodeURIComponent(screen)}${withUser}${callId}` : ""}`;
+        // A ring is only useful while it's ringing: drop it if it can't be delivered within a minute
+        const ttl = n.type === "call" ? 60 : undefined;
+        const { delivered, dead } = await deps.push.send(tokens, { title: n.title, body: n.body || "", url, ttl, data: { notification_id: n.id, type: n.type, screen: screen || null } });
         if (dead.length) await deps.removeTokens(dead);
         await deps.markPushed(id);
         result.push = { delivered, removed: dead.length };

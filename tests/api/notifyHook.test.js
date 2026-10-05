@@ -141,3 +141,19 @@ test("dead tokens reported by the push service are removed", async () => {
     h.close();
   }
 });
+
+test("an incoming call is pushed with a link straight into the call and a 60 s expiry", async () => {
+  const h = pushHarness({ type: "call" });
+  h.n.title = "Asha Rao";
+  h.n.body = "Incoming video call";
+  h.n.data = { from_user: "asha", screen: "call", call_id: "c-123", kind: "video" };
+  try {
+    await h.post({ notification_id: "p1" });
+    const m = h.pushed[0].m;
+    assert.equal(m.body, "Incoming video call");
+    assert.equal(m.url, "https://app.test/?open=call&with=asha&call=c-123");
+    assert.equal(m.ttl, 60);
+  } finally {
+    h.close();
+  }
+});

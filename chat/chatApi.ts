@@ -15,30 +15,10 @@ export interface ChatMessage {
 
 export function createChatApi(supabase: SupabaseClient) {
   return {
+    // Only works for people you're connected with (and haven't blocked) — enforced by the database
     async getOrCreateDirectChat(otherUserId: string): Promise<string> {
-      const { data, error } = await supabase.rpc("get_or_create_direct_chat", {
-        p_other_user_id: otherUserId,
-      });
-      if (error) {
-        // Fallback query if RPC isn't deployed yet
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not authenticated");
-        const [u1, u2] = user.id < otherUserId ? [user.id, otherUserId] : [otherUserId, user.id];
-        const { data: existing } = await supabase
-          .from("direct_chats")
-          .select("id")
-          .eq("user1_id", u1)
-          .eq("user2_id", u2)
-          .maybeSingle();
-        if (existing?.id) return existing.id;
-        const { data: inserted, error: insErr } = await supabase
-          .from("direct_chats")
-          .insert({ user1_id: u1, user2_id: u2 })
-          .select("id")
-          .single();
-        if (insErr) throw insErr;
-        return inserted.id;
-      }
+      const { data, error } = await supabase.rpc("get_or_create_direct_chat", { p_other_user_id: otherUserId });
+      if (error) throw new Error(friendlyChatError(error.message));
       return data as string;
     },
 
@@ -59,50 +39,27 @@ export function createChatApi(supabase: SupabaseClient) {
       return (data || []) as ChatMessage[];
     },
 
-    async sendMessage(opts: {
-      recipientId?: string;
-      chatId?: string;
-      eventId?: string;
-      content: string;
-      mediaUrl?: string;
-    }): Promise<ChatMessage> {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      let resolvedChatId = opts.chatId;
-      if (!resolvedChatId && opts.recipientId) {
-        resolvedChatId = await this.getOrCreateDirectChat(opts.recipientId);
-      }
-
-      const payload = {
-        chat_id: resolvedChatId || null,
-        event_id: opts.eventId || null,
-        sender_id: user.id,
-        recipient_id: opts.recipientId || null,
-        content: opts.content.trim(),
-        media_url: opts.mediaUrl || null,
-        status: "sent",
-      };
-
-      const { data, error } = await supabase
-        .from("chat_messages")
-        .insert(payload)
-        .select()
-        .single();
-
-      if (error) throw error;
+    // The single way to send: send_chat_message validates membership, blocks, length and rate
+    async sendMessage(opts: { recipientId?: string; chatId?: string; eventId?: string; content: string; mediaUrl?: string }): Promise<ChatMessage> {
+      const { data, error } = await supabase.rpc("send_chat_message", {
+        p_recipient_id: opts.recipientId || null,
+        p_event_id: opts.recipientId ? null : opts.eventId || null,
+        p_content: opts.content,
+        p_media_url: opts.mediaUrl || null,
+      });
+      if (error) throw new Error(friendlyChatError(error.message));
       return data as ChatMessage;
     },
 
     async markRead(chatId: string): Promise<void> {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user || !chatId) return;
-      await supabase
-        .from("chat_messages")
-        .update({ status: "read", read_at: new Date().toISOString() })
-        .eq("chat_id", chatId)
-        .eq("recipient_id", user.id)
-        .neq("status", "read");
+      if (!chatId) return;
+      await supabase.rpc("mark_chat_read", { p_chat_id: chatId });
+    },
+
+    async myChats(): Promise<{ chat_id: string; other_user: string; name: string; avatar: string | null; last_message_at: string; last_message: string | null; unread: number }[]> {
+      const { data, error } = await supabase.rpc("my_direct_chats");
+      if (error) throw new Error(friendlyChatError(error.message));
+      return (data as any[]) || [];
     },
 
     subscribeToChat(
@@ -111,8 +68,11 @@ export function createChatApi(supabase: SupabaseClient) {
       onMessage: (msg: ChatMessage) => void,
       onTyping?: (userId: string, isTyping: boolean) => void
     ): RealtimeChannel {
-      const channelName = chatId ? `chat:${chatId}` : `event_chat:${eventId || "global"}`;
-      const channel = supabase.channel(channelName);
+      // 1:1 chats use a private channel (only the two members may join); event rooms stay public
+      // but carry no message content — messages arrive via postgres_changes, which applies RLS
+      const channel = chatId
+        ? supabase.channel(`chat:${chatId}`, { config: { private: true } })
+        : supabase.channel(`event_chat:${eventId}`);
 
       channel
         .on(
@@ -145,4 +105,14 @@ export function createChatApi(supabase: SupabaseClient) {
       });
     },
   };
+}
+
+function friendlyChatError(raw: string): string {
+  if (/not_connected/.test(raw)) return "You can message people once you're connected.";
+  if (/unavailable/.test(raw)) return "This person isn't available.";
+  if (/rate_limited/.test(raw)) return "You're sending messages too quickly. Wait a moment.";
+  if (/message_too_long/.test(raw)) return "That message is too long (4,000 characters max).";
+  if (/empty_message/.test(raw)) return "Type a message first.";
+  if (/not_a_member|invalid_event/.test(raw)) return "Join this event to chat in its room.";
+  return "Couldn't send. Check your connection and try again.";
 }

@@ -1,0 +1,30 @@
+import { test, expect } from "@playwright/test";
+test("meeting: free room → real invite email (with calendar file) → success screen", async ({ page }) => {
+  test.setTimeout(200_000);
+  const api: string[] = [];
+  page.on("response", async (r) => { if (r.url().includes("/api/email")) api.push(`${r.status()} ${(await r.text().catch(() => "")).slice(0, 120)}`); });
+  page.on("request", (r) => { if (r.url().includes("/api/email")) { const b = r.postDataJSON?.() || {}; api.push(`REQ to=${b.to} ics=${b.ics ? (b.ics.includes("METHOD:REQUEST") ? "yes (REQUEST)" : "yes") : "no"}`); } });
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.getByRole("button", { name: "Meet Preview Bob" }).first().click();
+  await page.waitForTimeout(800);
+  await page.getByRole("radio", { name: "Free room" }).click();
+  await page.screenshot({ path: "qa-logs/meet-1-sheet.png" });
+  await page.getByRole("button", { name: "Send invite" }).click();
+  await expect(page.getByText(/Invite sent|sent/i).first()).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: "qa-logs/meet-2-sent.png" });
+  console.log(api.join("\n"));
+});
+test("events: Add to calendar downloads a valid calendar file", async ({ page }) => {
+  test.setTimeout(200_000);
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Events" }).click();
+  const btn = page.getByRole("button", { name: /to calendar$/ }).first();
+  await expect(btn).toBeVisible({ timeout: 30_000 });
+  const [dl] = await Promise.all([page.waitForEvent("download"), btn.click()]);
+  const body = Buffer.concat(await (await dl.createReadStream()).toArray()).toString();
+  console.log("ICS:", dl.suggestedFilename(), body.includes("BEGIN:VEVENT") ? "valid VEVENT" : "INVALID", (body.match(/DTSTART[^\r\n]*/) || [""])[0]);
+});

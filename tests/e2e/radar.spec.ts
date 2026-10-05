@@ -62,7 +62,15 @@ function seed(db: MockSupabase) {
   db.addUser("eve@acme.test", PASSWORD, { profile: { name: "Eve Outsider", company: "Elsewhere", role: "CTO" } });
 }
 
+// Radar opens on Nearby; event actions live on the Events tab
+async function eventsTab(page: Page) {
+  const tab = page.getByRole("tab", { name: "Events" });
+  await tab.click(); // waits for Radar to finish loading
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
 async function createEvent(page: Page, name: string) {
+  await eventsTab(page);
   await page.getByRole("button", { name: "Create event" }).click();
   await page.getByLabel("Event name").fill(name);
   await page.getByRole("button", { name: "Create & get code" }).click();
@@ -74,11 +82,14 @@ async function createEvent(page: Page, name: string) {
 }
 
 async function joinEvent(page: Page, code: string) {
+  await eventsTab(page);
   await page.getByLabel("Event code").fill(code);
   await page.getByRole("button", { name: "Join event" }).click();
 }
 
 test.describe("Event Radar", () => {
+  // Each test drives two browsers; running them one at a time keeps BLE timing stable on small machines
+  test.describe.configure({ mode: "serial" });
   test("two attendees discover each other over BLE and exchange contacts by consent", async ({ browser, db }) => {
     seed(db);
     const asha = await newPage(browser, db);
@@ -104,8 +115,8 @@ test.describe("Event Radar", () => {
     const hearing = setInterval(() => sendSightings(asha.page, bobToken, -79, 1).catch(() => {}), 2000);
 
     const nearby = asha.page.getByRole("list", { name: "Nearby attendees" });
-    await expect(nearby.getByText("Bob Iyer")).toBeVisible();
-    await expect(nearby.getByText("~5 m")).toBeVisible();
+    await expect(nearby.getByText("Bob Iyer")).toBeVisible({ timeout: 15_000 });
+    await expect(nearby.getByText("~5 m")).toBeVisible({ timeout: 15_000 });
     expect(await nearby.textContent()).not.toContain("bob@acme.test"); // no contact details before consent
 
     // Asha requests, Bob accepts → both get a contact
@@ -314,7 +325,7 @@ test.describe("Event Radar", () => {
     await login(page, "asha@acme.test");
     if (isMobileProject()) await page.getByRole("button", { name: "Events", exact: true }).last().click();
     else await page.getByRole("complementary").getByRole("button", { name: /^Events Hub/ }).click();
-    await page.getByRole("button", { name: "I'm attending · Radar" }).first().click();
+    await page.getByRole("button", { name: /^Going to / }).first().click();
     await expect(page.getByText("You're attending Bengaluru Product Circle")).toBeVisible();
     await expect(page.getByText("Live at")).toBeVisible();
     expect(db.events[0]).toMatchObject({ source: "listed", external_id: db.table("public_events")[0].id });

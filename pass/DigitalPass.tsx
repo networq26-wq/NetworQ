@@ -1,5 +1,6 @@
 // Digital Pass: an Apple Wallet–style card with a vCard QR any phone camera can save.
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { I } from "../ui/icons";
 import QRCode from "qrcode";
 import { buildVCard, type PassProfile } from "./vcard";
 
@@ -111,7 +112,8 @@ export function DigitalPass({
   }, [vcard]);
 
   const onMove = (e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse" || !cardRef.current) return;
+    // Mouse: follows hover. Touch: follows the finger only while it's pressed on the card.
+    if (!cardRef.current || (e.pointerType !== "mouse" && e.buttons === 0)) return;
     const r = cardRef.current.getBoundingClientRect();
     const x = (e.clientX - r.left) / r.width;
     const y = (e.clientY - r.top) / r.height;
@@ -173,6 +175,8 @@ export function DigitalPass({
           aria-label="Your digital pass"
           onPointerMove={onMove}
           onPointerLeave={() => setShine({ x: 50, y: 30, rx: 0, ry: 0 })}
+          onPointerUp={(e) => e.pointerType !== "mouse" && setShine({ x: 50, y: 30, rx: 0, ry: 0 })}
+          onPointerCancel={() => setShine({ x: 50, y: 30, rx: 0, ry: 0 })}
           style={{
             position: "relative",
             borderRadius: 24,
@@ -182,7 +186,7 @@ export function DigitalPass({
             overflow: "hidden",
             boxShadow: "0 24px 48px -16px rgba(40, 20, 90, 0.45), 0 2px 6px rgba(0,0,0,0.12)",
             transform: `rotateX(${shine.rx}deg) rotateY(${shine.ry}deg)`,
-            transition: "transform 120ms ease-out",
+            transition: "transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1)",
             border: st.id === "pearl" ? "1px solid rgba(0,0,0,0.06)" : "none",
           }}
         >
@@ -220,19 +224,19 @@ export function DigitalPass({
               <div style={{ fontSize: 14, color: st.sub, marginTop: 3 }}>{[profile.title, profile.company].filter(Boolean).join(" · ") || "Add your role in Settings"}</div>
               {mode === "event" && (
                 <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
-                  <span>🎯 Looking for:</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><I.Target size={14} />Looking for:</span>
                   <span>{eventGoal}</span>
                 </div>
               )}
               {mode === "sales" && (
                 <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
-                  <span>💼 Services:</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><I.Briefcase size={14} />Services:</span>
                   <span>{salesPitch}</span>
                 </div>
               )}
               {mode === "speaker" && (
                 <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,0.18)", padding: "2px 8px", borderRadius: 8, fontSize: 11, fontWeight: 700 }}>
-                  <span>🎤 Session:</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><I.Mic size={14} />Session:</span>
                   <span>{speakerTopic}</span>
                 </div>
               )}
@@ -401,7 +405,7 @@ export function DigitalPass({
                 boxShadow: "0 2px 8px rgba(124, 58, 237, 0.3)",
               }}
             >
-              <span>📡</span> Write to Physical NFC Card
+              <I.Contact size={15} /> Write to NFC card
             </button>
           )}
           <button onClick={onEditProfile} style={{ border: "none", background: "none", color: PURPLE, fontWeight: 600, fontSize: 14, cursor: "pointer", padding: "8px 0" }}>

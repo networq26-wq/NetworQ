@@ -1,6 +1,7 @@
 // "Your organization" profile: what the user's company does, used in every AI draft.
 // Can be pre-filled from the company website; the user reviews and saves.
 import React, { useEffect, useState } from "react";
+import { Skeleton } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProspectApi } from "./prospectApi";
 import { TONES } from "./prospectApi";
@@ -132,7 +133,17 @@ export function OrganizationForm({
     onSaved?.(row as OrgProfile);
   };
 
-  if (loading) return <div style={{ color: t.muted, fontSize: 14, padding: "12px 0" }}>Loading…</div>;
+  if (loading)
+    return (
+      <div role="status" aria-label="Loading organization" style={{ display: "flex", flexDirection: "column", gap: 10, padding: "12px 0" }}>
+        {[0, 1, 2].map((i) => (
+          <React.Fragment key={i}>
+            <Skeleton w={120} h={12} />
+            <Skeleton h={44} r={12} />
+          </React.Fragment>
+        ))}
+      </div>
+    );
 
   return (
     <div>

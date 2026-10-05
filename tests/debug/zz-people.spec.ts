@@ -1,0 +1,22 @@
+import { test, expect } from "@playwright/test";
+test("people redesign", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.goto("http://localhost:8082/?devLogin=a");
+  await expect(page.getByRole("navigation", { name: "Main navigation" })).toBeVisible({ timeout: 120_000 });
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: "qa-logs/people-1.png" });
+  await page.mouse.wheel(0, 500);
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: "qa-logs/people-2.png" });
+  await page.getByRole("button", { name: "Select", exact: true }).click();
+  await page.getByRole("button", { name: /^Select all/ }).click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: "qa-logs/people-3-select.png" });
+  await page.getByRole("toolbar", { name: "Selected people" }).getByRole("button", { name: /^Email/ }).click().catch(() => {});
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: "qa-logs/people-4-bulk.png" });
+  console.log("errors:", JSON.stringify(errors));
+});

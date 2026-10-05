@@ -63,12 +63,17 @@ function Shell() {
   // Hardware back: let the web app close overlays / go to the previous tab first;
   // on the home screen, a second press within 2 s exits.
   const lastBackAt = useRef(0);
+  const backFallback = useRef<any>(null);
+  const handleNavRef = useRef<(raw: string) => void>(() => {});
   const hasErrorRef = useRef(false);
   hasErrorRef.current = hasError;
   useEffect(() => {
     if (Platform.OS !== "android") return;
     const onBackPress = () => {
       if (hasErrorRef.current) return false; // offline screen: let Android close the app
+      // If the page doesn't answer (still loading, crashed), still go back — never exit on one press
+      clearTimeout(backFallback.current);
+      backFallback.current = setTimeout(() => handleNavRef.current(JSON.stringify({ type: "nav:back", handled: false })), 600);
       webViewRef.current?.injectJavaScript(
         `(function(){var h=false;try{h=!!(window.__networqHandleBack&&window.__networqHandleBack());}catch(e){}window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(JSON.stringify({type:"nav:back",handled:h}));})();true;`
       );
@@ -90,7 +95,20 @@ function Shell() {
         if (Platform.OS === "android") PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA).catch(() => {});
         return;
       }
-      if (msg?.type !== "nav:back" || msg.handled) return;
+      // Calls and voice notes: ask Android for the microphone (and camera for video), then tell the page
+      if (msg?.type === "perm:media") {
+        const reply = (granted: boolean) =>
+          webViewRef.current?.injectJavaScript(`window.__networqPermResult&&window.__networqPermResult(${JSON.stringify({ id: msg.id, granted })});true;`);
+        if (Platform.OS !== "android") return reply(true);
+        const wanted = [PermissionsAndroid.PERMISSIONS.RECORD_AUDIO, ...(msg.video ? [PermissionsAndroid.PERMISSIONS.CAMERA] : [])];
+        PermissionsAndroid.requestMultiple(wanted)
+          .then((r) => reply(wanted.every((p) => r[p] === PermissionsAndroid.RESULTS.GRANTED)))
+          .catch(() => reply(false));
+        return;
+      }
+      if (msg?.type !== "nav:back") return;
+      clearTimeout(backFallback.current);
+      if (msg.handled) return;
       if (canGoBack) return webViewRef.current?.goBack(); // e.g. from /privacy back to the app
       const now = Date.now();
       if (now - lastBackAt.current < 2000) return BackHandler.exitApp();
@@ -100,9 +118,15 @@ function Shell() {
     [canGoBack]
   );
 
+  handleNavRef.current = handleNavMessage;
+
   // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
-    if (/^(https?|about|data|blob):/i.test(request.url)) return true;
+    if (/^(about|data|blob):/i.test(request.url)) return true;
+    // Only NetworQ itself (and Supabase auth redirects) load inside the app, which has camera/mic access.
+    // Any other site — event pages, Google Calendar, Meet links — opens in the phone's browser/apps.
+    if (/^https:\/\/(([a-z0-9-]+\.)*networq\.co\.in|[a-z0-9-]+\.supabase\.co)(\/|$|\?|#)/i.test(request.url)) return true;
+    if (!request.isTopFrame) return true; // embedded frames (e.g. maps) stay as they are
     Linking.openURL(request.url).catch(() => {});
     return false;
   }, []);
@@ -145,7 +169,8 @@ function Shell() {
           injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}`}
           onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {
-            if (e.nativeEvent.url.startsWith(TARGET_URL)) handleNavMessage(e.nativeEvent.data);
+            // any page on our own domain (www or not, any path) can answer the back button
+            if (/^https:\/\/([a-z0-9-]+\.)*networq\.co\.in(\/|$)/i.test(e.nativeEvent.url)) handleNavMessage(e.nativeEvent.data);
             radarBridge.onMessage(e);
             googleAuth.onMessage(e);
             push.onMessage(e);
@@ -153,7 +178,7 @@ function Shell() {
           cacheEnabled={true}
           renderLoading={() => (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366F1" />
+              <ActivityIndicator size="large" color="#7C3AED" />
               <Text style={styles.loadingText}>Loading NetworQ…</Text>
             </View>
           )}
@@ -220,7 +245,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   retryButton: {
-    backgroundColor: "#6366F1",
+    backgroundColor: "#7C3AED",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,

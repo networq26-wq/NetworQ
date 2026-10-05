@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { I } from "../ui/icons";
 
 export function NfcWriterModal({
   open,
@@ -98,7 +99,7 @@ export function NfcWriterModal({
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 24 }}>📡</span>
+            <I.Contact size={24} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 800 }}>Program NFC Smart Card</div>
               <div style={{ fontSize: 12, color: textMuted }}>Turn any blank card or sticker into a NetworQ Pass</div>
@@ -154,7 +155,7 @@ export function NfcWriterModal({
               animation: writing ? "pulse 1.5s infinite" : "none",
             }}
           >
-            {success ? "✓" : writing ? "⚡" : "📇"}
+            {success ? <I.Check size={34} strokeWidth={2.4} /> : writing ? <I.Zap size={32} /> : <I.Contact size={32} />}
           </div>
 
           <div style={{ fontSize: 16, fontWeight: 700 }}>
@@ -207,7 +208,7 @@ export function NfcWriterModal({
             gap: 8,
           }}
         >
-          {writing ? "Writing... Hold Card Close" : success ? "✓ Tap Another Card" : "Write to NFC Card Now"}
+          {writing ? "Writing... Hold Card Close" : success ? "Write another card" : "Write to NFC Card Now"}
         </button>
 
         <div style={{ fontSize: 11, color: textMuted, textAlign: "center" }}>

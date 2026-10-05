@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { I } from "../ui/icons";
 import { haptic } from "../ui/haptics";
 
 // Full-screen, iOS-style card camera: live viewfinder, card-shaped guide with corner
@@ -93,7 +94,7 @@ export function CameraCapture({
   );
 
   return (
-    <div role="dialog" aria-label="Card camera" style={{ position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", flexDirection: "column", color: "#FFF" }}>
+    <div role="dialog" aria-label="Card camera" className="nq-pop" style={{ position: "fixed", inset: 0, zIndex: 99999, background: "#000", display: "flex", flexDirection: "column", color: "#FFF" }}>
       {/* Top bar */}
       <div style={{ padding: "calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 2 }}>
         <button
@@ -101,7 +102,7 @@ export function CameraCapture({
           aria-label="Close camera"
           style={{ width: 36, height: 36, borderRadius: 18, border: "none", background: "rgba(255,255,255,0.16)", color: "#FFF", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
-          ✕
+          <I.X size={18} />
         </button>
         <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Scan card</div>
         <div style={{ width: 36 }} />
@@ -114,8 +115,8 @@ export function CameraCapture({
             <div style={{ fontSize: 15, lineHeight: 1.45, color: "rgba(255,255,255,0.85)", maxWidth: 300 }}>{error}</div>
             <button
               onClick={() => {
+                onFallback(); // first, so closing doesn't navigate away from Scan
                 onClose();
-                onFallback();
               }}
               style={{ padding: "12px 22px", borderRadius: 999, border: "none", background: "#FFFFFF", color: "#000", fontWeight: 600, fontSize: 15, cursor: "pointer" }}
             >
@@ -132,6 +133,7 @@ export function CameraCapture({
                 {corner({ top: 0, right: 0 }, { borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 16 })}
                 {corner({ bottom: 0, left: 0 }, { borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 16 })}
                 {corner({ bottom: 0, right: 0 }, { borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 16 })}
+                {ready && <span className="nq-scanline" aria-hidden />}
               </div>
             </div>
             <div style={{ position: "absolute", left: 0, right: 0, bottom: 20, textAlign: "center", pointerEvents: "none" }}>

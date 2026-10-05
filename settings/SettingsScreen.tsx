@@ -9,6 +9,7 @@ import { BlockedUsers, HelpAbout, PushSwitch, RecentDevices } from "./MoreSettin
 import { hapticsEnabled, setHapticsEnabled, haptic } from "../ui/haptics";
 
 const PURPLE = "#7C3AED";
+export type SettingsSection = "profile" | "organization" | "card" | "notifications" | "privacy" | "security" | "appearance" | "data" | "help" | "account";
 type Toast = (message: string, type?: "success" | "error" | "info") => void;
 
 interface Prefs {
@@ -56,6 +57,8 @@ export function SettingsScreen({
   onSignOut,
   prospectApi,
   apiBaseUrl,
+  section,
+  cardSettings,
 }: {
   supabase: SupabaseClient;
   account: AccountApi;
@@ -69,7 +72,12 @@ export function SettingsScreen({
   onSignOut: () => void;
   prospectApi?: ProspectApi;
   apiBaseUrl?: string;
+  /** Show one category (Me → Settings sub-page); omit to show everything */
+  section?: SettingsSection;
+  /** Card style & details, supplied by the Me screen */
+  cardSettings?: React.ReactNode;
 }) {
+  const on = (k: SettingsSection) => !section || section === k;
   const [vibration, setVibration] = useState(hapticsEnabled());
   const t = theme(isDark);
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
@@ -254,8 +262,11 @@ export function SettingsScreen({
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
-      <h2 style={{ margin: "4px 0 0", fontSize: 28, letterSpacing: "-0.02em" }}>Settings</h2>
+      {!section && <h2 style={{ margin: "4px 0 0", fontSize: 28, letterSpacing: "-0.02em" }}>Settings</h2>}
+      {section === "card" && cardSettings}
 
+      {on("profile") && (
+        <>
       <section style={card} aria-labelledby="settings-profile">
         <h3 id="settings-profile" style={{ margin: "0 0 16px", fontSize: 18 }}>Profile</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
@@ -273,7 +284,7 @@ export function SettingsScreen({
             <button style={btn("ghost")} onClick={() => fileRef.current?.click()} disabled={uploading}>
               {uploading ? "Uploading…" : avatar ? "Change photo" : "Add photo"}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" aria-label="Upload profile photo" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && uploadAvatar(e.target.files[0])} />
+            <input ref={fileRef} type="file" accept="image/*" aria-label="Upload profile photo" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadAvatar(f); }} />
             <div style={{ color: t.muted, fontSize: 12, marginTop: 6 }}>Shown on Event Radar and to people you connect with.</div>
           </div>
         </div>
@@ -296,6 +307,11 @@ export function SettingsScreen({
         </button>
       </section>
 
+        </>
+      )}
+
+      {on("organization") && (
+        <>
       {prospectApi && currentUser?.id && (
         <section style={card} aria-labelledby="settings-org">
           <h3 id="settings-org" style={{ margin: "0 0 4px", fontSize: 18 }}>Your organization</h3>
@@ -303,6 +319,11 @@ export function SettingsScreen({
         </section>
       )}
 
+        </>
+      )}
+
+      {on("security") && (
+        <>
       <section style={card} aria-labelledby="settings-security">
         <h3 id="settings-security" style={{ margin: "0 0 4px", fontSize: 18 }}>Security</h3>
         <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Signed in as {currentUser?.email}</div>
@@ -328,6 +349,11 @@ export function SettingsScreen({
         <RecentDevices supabase={supabase} t={t} btn={btn("ghost")} onSignOutEverywhere={signOutEverywhere} />
       </section>
 
+        </>
+      )}
+
+      {on("notifications") && (
+        <>
       <section style={card} aria-labelledby="settings-notifications">
         <h3 id="settings-notifications" style={{ margin: "0 0 4px", fontSize: 18 }}>Notifications</h3>
         <PushSwitch supabase={supabase} t={t} apiBaseUrl={apiBaseUrl} showToast={showToast} />
@@ -337,6 +363,11 @@ export function SettingsScreen({
         <Switch id="product_updates" title="Product updates" hint="Occasional news about new NetworQ features." />
       </section>
 
+        </>
+      )}
+
+      {on("appearance") && (
+        <>
       <section style={card} aria-labelledby="settings-appearance">
         <h3 id="settings-appearance" style={{ margin: "0 0 4px", fontSize: 18 }}>Appearance</h3>
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
@@ -376,8 +407,18 @@ export function SettingsScreen({
         </div>
       </section>
 
+        </>
+      )}
+
+      {on("privacy") && (
+        <>
       <BlockedUsers supabase={supabase} t={t} card={card} showToast={showToast} />
 
+        </>
+      )}
+
+      {on("data") && (
+        <>
       <section style={card} aria-labelledby="settings-data">
         <h3 id="settings-data" style={{ margin: "0 0 12px", fontSize: 18 }}>Your data</h3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -387,8 +428,18 @@ export function SettingsScreen({
         </div>
       </section>
 
+        </>
+      )}
+
+      {on("help") && (
+        <>
       <HelpAbout t={t} card={card} btn={btn("ghost")} userEmail={currentUser?.email} apiBaseUrl={apiBaseUrl} />
 
+        </>
+      )}
+
+      {on("account") && (
+        <>
       <button style={{ ...btn("ghost"), width: "100%" }} onClick={onSignOut}>
         Sign out
       </button>
@@ -405,6 +456,9 @@ export function SettingsScreen({
           </button>
         </div>
       </section>
+
+        </>
+      )}
     </div>
   );
 }

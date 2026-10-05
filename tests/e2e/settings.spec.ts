@@ -1,9 +1,17 @@
 import type { Page } from "@playwright/test";
 import { test, expect, login, gotoLogin, PASSWORD, PROFILE } from "./fixtures";
 
-async function openSettings(page: Page) {
-  await page.getByTitle("Profile & Settings").click();
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+// Settings live under Me, one topic per page: tap your avatar, then the row
+const ROW: Record<string, RegExp> = {
+  profile: /^Profile Name/, security: /^Password & devices/, notifications: /^Notifications/, appearance: /^Appearance/,
+  privacy: /^Privacy & blocking/, help: /^Help & about/, account: /^Account/,
+};
+async function openSettings(page: Page, section: keyof typeof ROW) {
+  const back = page.getByRole("button", { name: "Back to Me" });
+  if (await back.count()) await back.click();
+  else await page.getByTitle("Profile & Settings").first().click();
+  await page.getByRole("button", { name: ROW[section] }).last().click(); // rows come after the header buttons
+  await expect(page.getByRole("button", { name: "Back to Me" })).toBeVisible();
 }
 
 test.describe("Settings & account security", () => {
@@ -34,7 +42,7 @@ test.describe("Settings & account security", () => {
 
   test("profile edits save", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "profile");
     await page.getByLabel("Role / title").fill("CEO");
     await page.getByRole("button", { name: "Save profile" }).click();
     await expect(page.getByText("Profile saved.")).toBeVisible();
@@ -43,7 +51,7 @@ test.describe("Settings & account security", () => {
 
   test("profile photo uploads to the user's own folder", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "profile");
     // 2×2 PNG
     const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVR4nGP8z8DwnwEJMCJzAEoCAgEaFpt/AAAAAElFTkSuQmCC", "base64");
     await page.getByLabel("Upload profile photo").setInputFiles({ name: "me.png", mimeType: "image/png", buffer: png });
@@ -55,7 +63,7 @@ test.describe("Settings & account security", () => {
 
   test("change password: wrong current password is refused; correct one works and notifies", async ({ page, db, accountCalls }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "security");
     await page.getByLabel("Current password").fill("wrong-password");
     await page.getByLabel("New password", { exact: true }).fill("BrandNewPass9");
     await page.getByLabel("Confirm new password").fill("BrandNewPass9");
@@ -72,7 +80,7 @@ test.describe("Settings & account security", () => {
 
   test("change password validates length and match", async ({ page }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "security");
     await page.getByLabel("Current password").fill(PASSWORD);
     await page.getByLabel("New password", { exact: true }).fill("short");
     await page.getByLabel("Confirm new password").fill("short");
@@ -86,7 +94,7 @@ test.describe("Settings & account security", () => {
 
   test("change email sends a confirmation", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "security");
     await page.getByLabel("New email address").fill("asha@newco.test");
     await page.getByRole("button", { name: "Send confirmation" }).click();
     await expect(page.getByText(/Check asha@newco.test/)).toBeVisible();
@@ -95,7 +103,7 @@ test.describe("Settings & account security", () => {
 
   test("notification preferences persist", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "notifications");
     const toggle = page.getByRole("switch", { name: "New sign-in alerts" });
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await toggle.click();
@@ -107,7 +115,7 @@ test.describe("Settings & account security", () => {
 
   test("sign out of all devices revokes every session", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "security");
     await page.getByRole("button", { name: "Sign out of all devices" }).click();
     await expect(page.getByText("Signed out of all devices.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign In", exact: true })).toBeVisible();
@@ -116,7 +124,7 @@ test.describe("Settings & account security", () => {
 
   test("delete account: needs DELETE, schedules, signs out; signing back in offers cancel", async ({ page, db }) => {
     await login(page, "asha@acme.test");
-    await openSettings(page);
+    await openSettings(page, "account");
     const del = page.getByRole("button", { name: "Delete my account" });
     await expect(del).toBeDisabled();
     await page.getByLabel("Type DELETE to confirm").fill("DELETE");
@@ -139,7 +147,7 @@ test.describe("Settings & account security", () => {
     const me = db.users.find((u) => u.email === "asha@acme.test")!;
     db.blocks.push({ blocker: me.id, blocked: bob.id });
     db.table("login_devices").push({ user_id: me.id, device_hash: "a".repeat(64), user_agent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/124.0 Mobile Safari/537.36", first_seen: "2026-09-01T10:00:00Z", last_seen: "2026-10-02T09:00:00Z" });
-    await openSettings(page);
+    await openSettings(page, "privacy");
 
     const blocked = page.getByRole("list", { name: "Blocked people" });
     await expect(blocked.getByText("Bob Iyer")).toBeVisible();
@@ -147,19 +155,23 @@ test.describe("Settings & account security", () => {
     await expect(page.getByText("You haven't blocked anyone.")).toBeVisible();
     expect(db.blocks).toHaveLength(0);
 
+    await openSettings(page, "security");
     await expect(page.getByRole("list", { name: "Recent devices" }).getByText("Chrome on Android")).toBeVisible();
 
+    await openSettings(page, "notifications");
     const conn = page.getByRole("switch", { name: "Connection emails" });
     await expect(conn).toHaveAttribute("aria-checked", "true");
     await conn.click();
     await expect.poll(() => db.table("profiles").find((p) => p.id === me.id)!.notification_prefs.connection_emails).toBe(false);
 
+    await openSettings(page, "appearance");
     const vib = page.getByRole("switch", { name: "Vibration" });
     await expect(vib).toHaveAttribute("aria-checked", "true");
     await vib.click();
     await expect(vib).toHaveAttribute("aria-checked", "false");
     expect(await page.evaluate(() => localStorage.getItem("networq.haptics"))).toBe("off");
 
+    await openSettings(page, "help");
     await expect(page.getByLabel("App version")).toContainText("1.0.0");
     await expect(page.getByText(/^Online · /)).toBeVisible();
     await expect(page.getByRole("link", { name: "Contact support" })).toHaveAttribute("href", /^mailto:support@networq\.co\.in/);

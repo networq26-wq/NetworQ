@@ -1,5 +1,6 @@
 // Notification centre sheet: newest first, tap to open the right screen.
 import React, { useEffect } from "react";
+import { I } from "../ui/icons";
 import type { AppNotification } from "./useNotifications";
 
 const PURPLE = "#7C3AED";
@@ -12,13 +13,16 @@ function ago(iso: string) {
   return `${Math.floor(s / 86400)}d`;
 }
 
-const ICON: Record<AppNotification["type"], string> = {
-  connection_request: "👋",
-  connection_accepted: "🤝",
-  connection_declined: "•",
-  security: "🔒",
-  event: "📅",
-  system: "ℹ️",
+const ICON: Record<string, { Icon: (p: { size?: number; color?: string }) => React.ReactElement; color: string }> = {
+  connection_request: { Icon: I.UserPlus, color: "#7C3AED" },
+  connection_accepted: { Icon: I.UserCheck, color: "#34C759" },
+  connection_declined: { Icon: I.User, color: "#8E8E93" },
+  reminder: { Icon: I.Clock, color: "#FF9F0A" },
+  message: { Icon: I.Mail, color: "#7C3AED" },
+  call: { Icon: I.Phone, color: "#34C759" },
+  security: { Icon: I.Lock, color: "#FF3B30" },
+  event: { Icon: I.Calendar, color: "#0A84FF" },
+  system: { Icon: I.Bell, color: "#8E8E93" },
 };
 
 export function NotificationCenter({
@@ -51,13 +55,14 @@ export function NotificationCenter({
   const unread = items.filter((n) => !n.read_at).length;
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
+    <div onClick={onClose} className="nq-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 1100, display: "flex", justifyContent: "flex-end" }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
+        className="nq-sheet-right"
         onClick={(e) => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 420, height: "100%", background: t.surface, color: t.text, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)", animation: "fadeIn 0.2s ease" }}
+        style={{ width: "100%", maxWidth: 420, height: "100%", background: t.surface, color: t.text, display: "flex", flexDirection: "column", paddingTop: "env(safe-area-inset-top)" }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "16px 16px 8px" }}>
           <h2 style={{ margin: 0, fontSize: 22, flex: 1 }}>Notifications</h2>
@@ -77,25 +82,32 @@ export function NotificationCenter({
             onClick={onOpenReminders}
             style={{ margin: "4px 16px 8px", padding: "12px 14px", borderRadius: 14, border: `1px solid ${t.border}`, background: t.raised, color: t.text, textAlign: "left", cursor: "pointer", fontSize: 14 }}
           >
-            ⏰ <strong>{dueReminders}</strong> follow-up reminder{dueReminders === 1 ? "" : "s"} due
+            <I.Clock size={16} style={{ marginRight: 6, verticalAlign: "-3px" }} /><strong>{dueReminders}</strong> follow-up reminder{dueReminders === 1 ? "" : "s"} due
           </button>
         )}
 
         <div style={{ overflowY: "auto", flex: 1, padding: "0 8px 24px" }}>
           {items.length === 0 ? (
             <div style={{ textAlign: "center", color: t.muted, padding: "48px 24px" }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
+              <div style={{ width: 56, height: 56, borderRadius: 28, margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center", background: t.raised }}><I.Bell size={26} /></div>
               You're all caught up. Connection requests and updates appear here.
             </div>
           ) : (
-            <ul aria-label="Notification list" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            <ul aria-label="Notification list" className="nq-stagger" style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {items.map((n) => (
                 <li key={n.id}>
                   <button
                     onClick={() => onOpen(n)}
                     style={{ width: "100%", display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 10px", border: "none", borderRadius: 14, background: n.read_at ? "transparent" : isDark ? "rgba(124,58,237,0.12)" : "rgba(124,58,237,0.06)", color: t.text, textAlign: "left", cursor: "pointer", marginBottom: 2 }}
                   >
-                    <span aria-hidden="true" style={{ fontSize: 20, width: 28, textAlign: "center" }}>{ICON[n.type] || "•"}</span>
+                    {(() => {
+                      const { Icon, color } = ICON[n.type] || ICON.system;
+                      return (
+                        <span aria-hidden="true" style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: `${color}1F`, color }}>
+                          <Icon size={18} />
+                        </span>
+                      );
+                    })()}
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontWeight: n.read_at ? 500 : 700, fontSize: 15 }}>{n.title}</span>
                       {n.body && <span style={{ display: "block", color: t.muted, fontSize: 13, marginTop: 2 }}>{n.body}</span>}
