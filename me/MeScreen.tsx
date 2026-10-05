@@ -106,8 +106,8 @@ export function MeScreen({
         <button onClick={() => setQrOpen(true)} style={{ flex: 1, minHeight: 52, borderRadius: 16, border: "none", background: "#7C3AED", color: "#FFF", fontSize: 16, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
           <I.Contact size={18} /> Show QR
         </button>
-        <button onClick={share} style={{ flex: 1, minHeight: 52, borderRadius: 16, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 16, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-          <I.ArrowRight size={18} style={{ transform: "rotate(-45deg)" }} /> Share
+        <button onClick={share} aria-label="Share card — send your contact card to WhatsApp, email or any app" style={{ flex: 1, minHeight: 52, borderRadius: 16, border: `1px solid ${t.border}`, background: t.surface, color: t.text, fontSize: 16, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <I.ArrowRight size={18} style={{ transform: "rotate(-45deg)" }} /> Share card
         </button>
       </div>
 

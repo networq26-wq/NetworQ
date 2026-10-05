@@ -276,7 +276,7 @@ export function EventsHub({
           {/* Search with the location built in */}
           <div style={{ display: "flex", alignItems: "center", gap: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: "4px 4px 4px 14px", minHeight: 52, boxSizing: "border-box" }}>
             <span aria-hidden style={{ color: t.muted, display: "flex" }}><I.Search size={18} /></span>
-            <input aria-label="Search events" placeholder="Search events" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: t.text, fontSize: 16, padding: "0 10px", fontFamily: "inherit", minHeight: 44 }} />
+            <input aria-label="Search events" placeholder="Search events" className="nq-search-input" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: t.text, fontSize: 16, padding: "0 10px", fontFamily: "inherit", minHeight: 44 }} />
             <button onClick={() => setCityOpen(true)} aria-label={`Location: ${cityLabel}`} style={{ flexShrink: 0, minHeight: 44, maxWidth: 170, padding: "0 12px", borderRadius: 12, border: "none", background: t.raised, color: t.text, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <I.MapPin size={16} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cityLabel}</span>

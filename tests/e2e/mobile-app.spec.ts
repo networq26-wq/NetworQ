@@ -107,4 +107,17 @@ test.describe("Android app behaviour", () => {
     await expect(home).toBeVisible();
     expect(await back(page)).toBe(false);
   });
+
+  test("the phone's own back gesture (browser history) also steps back, never skipping screens", async ({ page }) => {
+    await login(page, "asha@acme.test");
+    await page.getByRole("button", { name: "AI Assistant" }).click();
+    await expect(page.getByText("NetworQ Assistant")).toBeVisible();
+    await page.goBack();
+    await expect(page.getByText("NetworQ Assistant")).toHaveCount(0);
+    await expect(page.getByText("Your people")).toBeVisible();
+    await page.getByRole("button", { name: "Events", exact: true }).last().click();
+    await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
+    await page.goBack();
+    await expect(page.getByText("Your people")).toBeVisible();
+  });
 });

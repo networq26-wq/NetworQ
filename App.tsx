@@ -1293,8 +1293,24 @@ function NetworQApp() {
   const [meetDetails, setMeetDetails] = useState({ date: "", time: "", notes: "" });
   const [meetSent, setMeetSent] = useState(false);
   const [meetSending, setMeetSending] = useState(false);
+  // Opening the meeting sheet: suggest tomorrow 10:00 so it's one tap to send (easy to change)
+  useEffect(() => {
+    if (!meetModal) return;
+    setMeetDetails((d) => {
+      if (d.date && d.time) return d;
+      const t = new Date(Date.now() + 86400000);
+      const day = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+      return { ...d, date: d.date || day, time: d.time || "10:00" };
+    });
+  }, [meetModal]);
   // How the video link is made: Google Meet (website, via Google Calendar), a pasted link, or a free Jitsi room
-  const [meetMode, setMeetMode] = useState<"google" | "paste" | "jitsi">(GOOGLE_MEET_AVAILABLE ? "google" : "paste");
+  // Default to what always works: your saved meeting link, else a free video room. Google Meet stays one tap away.
+  const [meetMode, setMeetMode] = useState<"google" | "paste" | "jitsi">(() => {
+    try {
+      if (localStorage.getItem("networq.meet.link")) return "paste";
+    } catch {}
+    return "jitsi";
+  });
   const [meetLinkInput, setMeetLinkInput] = useState(() => {
     try {
       return localStorage.getItem("networq.meet.link") || "";
@@ -1844,10 +1860,82 @@ VOICE & ASSISTANT DIRECTIVES:
     }
     return false;
   };
+  // Back via browser history too: while you're anywhere but the People home, keep one history step
+  // on the stack. The phone's back (Android app, mobile Chrome, desktop browser) pops it → we step back
+  // one screen → if you're still not home, the step is put back. At home there's no step, so back leaves.
+  const ignorePop = useRef(false);
+  const isDeep = () =>
+    screen === "app" &&
+    (tab !== "contacts" || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
+      daySummaryOpen || globalSearchOpen || voiceDebriefOpen || nfcWriterOpen || exportContactsOpen || chatOpen || copilotOpen || !!composer ||
+      !!meetModal || bulkEmailModalOpen || !!modal || commandOpen || aiOpen || groupMessageOpen ||
+      (typeof document !== "undefined" && !!document.querySelector('[role="dialog"]')));
+  const pushedStep = useRef(false); // a step this page load added (a leftover from before a reload is never "ours")
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const deep = isDeep();
+    const marked = !!window.history.state?.nqBack;
+    if (deep && !marked) {
+      window.history.pushState({ ...(window.history.state || {}), nqBack: 1 }, "");
+      pushedStep.current = true;
+    } else if (!deep && marked) {
+      if (pushedStep.current) {
+        pushedStep.current = false;
+        ignorePop.current = true; // we're home again: drop our step quietly
+        window.history.back();
+      } else {
+        // left over from before a reload / sign-out: just clear the marker, never navigate
+        const { nqBack, ...rest } = window.history.state || {};
+        window.history.replaceState(rest, "");
+      }
+    }
+  });
+  useEffect(() => {
+    const onPop = () => {
+      if (ignorePop.current) {
+        ignorePop.current = false;
+        return;
+      }
+      backState.current();
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
   useEffect(() => {
     (window as any).__networqHandleBack = () => backState.current();
     return () => {
       delete (window as any).__networqHandleBack;
+    };
+  }, []);
+
+  // Always run the newest version: when the app comes back to the screen (Android keeps it alive for
+  // days), check whether a newer build is live and refresh — never during a call or while typing.
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    const mine = () => (document.querySelector('script[src*="/_expo/static/js/web/index-"]') as HTMLScriptElement | null)?.src.split("/").pop() || "";
+    let checking = false;
+    const check = async () => {
+      if (document.visibilityState !== "visible" || checking) return;
+      const current = mine();
+      if (!current) return; // dev server
+      checking = true;
+      try {
+        const html = await fetch(`/?v=${Date.now()}`, { cache: "no-store" }).then((r) => r.text());
+        const live = (html.match(/\/_expo\/static\/js\/web\/(index-[a-f0-9]+\.js)/) || [])[1];
+        const typing = /^(INPUT|TEXTAREA)$/.test(document.activeElement?.tagName || "");
+        if (live && live !== current && !(window as any).__networqCallBusy && !typing) window.location.reload();
+      } catch {
+        /* offline — try next time */
+      } finally {
+        checking = false;
+      }
+    };
+    document.addEventListener("visibilitychange", check);
+    const t = setInterval(check, 10 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", check);
+      clearInterval(t);
     };
   }, []);
 
@@ -2846,6 +2934,9 @@ Keep it punchy, sharp, and directly actionable.`;
     .nq-stagger > * { animation: nqScreenIn 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
     .nq-stagger > *:nth-child(2) { animation-delay: 25ms; } .nq-stagger > *:nth-child(3) { animation-delay: 50ms; }
     .nq-stagger > *:nth-child(n+4) { animation-delay: 75ms; }
+    /* Sideways strips (chips, Coming up): swipe, but never show a scrollbar line */
+    .nq-chips { scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
+    .nq-chips::-webkit-scrollbar { display: none; width: 0; height: 0; background: transparent; }
     .nq-skeleton { background: linear-gradient(90deg, ${isDark ? "#1C1C1E 25%, #2C2C2E 50%, #1C1C1E 75%" : "#ECECF0 25%, #F7F7FA 50%, #ECECF0 75%"}); background-size: 200% 100%; animation: nqShimmer 1.4s linear infinite; border-radius: 12px; }
     @keyframes nqDraw { to { stroke-dashoffset: 0; } }
     .nq-success-disc { transform-origin: 32px 32px; animation: nqPop 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
@@ -2866,6 +2957,7 @@ Keep it punchy, sharp, and directly actionable.`;
       *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; animation-delay: 0ms !important; transition-duration: 0.01ms !important; }
     }
 
+    input.nq-search-input:focus { border-color: transparent !important; box-shadow: none !important; }
     input:focus, textarea:focus, select:focus {
       border-color: #7C3AED !important;
       box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.22) !important;
@@ -4369,31 +4461,23 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
-                <div style={{ position: "relative", flex: isMobile ? "1 1 0" : "1 1 220px", minWidth: 0 }}>
-                  <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: themeStyles.textMuted, display: "flex" }}>
-                    <Icons.Search size={15} />
+                {/* Product search pill — same look as Events */}
+                <div style={{ flex: isMobile ? "1 1 0" : "1 1 220px", minWidth: 0, display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "0 6px 0 16px", boxSizing: "border-box", borderRadius: 16, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` }}>
+                  <span aria-hidden style={{ color: themeStyles.textMuted, display: "flex" }}>
+                    <I.Search size={18} />
                   </span>
                   <input
-                    placeholder="Search by name, company, role…"
+                    placeholder="Search people"
+                    aria-label="Search people"
                     value={searchQ}
                     onChange={(e) => setSearchQ(e.target.value)}
-                    style={{ ...S.input, width: "100%", minHeight: isMobile ? 44 : 40, paddingLeft: 38, fontSize: isMobile ? 15 : 13 }}
+                    className="nq-search-input"
+                    style={{ flex: 1, minWidth: 0, minHeight: 44, border: "none", outline: "none", background: "transparent", color: themeStyles.text, fontSize: 16, fontFamily: "inherit", padding: 0, boxShadow: "none" }}
                   />
                   {searchQ && (
-                    <span
-                      onClick={() => setSearchQ("")}
-                      style={{
-                        position: "absolute",
-                        right: 12,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        cursor: "pointer",
-                        color: themeStyles.textMuted,
-                        display: "flex",
-                      }}
-                    >
-                      <Icons.Close size={15} />
-                    </span>
+                    <button onClick={() => setSearchQ("")} aria-label="Clear search" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                      <I.X size={14} />
+                    </button>
                   )}
                 </div>
 
@@ -4455,7 +4539,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
                 {!contactsLoading && contacts.length > 0 && (
                   <button
-                    style={{ ...S.btnOutline, fontSize: 13, padding: 0, width: isMobile ? 44 : 40, minHeight: isMobile ? 44 : 40 }}
+                    style={{ ...S.btnOutline, fontSize: 13, padding: 0, width: 52, minHeight: 52, borderRadius: 16 }}
                     onClick={exportCSV}
                     aria-label={`Export ${filtered.length} contacts`}
                     title={`Export ${filtered.length} contacts`}
@@ -6260,7 +6344,10 @@ Keep it punchy, sharp, and directly actionable.`;
                 </div>
                 <div style={{ fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
                   {meetMode === "google" ? (
-                    "Google asks you to allow NetworQ to add events to your calendar, then creates a Meet link and emails the invite."
+                    <>
+                      Google asks you to allow NetworQ to add events to your calendar, then creates a Meet link and emails the invite.{" "}
+                      <span style={{ color: themeStyles.text }}>If Google says “Access blocked”, choose <b>Free room</b> or <b>Paste link</b> instead.</span>
+                    </>
                   ) : meetMode === "paste" ? (
                     <>
                       <input

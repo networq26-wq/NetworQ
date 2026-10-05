@@ -72,3 +72,46 @@ test("provider errors come back as 503 so the app can fall back to device speech
     h.close();
   }
 });
+
+function elevenHarness({ elevenStatus = 200, groq = true } = {}) {
+  const seen = [];
+  const app = express();
+  app.use(express.json());
+  app.use("/api", createTtsRouter({
+    apiKey: groq ? "k" : undefined,
+    voice: "diana",
+    elevenKey: "xi",
+    elevenVoice: "voice123",
+    getUser: async (t) => (t === "tok" ? { id: "u" } : null),
+    fetchImpl: async (url, init) => {
+      seen.push({ url, init });
+      if (url.includes("elevenlabs")) return elevenStatus === 200 ? new Response(Buffer.from("ID3fakemp3"), { status: 200 }) : new Response("{}", { status: elevenStatus });
+      return new Response(Buffer.from("RIFFfakewav"), { status: 200 });
+    },
+  }));
+  const server = app.listen(0);
+  const post = (body) => fetch(`http://127.0.0.1:${server.address().port}/api/tts`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer tok" }, body: JSON.stringify(body) });
+  return { seen, post, close: () => server.close() };
+}
+
+test("ElevenLabs is used first when configured (natural voice, one mp3 clip)", async () => {
+  const h = elevenHarness();
+  try {
+    const d = await (await h.post({ text: "Hello there. This is NetworQ." })).json();
+    assert.equal(d.voice, "elevenlabs");
+    assert.equal(d.clips.length, 1);
+    assert.match(d.clips[0], /^data:audio\/mpeg;base64,/);
+    assert.match(h.seen[0].url, /api\.elevenlabs\.io\/v1\/text-to-speech\/voice123/);
+    assert.equal(h.seen[0].init.headers["xi-api-key"], "xi");
+  } finally { h.close(); }
+});
+
+test("if ElevenLabs fails, the Groq voice takes over; with no fallback it's an honest 503", async () => {
+  const h = elevenHarness({ elevenStatus: 401 });
+  try {
+    const d = await (await h.post({ text: "Hello." })).json();
+    assert.equal(d.voice, "diana");
+  } finally { h.close(); }
+  const h2 = elevenHarness({ elevenStatus: 500, groq: false });
+  try { assert.equal((await h2.post({ text: "Hello." })).status, 503); } finally { h2.close(); }
+});

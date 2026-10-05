@@ -284,7 +284,7 @@ export function SettingsScreen({
             <button style={btn("ghost")} onClick={() => fileRef.current?.click()} disabled={uploading}>
               {uploading ? "Uploading…" : avatar ? "Change photo" : "Add photo"}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" aria-label="Upload profile photo" style={{ display: "none" }} onChange={(e) => e.target.files?.[0] && uploadAvatar(e.target.files[0])} />
+            <input ref={fileRef} type="file" accept="image/*" aria-label="Upload profile photo" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadAvatar(f); }} />
             <div style={{ color: t.muted, fontSize: 12, marginTop: 6 }}>Shown on Event Radar and to people you connect with.</div>
           </div>
         </div>

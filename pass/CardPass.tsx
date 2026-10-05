@@ -143,6 +143,7 @@ export function CardPass({ user, prefs }: { user: User; prefs: PassPrefs }) {
         {/* Front */}
         <div style={{ ...face, background: f.bg, color: f.fg, padding: "7% 7.5%", boxSizing: "border-box", display: "flex", flexDirection: "column", border: f.id === "pearl" ? "1px solid rgba(0,0,0,0.06)" : "none" }}>
           <div aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none", background: `radial-gradient(circle at ${tilt.x}% ${tilt.y}%, rgba(255,255,255,0.2), transparent 55%)` }} />
+          <NetworkTraces accent={f.accent} pearl={f.id === "pearl"} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative" }}>
             {/* Official wordmark: white on dark finishes, full colour on Pearl */}
             <img src={f.id === "pearl" ? "/brand/networq-wordmark.png" : "/brand/networq-wordmark-white.png"} alt="NetworQ" draggable={false} style={{ height: 20, width: "auto", display: "block" }} />
@@ -278,5 +279,54 @@ export function CardSettings({ user, isDark, onEditProfile, onWriteNfc }: { user
         )}
       </div>
     </div>
+  );
+}
+
+// Circuit traces + network nodes, with signal pulses running toward the logo. Decorative only.
+function NetworkTraces({ accent, pearl }: { accent: string; pearl: boolean }) {
+  const line = pearl ? "rgba(124,58,237,0.22)" : "rgba(255,255,255,0.16)";
+  const node = pearl ? "rgba(124,58,237,0.45)" : accent;
+  const pulse = pearl ? "#7C3AED" : "#FFFFFF";
+  // Right-angle traces (PCB style) from the right edge and bottom-right toward the top-left logo area
+  const traces = [
+    "M856 120 H700 L670 90 H520 L490 60 H300",
+    "M856 210 H760 L720 170 H600 L560 130 H430",
+    "M856 300 H790 L750 260 H640",
+    "M730 540 V430 L700 400 V330 L670 300 H560",
+    "M856 470 H800 L770 440 H700",
+  ];
+  const nodes: [number, number][] = [[300, 60], [430, 130], [640, 260], [560, 300], [700, 440], [520, 90], [600, 170], [700, 400]];
+  return (
+    <svg aria-hidden viewBox="0 0 856 540" preserveAspectRatio="xMidYMid slice" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none" }}>
+      <style>{`
+        .nq-trace-pulse { stroke-dasharray: 46 1400; animation: nqTracePulse 4.8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+        .nq-trace-pulse.p2 { animation-delay: 1.6s; } .nq-trace-pulse.p3 { animation-delay: 3.1s; }
+        .nq-node-glow { animation: nqNodeGlow 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+        @keyframes nqTracePulse { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -1446; } }
+        @keyframes nqNodeGlow { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+        @media (prefers-reduced-motion: reduce) { .nq-trace-pulse { display: none; } .nq-node-glow { animation: none; } }
+      `}</style>
+      {/* faint connection mesh (network) behind the traces */}
+      <g stroke={line} strokeWidth={1}>
+        <line x1="640" y1="260" x2="520" y2="90" />
+        <line x1="600" y1="170" x2="560" y2="300" />
+        <line x1="700" y1="400" x2="640" y2="260" />
+      </g>
+      <g fill="none" stroke={line} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        {traces.map((d, i) => <path key={i} d={d} />)}
+      </g>
+      {/* signal pulses travelling inward */}
+      <g fill="none" stroke={pulse} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" opacity={0.9}>
+        <path className="nq-trace-pulse" d={traces[0]} />
+        <path className="nq-trace-pulse p2" d={traces[1]} />
+        <path className="nq-trace-pulse p3" d={traces[3]} />
+      </g>
+      {nodes.map(([x, y], i) => (
+        <g key={i}>
+          <circle cx={x} cy={y} r={7} fill="none" stroke={node} strokeWidth={2} opacity={0.7} />
+          <circle className={i % 3 === 0 ? "nq-node-glow" : undefined} cx={x} cy={y} r={3} fill={node} />
+        </g>
+      ))}
+    </svg>
   );
 }

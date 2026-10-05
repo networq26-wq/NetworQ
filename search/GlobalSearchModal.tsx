@@ -81,18 +81,23 @@ export function GlobalSearchModal({
         {/* Search Input Bar */}
         <div
           style={{
-            padding: "18px 24px",
-            borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+            margin: 16,
+            padding: "0 8px 0 16px",
+            minHeight: 52,
+            borderRadius: 16,
+            background: isDark ? "#2C2C2E" : "#F2F2F7",
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            gap: 10,
           }}
         >
-          <I.Search size={20} style={{ opacity: 0.55 }} />
+          <I.Search size={18} style={{ opacity: 0.6 }} />
           <input
             type="text"
             autoFocus
-            placeholder="Search by name, company, job title, skills, or location…"
+            className="nq-search-input"
+            aria-label="Search"
+            placeholder="Search people, companies, roles"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
