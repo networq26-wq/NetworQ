@@ -17,6 +17,7 @@
 ## Authentication
 - Supabase Auth (email/password, Google). In the Android app, Google sign-in runs in the system browser (PKCE) because Google blocks embedded WebViews.
 - Every private API route verifies the bearer token server-side before doing anything (AI, email, transcribe, TURN, research, import).
+- **App lock** (Android): fingerprint/face or the phone's screen-lock passcode via the OS (expo-local-authentication); setting kept in Android's encrypted storage; changing it requires the owner's fingerprint/passcode.
 - Sign-in alerts, recent devices, sign out everywhere, password change requires the current password, account deletion with a grace period.
 
 ## Authorization highlights

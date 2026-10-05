@@ -3,6 +3,7 @@
 ## 2026-10-05 (afternoon) — "Every user, every device" release
 
 ### New
+- **App lock** — fingerprint / face with the phone's PIN, pattern or password as the passcode (like Google's apps); Lock after Immediately / 1 min / 5 min (Android app).
 - **Google Calendar & Meet for every user** — connect once (in the phone's browser in the app); NetworQ then creates Meet invites from the server; Google emails Accept/Decline. Works on web and in the Android app.
 - **Google sign-in on networq.co.in** — Google now shows "continue to networq.co.in" instead of the Supabase address (NetworQ name + logo after Google's branding review). Older app versions fall back automatically.
 - **Set-password email** — Google-only accounts get one "Set a password" email so they can also sign in with email.
