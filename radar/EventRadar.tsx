@@ -305,7 +305,7 @@ export function EventRadar({
   }
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
+    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text, paddingBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 96px)" }}>
       <ScopeSwitch t={t} scope={scope} onChange={setScope} />
       {scope === "nearby" ? (
         nearby === undefined ? (

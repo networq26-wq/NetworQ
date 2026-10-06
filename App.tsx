@@ -18,7 +18,6 @@ import { createProspectApi } from "./prospect/prospectApi";
 import { MeScreen } from "./me/MeScreen";
 import { CardSettings } from "./pass/CardPass";
 import { MessagesScreen } from "./messages/MessagesScreen";
-import { LiquidGlass } from "quick-liquid/react";
 import { parseContactQr } from "./pass/vcard";
 import { buildInvite, jitsiRoom, normaliseMeetingLink } from "./meet/ics";
 import { BatchScannerModal } from "./scanner/BatchScannerModal";
@@ -6401,15 +6400,13 @@ Keep it punchy, sharp, and directly actionable.`;
             height: 64,
             zIndex: 200,
             borderRadius: 36,
+            background: isDark ? "rgba(22, 22, 28, 0.96)" : "rgba(255, 255, 255, 0.97)",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+            border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "rgba(124, 58, 237, 0.16)"}`,
             boxShadow: isDark ? "0 16px 36px rgba(0,0,0,0.55)" : "0 16px 36px rgba(60, 30, 120, 0.16)",
           }}
         >
-          {/* Liquid glass is only the surface (HIG liquid-glass.md: floating control layer); NetworQ owns layout & layering */}
-          <LiquidGlass
-            // Tuned for legibility over busy content: heavy frost, thin refractive rim, no colour fringing
-            config={{ material: "thick", blur: 14, saturation: 1.6, tintOpacity: isDark ? 0.42 : 0.55, tint: isDark ? "28, 28, 34" : "255, 255, 255", refractionStrength: 9, bezelWidth: 16, chromaticAberration: 0, edgeHighlight: 0.7, specularStrength: 0.18, borderRadius: 36, quality: "medium", appearance: isDark ? "dark" : "light", elevation: 0 }}
-            style={{ width: "100%", height: "100%", borderRadius: 36 }}
-          >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "4px 8px", boxSizing: "border-box", width: "100%" }}>
           {[
             { t: "contacts", icon: Icons.Users, label: "People" },
@@ -6484,7 +6481,6 @@ Keep it punchy, sharp, and directly actionable.`;
             );
           })}
           </div>
-          </LiquidGlass>
         </nav>
       )}
 
