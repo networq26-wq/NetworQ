@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-07 — Group calls & attachments
+
+### New
+- **Group calls** — voice or video with up to 6 people (you + 5 connections). People → Select → *Call N*; everyone rings (in the app or by push), joins, and sees everyone in a video grid; mute / camera / leave; the call ends when everyone has left. Peer-to-peer mesh — no media on our servers.
+- **Photos & files in chat** — 📎 in private chats: photos (shrunk automatically for mobile data), PDF, Office docs, text/CSV, zip up to 10 MB; previews, full-screen photos, file cards; private storage only the two people can open.
+- Antigravity's Radar rings (2/5/10/20 m) and frosted bottom bar — reviewed and fixed (dots aligned to rings, no crash before layout).
+
+
 ## 2026-10-05 (afternoon) — "Every user, every device" release
 
 ### New

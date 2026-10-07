@@ -78,7 +78,7 @@ Rate limits are mounted before routes (global 600/15 min; tighter per endpoint).
 
 ## Data (Supabase)
 
-Migrations: `supabase/migrations/20261001…20261017` (applied in order by `scripts/setup-supabase.mjs`).
+Migrations: `supabase/migrations/20261001…20261019` (applied in order by `scripts/setup-supabase.mjs`).
 
 | Table | What | Access |
 |---|---|---|
@@ -91,6 +91,8 @@ Migrations: `supabase/migrations/20261001…20261017` (applied in order by `scri
 | `public_events` | imported real events (category, dedupe key) | read: everyone signed in; write: server |
 | `direct_chats`, `chat_messages` | 1:1 + event-room messages | read by members; write only via `send_chat_message` |
 | `calls` | ringing / accepted / declined / missed / cancelled / ended | read by the two people; write only via `start_call` / `answer_call` / `end_call` |
+| `group_calls`, `group_call_members` | group call + who's ringing / joined / left | members only; write only via `start_group_call` / `join_group_call` / `leave_group_call` |
+| `storage: chat-files` (private) | chat photos & files under `<chat_id>/…` | the two people in that chat (`chat_file_allowed`) |
 | `notifications` | bell items (connection, message, call, reminder, …) + push/email dispatch flags | owner |
 | `push_tokens` | Expo / Web Push subscriptions | via RPCs |
 | `google_calendar_links` | per-user Google refresh token (AES-256-GCM encrypted) + email | server only (no client access) |

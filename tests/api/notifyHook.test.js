@@ -157,3 +157,17 @@ test("an incoming call is pushed with a link straight into the call and a 60 s e
     h.close();
   }
 });
+
+test("a group call push opens straight into that group call", async () => {
+  const h = pushHarness({ type: "call" });
+  h.n.title = "Asha Rao";
+  h.n.body = "Incoming group video call";
+  h.n.data = { from_user: "asha", screen: "call", group_call_id: "g-9", kind: "video" };
+  try {
+    await h.post({ notification_id: "p1" });
+    assert.equal(h.pushed[0].m.url, "https://app.test/?open=call&with=asha&gcall=g-9");
+    assert.equal(h.pushed[0].m.ttl, 60);
+  } finally {
+    h.close();
+  }
+});

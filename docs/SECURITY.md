@@ -28,6 +28,8 @@
 | Blocking | `radar_is_blocked()` checked in radar, chat, calls and realtime topic auth, both directions |
 | Messages | no direct inserts/updates; `send_chat_message` requires connection + no block; 30/min; event rooms members-only, never the Nearby space |
 | Calls | no direct writes; `start_call` connected + unblocked + 10 per 5 min; only the callee can answer; only participants can end; 45 s ring window; helper functions not executable by clients |
+| Group calls | `start_group_call` only with connected, unblocked people (2–5), rate-limited; members-only `gcall:<id>` channel; media peer-to-peer |
+| Chat files | private bucket; object path must be the chat's folder; send checks the file exists and was uploaded by the sender; short-lived signed links; blocks cut access |
 | Realtime channels | private `chat:<id>` / `call:<u1>_<u2>` topics authorised by `realtime_topic_allowed()` (members only, connected, unblocked) |
 | Radar | rotating random tokens (15 min), no location stored, resolve only for active members, periodic revalidation drops blocked/hidden people |
 | Push | tokens registered via RPC; dead tokens pruned; call pushes expire after 60 s |

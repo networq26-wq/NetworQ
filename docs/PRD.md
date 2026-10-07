@@ -69,7 +69,8 @@ Web (desktop + mobile browsers) and an Android app (WebView shell with native ca
 
 | Priority | Item |
 |---|---|
-| Next | Group calls & screen share (Jitsi/LiveKit), photos & files in chat, TURN relay account |
+| ✅ Built (7 Oct) | Group calls (up to 6, mesh) and photos & files in chat |
+| Next | Screen share, group chats, TURN relay account |
 | Next | iOS app (EAS) and Play Store listing |
 | Later | CSV / LinkedIn import, CRM sync (HubSpot, Salesforce, Zoho) |
 | Later | Teams / organisation workspaces and shared event lists |

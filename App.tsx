@@ -26,6 +26,7 @@ import { IntroductionsModal } from "./network/IntroductionsModal";
 import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
 import { ComingUp } from "./people/ComingUp";
 import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
+import { GroupCallLayer, startGroupCall, openGroupCall } from "./calls/GroupCallLayer";
 import { useVoiceRecorder } from "./voice/useVoiceRecorder";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
@@ -1137,6 +1138,11 @@ function NetworQApp() {
     const w = new URLSearchParams(window.location.search).get("with");
     return w && /^[0-9a-f-]{36}$/i.test(w) ? w : null;
   });
+  const [openGroupCallId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const c = new URLSearchParams(window.location.search).get("gcall");
+    return c && /^[0-9a-f-]{36}$/i.test(c) ? c : null;
+  });
   // ?open=call&call=<call id> (from an incoming-call push)
   const [openCallId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -1629,7 +1635,8 @@ VOICE & ASSISTANT DIRECTIVES:
     if (screen !== "app" || !openTarget) return;
     if (openTarget === "call") {
       // let the call layer mount and subscribe first
-      if (openCallId) setTimeout(() => openCall(openCallId), 600);
+      if (openGroupCallId) setTimeout(() => openGroupCall(openGroupCallId), 600);
+      else if (openCallId) setTimeout(() => openCall(openCallId), 600);
     } else if (openTarget === "chat") {
       if (openChatWith) {
         setChatPartner({ id: openChatWith, name: "Message" });
@@ -1667,6 +1674,10 @@ VOICE & ASSISTANT DIRECTIVES:
     notif.markRead([n.id]);
     setNotifOpen(false);
     const screen = n.data?.screen;
+    if (screen === "call" && (n.data as any)?.group_call_id) {
+      openGroupCall((n.data as any).group_call_id);
+      return;
+    }
     if (screen === "call" && n.data?.call_id) {
       openCall(n.data.call_id); // still ringing → Accept / Decline; otherwise "That call has ended"
       return;
@@ -1729,7 +1740,7 @@ VOICE & ASSISTANT DIRECTIVES:
 
   const backState = useRef<() => boolean>(() => false);
   backState.current = () => {
-    if ((window as any).__networqCallBusy) return true; // back never drops a live call
+    if ((window as any).__networqCallBusy || (window as any).__networqGroupCallBusy) return true; // back never drops a live call
     // Topmost open sheet/dialog (incl. ones inside feature screens): press its own Close/Back button,
     // otherwise send Escape. Back always closes what's on top first.
     const dialogs = Array.from(document.querySelectorAll<HTMLElement>('[role="dialog"]')).filter((d) => d.offsetParent !== null || getComputedStyle(d).position === "fixed");
@@ -6537,11 +6548,27 @@ Keep it punchy, sharp, and directly actionable.`;
               <button disabled={!onApp} onClick={() => setGroupMessageOpen(true)} style={barBtn(!!onApp)}>
                 <I.Mail size={16} /> Message{onApp ? ` ${onApp}` : ""}
               </button>
+              {onApp >= 2 && (
+                <button
+                  disabled={onApp > 5}
+                  onClick={() => {
+                    startGroupCall(picked.filter((c) => c.linkedUserId).map((c) => ({ id: c.linkedUserId, name: c.name || "NetworQ member" })), "video");
+                    setSelectMode(false);
+                    setSelectedIds(new Set());
+                  }}
+                  aria-label={`Group call ${onApp} people`}
+                  style={barBtn(onApp <= 5)}
+                >
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m22 8-6 4 6 4V8Z" /><rect x="2" y="6" width="14" height="12" rx="2" /></svg>
+                  Call {onApp}
+                </button>
+              )}
             </div>
             {picked.length > 0 && (picked.length > withEmail || picked.length > onApp) && (
               <div style={{ fontSize: 12, color: themeStyles.textMuted, padding: "8px 4px 0", lineHeight: 1.4 }}>
                 {picked.length > withEmail && `${picked.length - withEmail} without email. `}
-                {picked.length > onApp && `${picked.length - onApp} not on NetworQ, so they can't get messages.`}
+                {picked.length > onApp && `${picked.length - onApp} not on NetworQ, so they can't get messages or calls.`}
+                {onApp > 5 && " Group calls are up to 5 people plus you."}
               </div>
             )}
           </div>
@@ -7363,6 +7390,9 @@ Keep it punchy, sharp, and directly actionable.`;
       {/* ── CALLS: ring anywhere; voice & video ── */}
       {screen === "app" && currentUser?.id && (
         <CallLayer supabase={supabase} me={{ id: currentUser.id, name: currentUser.name }} apiBaseUrl={apiBase(AI_PROXY)} showToast={showToast} />
+      )}
+      {screen === "app" && currentUser?.id && (
+        <GroupCallLayer supabase={supabase} me={{ id: currentUser.id, name: currentUser.name }} apiBaseUrl={apiBase(AI_PROXY)} showToast={showToast} />
       )}
 
       {/* ── REALTIME IN-APP CHAT & EVENT ROOM MESSAGING ── */}

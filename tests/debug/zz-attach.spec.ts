@@ -30,7 +30,7 @@ test("photo + file in chat: sender uploads, receiver sees the preview and the fi
   await expect(photo).toBeVisible({ timeout: 30_000 });
   await expect(b.getByRole("button", { name: "Open deck.pdf" }).last()).toBeVisible();
   const loaded = await b.waitForFunction(() => {
-    const imgs = [...document.querySelectorAll('button[aria-label="Open photo"] img')] as HTMLImageElement[];
+    const imgs = Array.from(document.querySelectorAll("button[aria-label=\"Open photo\"] img")) as HTMLImageElement[];
     const img = imgs[imgs.length - 1];
     return img && img.complete && img.naturalWidth > 0 ? img.naturalWidth : false;
   }, null, { timeout: 30_000 });

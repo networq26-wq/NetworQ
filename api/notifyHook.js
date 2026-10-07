@@ -38,7 +38,8 @@ function createNotifyHookRouter(deps) {
       else {
         const screen = n.data?.screen;
         const withUser = (screen === "chat" || screen === "call") && n.data?.from_user ? `&with=${encodeURIComponent(n.data.from_user)}` : "";
-        const callId = screen === "call" && n.data?.call_id ? `&call=${encodeURIComponent(n.data.call_id)}` : "";
+        const callId =
+          screen === "call" && n.data?.group_call_id ? `&gcall=${encodeURIComponent(n.data.group_call_id)}` : screen === "call" && n.data?.call_id ? `&call=${encodeURIComponent(n.data.call_id)}` : "";
         const url = `${deps.appUrl}/${screen ? `?open=${encodeURIComponent(screen)}${withUser}${callId}` : ""}`;
         // A ring is only useful while it's ringing: drop it if it can't be delivered within a minute
         const ttl = n.type === "call" ? 60 : undefined;

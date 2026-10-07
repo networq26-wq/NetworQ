@@ -254,7 +254,7 @@ export function CallLayer({
   // ── Outgoing ──
   const start = useCallback(
     async (to: CallPeer, kind: CallKind) => {
-      if (phaseRef.current !== "idle") return showToast("You're already in a call.", "info");
+      if (phaseRef.current !== "idle" || (window as any).__networqGroupCallBusy) return showToast("You're already in a call.", "info");
       setPeer(to);
       setPhase("outgoing");
       try {
@@ -284,7 +284,7 @@ export function CallLayer({
     async (row: CallRow) => {
       if (row.callee_id !== me.id || row.status !== "ringing") return;
       if (Date.now() - new Date(row.created_at).getTime() > RING_MS) return;
-      if (phaseRef.current !== "idle") return; // busy: they'll see a missed call
+      if (phaseRef.current !== "idle" || (window as any).__networqGroupCallBusy) return; // busy: they'll see a missed call
       const { data: n } = await supabase.from("notifications").select("title").eq("dedupe_key", `call:${row.id}`).maybeSingle();
       setPeer({ id: row.caller_id, name: (n as any)?.title || "NetworQ member" });
       setCall(row);
