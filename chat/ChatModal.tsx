@@ -120,6 +120,25 @@ export function ChatModal({
     }
   };
 
+  // 📎 photos & files (private chats): upload to the chat's private folder, then send with any typed caption
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const sendAttachment = async (file: File) => {
+    if (!partner?.id || !chatId || sending || uploading) return;
+    const caption = inputText.trim();
+    setUploading(file.type.startsWith("image/") ? "Sending photo…" : `Sending ${file.name}…`);
+    try {
+      const attachment = await chatApi.uploadAttachment(chatId, file);
+      const sent = await chatApi.sendMessage({ chatId, recipientId: partner.id, content: caption, attachment });
+      setInputText("");
+      setMessages((prev) => (prev.some((m) => m.id === sent.id) ? prev : [...prev, sent]));
+    } catch (err: any) {
+      showToast(err.message || "Couldn't send the file.", "error");
+    } finally {
+      setUploading(null);
+    }
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputText).trim();
     if (!text || sending) return;
@@ -347,6 +366,7 @@ export function ChatModal({
                       boxShadow: isMine ? "0 2px 8px rgba(124, 58, 237, 0.25)" : "none",
                     }}
                   >
+                    {m.attachment_path && <AttachmentView api={chatApi} m={m} mine={isMine} isDark={isDark} />}
                     {m.content}
                     <div
                       style={{
@@ -413,6 +433,13 @@ export function ChatModal({
           ))}
         </div>
 
+        {uploading && (
+          <div role="status" style={{ padding: "8px 16px", fontSize: 13, color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="nq-spin" style={{ width: 14, height: 14, borderRadius: 7, border: "2px solid rgba(124,58,237,0.3)", borderTopColor: "#7C3AED" }} />
+            {uploading}
+          </div>
+        )}
+
         {/* Input Bar */}
         <form
           onSubmit={(e) => {
@@ -428,6 +455,34 @@ export function ChatModal({
             gap: 10,
           }}
         >
+          {partner && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                aria-label="Attach a photo or file"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) sendAttachment(f);
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!chatId || !!uploading}
+                aria-label="Attach a photo or file"
+                title="Photo or file"
+                style={{ width: 40, height: 40, minWidth: 40, borderRadius: 20, border: "none", background: isDark ? "rgba(255,255,255,0.08)" : "#F3F4F6", color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: chatId && !uploading ? "pointer" : "default", opacity: chatId && !uploading ? 1 : 0.5 }}
+              >
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
+            </>
+          )}
           <input
             type="text"
             value={inputText}
@@ -467,5 +522,55 @@ export function ChatModal({
         </form>
       </div>
     </div>
+  );
+}
+
+// A photo (preview, tap for full size) or a file card (icon, name, size, tap to open). Links are short-lived.
+function AttachmentView({ api, m, mine, isDark }: { api: ReturnType<typeof createChatApi>; m: ChatMessage; mine: boolean; isDark: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [full, setFull] = useState(false);
+  const isImage = (m.attachment_type || "").startsWith("image/");
+  useEffect(() => {
+    let alive = true;
+    if (isImage && m.attachment_path) api.fileUrl(m.attachment_path).then((u) => alive && setUrl(u));
+    return () => {
+      alive = false;
+    };
+  }, [api, m.attachment_path, isImage]);
+  const size = m.attachment_size ? (m.attachment_size > 1048576 ? `${(m.attachment_size / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(m.attachment_size / 1024))} KB`) : "";
+  const open = async () => {
+    const u = await api.fileUrl(m.attachment_path!, isImage ? undefined : m.attachment_name || "file");
+    if (u) window.open(u, "_blank", "noopener");
+  };
+  if (isImage) {
+    return (
+      <>
+        <button onClick={() => setFull(true)} aria-label="Open photo" style={{ all: "unset", cursor: "pointer", display: "block", margin: m.content ? "0 0 8px" : 0 }}>
+          {url ? (
+            <img src={url} alt={m.attachment_name || "Photo"} style={{ display: "block", maxWidth: 240, maxHeight: 300, width: "100%", borderRadius: 12, objectFit: "cover" }} />
+          ) : (
+            <span className="nq-skeleton" style={{ display: "block", width: 200, height: 150, borderRadius: 12 }} />
+          )}
+        </button>
+        {full && url && (
+          <div role="dialog" aria-modal="true" aria-label="Photo" onClick={() => setFull(false)} style={{ position: "fixed", inset: 0, zIndex: 10001, background: "rgba(0,0,0,0.92)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+            <img src={url} alt={m.attachment_name || "Photo"} style={{ maxWidth: "100%", maxHeight: "100%", objectFit: "contain", borderRadius: 8 }} />
+            <button aria-label="Close" onClick={() => setFull(false)} style={{ position: "absolute", top: "calc(var(--safe-top, 0px) + 16px)", right: 16, width: 40, height: 40, borderRadius: 20, border: "none", background: "rgba(255,255,255,0.18)", color: "#FFF", fontSize: 20, cursor: "pointer" }}>
+              ×
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }
+  const ext = (m.attachment_name || "").split(".").pop()?.toUpperCase().slice(0, 4) || "FILE";
+  return (
+    <button onClick={open} aria-label={`Open ${m.attachment_name || "file"}`} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, minWidth: 200, maxWidth: 260, padding: 10, margin: m.content ? "0 0 8px" : 0, borderRadius: 12, background: mine ? "rgba(255,255,255,0.16)" : isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF" }}>
+      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, background: mine ? "rgba(255,255,255,0.22)" : "rgba(124,58,237,0.12)", color: mine ? "#FFF" : "#7C3AED" }}>{ext}</span>
+      <span style={{ minWidth: 0 }}>
+        <span style={{ display: "block", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.attachment_name || "File"}</span>
+        <span style={{ display: "block", fontSize: 12, opacity: 0.75 }}>{size ? `${size} · ` : ""}Tap to open</span>
+      </span>
+    </button>
   );
 }

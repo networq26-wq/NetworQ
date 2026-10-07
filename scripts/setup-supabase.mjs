@@ -68,6 +68,7 @@ const MIGRATIONS = [
   "20261015_avatar_select.sql",
   "20261016_google_calendar.sql",
   "20261017_password_setup_sent.sql",
+  "20261018_chat_attachments.sql",
 ];
 
 const authConfig = {
