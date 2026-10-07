@@ -15,9 +15,10 @@ const RING_FOR_BUCKET: Record<DistanceBucket, number> = {
 };
 const UNKNOWN_RING = 0.92;
 const RINGS: { r: number; label: string }[] = [
-  { r: 0.47, label: "5 m" },
-  { r: 0.64, label: "10 m" },
-  { r: 0.8, label: "20 m" },
+  { r: 0.30, label: "2 m" },
+  { r: 0.50, label: "5 m" },
+  { r: 0.70, label: "10 m" },
+  { r: 0.88, label: "20 m" },
 ];
 
 function hashAngle(id: string): number {
@@ -94,19 +95,27 @@ export function RadarCanvas({
       ctx.arc(c, c, R, 0, Math.PI * 2);
       ctx.fill();
 
+      // Outer boundary ring
+      ctx.strokeStyle = isDark ? "rgba(167, 139, 250, 0.42)" : "rgba(124, 58, 237, 0.35)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(c, c, R, 0, Math.PI * 2);
+      ctx.stroke();
+
       // Rings
-      ctx.font = "600 10px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
+      ctx.font = "700 11px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
       ctx.textAlign = "left";
       for (const ring of RINGS) {
-        ctx.strokeStyle = isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.08)";
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 5]);
+        ctx.strokeStyle = isDark ? "rgba(167, 139, 250, 0.40)" : "rgba(124, 58, 237, 0.36)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
         ctx.beginPath();
         ctx.arc(c, c, R * ring.r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)";
-        ctx.fillText(ring.label, c + 4, c - R * ring.r + 12);
+        ctx.fillStyle = isDark ? "#C4B5FD" : "#6D28D9";
+        ctx.fillText(ring.label, c + 6, c - R * ring.r + 13);
       }
 
       // Sweep
