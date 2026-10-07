@@ -22,22 +22,35 @@ export function Waitlist() {
       setStatus("loading");
       setErrorMsg("");
 
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/join_waitlist`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        },
-        body: JSON.stringify({ p_email: cleanEmail }),
-      });
+      let data: any = null;
+      try {
+        const apiRes = await fetch("/api/waitlist/join", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail }),
+        });
+        if (apiRes.ok) {
+          data = await apiRes.json();
+        }
+      } catch (_) {}
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || errJson.hint || "Failed to join waitlist");
+      if (!data) {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/join_waitlist`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ p_email: cleanEmail }),
+        });
+
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.message || errJson.hint || "Failed to join waitlist");
+        }
+        data = await res.json();
       }
-
-      const data = await res.json();
       setPosition(data.position || null);
 
       if (data.already_exists) {

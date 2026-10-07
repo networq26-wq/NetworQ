@@ -152,10 +152,30 @@ function connectionAccepted({ name, otherName, otherTitle, eventName, appUrl }) 
   };
 }
 
+function waitlistConfirmation({ email, position, appUrl = "https://www.networq.co.in" }) {
+  const num = position ? `#${position}` : "early access";
+  return {
+    subject: "You're on the NetworQ early access list 🎉",
+    appUrl,
+    preview: position ? `You're #${position} on the NetworQ waitlist.` : "Welcome to NetworQ early access.",
+    heading: "You're on the early access list! 🎉",
+    lines: [
+      "Thank you for joining the NetworQ early access waitlist.",
+      position
+        ? `You have reserved spot ${num} in our priority queue.`
+        : "Your spot in our priority queue is confirmed.",
+      "NetworQ quietly remembers every connection, scans business cards into actionable contacts, and drafts intelligent follow-ups so you never lose momentum.",
+      "We are onboarding members in waves to guarantee high-touch service and speed. We will send your personal invite link as soon as your access is active.",
+    ],
+    cta: { label: "Explore NetworQ", url: appUrl },
+    footnote: "Thank you for supporting NetworQ — Professional Network Intelligence.",
+  };
+}
+
 async function render(tpl) {
   const el = h(Layout, tpl);
   const [html, text] = await Promise.all([renderEmail(el), renderEmail(el, { plainText: true })]);
   return { subject: tpl.subject, html, text };
 }
 
-module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, render, setPassword };
+module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, waitlistConfirmation, render, setPassword };

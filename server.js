@@ -221,8 +221,9 @@ app.get("/terms", (req, res) => res.sendFile(path.join(legalDir, "terms.html")))
 app.get("/delete-account", (req, res) => res.sendFile(path.join(legalDir, "delete-account.html")));
 app.get("/bot", (req, res) => res.sendFile(path.join(legalDir, "bot.html")));
 
-// ── Waitlist ──────────────────────────────────────────────────────────────────
-app.get("/waitlist", (req, res) => waitlistHandler(req, res));
+// ── Waitlist & Admin Dashboard ────────────────────────────────────────────────
+app.use("/waitlist", (req, res) => waitlistHandler(req, res));
+app.use("/api/waitlist", (req, res) => waitlistHandler(req, res));
 
 // ── Company enrichment ────────────────────────────────────────────────────────
 app.all("/api/enrich", async (req, res) => enrichHandler(req, res));
@@ -411,6 +412,9 @@ function startServer() {
       const admin = createSupabaseClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
       stopCrawler = startEventsCrawler(admin);
     }
+    const { processPendingWaitlistEmails } = require("./api/waitlist");
+    processPendingWaitlistEmails().catch(console.error);
+    var waitlistTimer = setInterval(() => processPendingWaitlistEmails().catch(console.error), 60 * 1000);
   }
 
   // ── Graceful shutdown: finish in-flight requests on deploy/restart ──────────
@@ -422,6 +426,7 @@ function startServer() {
     if (reminderTimer) clearInterval(reminderTimer);
     if (purgeTimer) clearInterval(purgeTimer);
     if (stopCrawler) stopCrawler();
+    if (typeof waitlistTimer !== "undefined" && waitlistTimer) clearInterval(waitlistTimer);
     let open = servers.length;
     if (!open) process.exit(0);
     servers.forEach((srv) =>
