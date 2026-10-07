@@ -479,8 +479,23 @@
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('join_waitlist', { p_email: email });
-      if (error) throw error;
+      let data = null;
+      try {
+        const apiRes = await fetch('/api/waitlist/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (apiRes.ok) {
+          data = await apiRes.json();
+        }
+      } catch (_) {}
+
+      if (!data) {
+        const { data: sbData, error } = await supabase.rpc('join_waitlist', { p_email: email });
+        if (error) throw error;
+        data = sbData;
+      }
 
       const pos          = data.position;
       const dupe         = data.already_exists;

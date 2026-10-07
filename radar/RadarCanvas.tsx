@@ -102,7 +102,7 @@ export function RadarCanvas({
       ctx.arc(c, c, R, 0, Math.PI * 2);
       ctx.fill();
 
-      // Outer edge
+      // Outer boundary ring
       ctx.strokeStyle = isDark ? "rgba(167, 139, 250, 0.42)" : "rgba(124, 58, 237, 0.35)";
       ctx.lineWidth = 1.5;
       ctx.setLineDash([]);
