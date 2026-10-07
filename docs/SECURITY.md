@@ -17,6 +17,7 @@
 ## Authentication
 - Supabase Auth (email/password, Google). In the Android app, Google sign-in runs in the system browser (PKCE) because Google blocks embedded WebViews.
 - Every private API route verifies the bearer token server-side before doing anything (AI, email, transcribe, TURN, research, import).
+- **App lock** (Android): fingerprint/face or the phone's screen-lock passcode via the OS (expo-local-authentication); setting kept in Android's encrypted storage; changing it requires the owner's fingerprint/passcode.
 - Sign-in alerts, recent devices, sign out everywhere, password change requires the current password, account deletion with a grace period.
 
 ## Authorization highlights
@@ -30,6 +31,8 @@
 | Realtime channels | private `chat:<id>` / `call:<u1>_<u2>` topics authorised by `realtime_topic_allowed()` (members only, connected, unblocked) |
 | Radar | rotating random tokens (15 min), no location stored, resolve only for active members, periodic revalidation drops blocked/hidden people |
 | Push | tokens registered via RPC; dead tokens pruned; call pushes expire after 60 s |
+| Google Calendar | refresh tokens encrypted (AES-256-GCM, key derived from `LINK_SIGNING_SECRET`), table readable only by the server; OAuth `state` is HMAC-signed and expires in 10 min; revoked tokens are deleted |
+| Google sign-in | code exchanged on the server; only the ID token is handed back (URL fragment / app link — never logged); Supabase verifies it against NetworQ's client ID |
 
 ## Input & abuse controls
 - Rate limits (express-rate-limit) mounted before routes: global 600/15 min (the secret-protected DB webhook is exempt); AI 60/min; transcribe 20/min; email 20/min; events import 20/min; TTS 30/min; calls 10/min; account/auth 30/min. Daily per-user caps (`increment_ai_usage`): drafts 40, card scans 10, sends 50, research 20, transcriptions 60.

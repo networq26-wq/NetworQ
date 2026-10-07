@@ -5,7 +5,7 @@ import { PasswordInput } from "../ui/PasswordInput";
 import type { AccountApi } from "./accountApi";
 import { OrganizationForm } from "../prospect/OrganizationForm";
 import type { ProspectApi } from "../prospect/prospectApi";
-import { BlockedUsers, HelpAbout, PushSwitch, RecentDevices } from "./MoreSettings";
+import { AppLockSetting, BlockedUsers, HelpAbout, PushSwitch, RecentDevices } from "./MoreSettings";
 import { hapticsEnabled, setHapticsEnabled, haptic } from "../ui/haptics";
 
 const PURPLE = "#7C3AED";
@@ -346,6 +346,7 @@ export function SettingsScreen({
           </button>
         </div>
 
+        <AppLockSetting t={t} showToast={showToast} />
         <RecentDevices supabase={supabase} t={t} btn={btn("ghost")} onSignOutEverywhere={signOutEverywhere} />
       </section>
 

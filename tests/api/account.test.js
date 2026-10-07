@@ -79,6 +79,9 @@ function harness() {
       async sendPasswordReset(email) {
         state.resets.push(email);
       },
+      async markPasswordSetupSent(userId) {
+        state.profiles[userId].password_setup_sent_at = "now";
+      },
       async passwordSetupLink(email) {
         state.setupLinks.push(email);
         return "https://jp.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=https://app.test";
@@ -241,6 +244,26 @@ test("email/password sign-ups get the normal welcome (no setup link)", async () 
     await h.call("/auth/session-event", { token: "tok-asha", body: { type: "signed_in" } });
     assert.doesNotMatch(h.state.sent[0].html, /Set a password/);
     assert.deepEqual(h.state.setupLinks, []);
+  } finally {
+    h.close();
+  }
+});
+
+test("an older Google-only account gets one 'Set a password' email on its next sign-in, never twice", async () => {
+  const h = harness();
+  try {
+    h.state.devices.push({ user_id: "gina", device_hash: "old-device", user_agent: "x" }); // not a first login
+    await h.call("/auth/session-event", { token: "tok-gina", body: { type: "signed_in" } });
+    const mail = h.state.sent.find((m) => m.subject === "Set a password for NetworQ");
+    assert.ok(mail, "set-password email sent");
+    assert.equal(mail.to, "gina@gmail.test");
+    assert.match(mail.html, /verify\?token=abc/);
+    assert.equal(h.state.profiles.gina.password_setup_sent_at, "now");
+    h.state.sent.length = 0;
+    await h.call("/auth/session-event", { token: "tok-gina", body: { type: "signed_in" } });
+    assert.equal(h.state.sent.filter((m) => m.subject === "Set a password for NetworQ").length, 0, "only once");
+    await h.call("/auth/session-event", { token: "tok-asha", body: { type: "signed_in" } });
+    assert.equal(h.state.sent.filter((m) => m.subject === "Set a password for NetworQ").length, 0, "email users never get it");
   } finally {
     h.close();
   }

@@ -39,10 +39,18 @@ export function useGoogleAuthBridge(webViewRef: React.RefObject<React.ElementRef
       }
       if (msg?.type !== "auth:google") return;
       try {
-        const { verifier, challenge } = await pkcePair();
-        const result = await WebBrowser.openAuthSessionAsync(buildAuthorizeUrl(supabaseUrl, challenge), AUTH_REDIRECT);
+        // NetworQ's own sign-in page: Google shows "continue to networq.co.in" (not the Supabase address)
+        const result = await WebBrowser.openAuthSessionAsync(`${allowedOrigin}/api/google/signin?from=app`, AUTH_REDIRECT);
         if (result.type !== "success") return send({ type: "auth:error", message: "Google sign-in was cancelled." });
-        const parsed = parseCallback(result.url);
+        const q = new URLSearchParams(result.url.split("?")[1]?.split("#")[0] || "");
+        const idToken = q.get("id_token");
+        if (idToken) return send({ type: "auth:idtoken", idToken });
+        if (q.get("error") && !q.get("fallback")) return send({ type: "auth:error", message: q.get("error") });
+        // Fallback: the older Supabase PKCE flow
+        const { verifier, challenge } = await pkcePair();
+        const legacy = await WebBrowser.openAuthSessionAsync(buildAuthorizeUrl(supabaseUrl, challenge), AUTH_REDIRECT);
+        if (legacy.type !== "success") return send({ type: "auth:error", message: "Google sign-in was cancelled." });
+        const parsed = parseCallback(legacy.url);
         if ("error" in parsed) return send({ type: "auth:error", message: parsed.error });
         const session = await exchangeCode(supabaseUrl, supabaseAnonKey, parsed.code, verifier);
         send({ type: "auth:session", ...session });

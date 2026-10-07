@@ -86,16 +86,27 @@ function createAccountRouter(deps) {
     const newDevice = !firstLogin && !devices.some((d) => d.device_hash === hash);
     await deps.store.upsertDevice(user.id, hash, ua);
 
+    // Google-only accounts get ONE "Set a password" link (first sign-in, or the next sign-in for older accounts)
+    const providers = user.app_metadata?.providers || [];
+    const googleOnly = providers.length > 0 && !providers.includes("email");
+    const owesSetup = googleOnly && !profile.password_setup_sent_at && !!deps.store.passwordSetupLink;
+    let setPasswordUrl = null;
+    if (owesSetup) {
+      setPasswordUrl = await deps.store.passwordSetupLink(user.email).catch((err) => {
+        console.warn("[Account] password setup link failed:", err.message);
+        return null;
+      });
+    }
+    const markSent = async () => {
+      if (setPasswordUrl && deps.store.markPasswordSetupSent) await deps.store.markPasswordSetupSent(user.id).catch(() => {});
+    };
+
     if (firstLogin) {
-      const providers = user.app_metadata?.providers || [];
-      let setPasswordUrl = null;
-      if (providers.length && !providers.includes("email") && deps.store.passwordSetupLink) {
-        setPasswordUrl = await deps.store.passwordSetupLink(user.email).catch((err) => {
-          console.warn("[Account] password setup link failed:", err.message);
-          return null;
-        });
-      }
       await mail(user.email, emails.welcome({ name: profile.name, appUrl: deps.appUrl, setPasswordUrl }));
+      await markSent();
+    } else if (setPasswordUrl) {
+      await mail(user.email, emails.setPassword({ name: profile.name, appUrl: deps.appUrl, setPasswordUrl }));
+      await markSent();
     } else if (newDevice && profile.notification_prefs?.login_alerts !== false) {
       const city = req.headers["cf-ipcity"] || req.headers["x-vercel-ip-city"];
       await mail(
@@ -186,7 +197,8 @@ function productionDeps() {
       listDevices: async (userId) => must(await admin.from("login_devices").select("device_hash").eq("user_id", userId)),
       upsertDevice: async (userId, hash, ua) =>
         must(await admin.from("login_devices").upsert({ user_id: userId, device_hash: hash, user_agent: ua, last_seen: new Date().toISOString() }, { onConflict: "user_id,device_hash" })),
-      getProfile: async (userId) => must(await admin.from("profiles").select("name, notification_prefs, deletion_scheduled_at").eq("id", userId).maybeSingle()),
+      getProfile: async (userId) => must(await admin.from("profiles").select("name, notification_prefs, deletion_scheduled_at, password_setup_sent_at").eq("id", userId).maybeSingle()),
+      markPasswordSetupSent: async (userId) => must(await admin.from("profiles").update({ password_setup_sent_at: new Date().toISOString() }).eq("id", userId)),
       setDeletion: async (userId, at) => must(await admin.from("profiles").update({ deletion_scheduled_at: at }).eq("id", userId)),
       revokeSessions: async (userId) => must(await admin.rpc("revoke_all_sessions", { p_user_id: userId })),
       getEmail: async (userId) => must(await admin.auth.admin.getUserById(userId)).user?.email,

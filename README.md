@@ -18,9 +18,9 @@
 | 💬 | **Messages** | Private 1:1 chat between connected people — live, with typing and read receipts. "New message" lists your contacts. |
 | 📞 | **Voice & video calls** | Call any connection; it rings on any screen and by push when the app is closed. Mute, camera, flip. |
 | 📡 | **Radar** | *Nearby*: NetworQ people around you over Bluetooth (Android app). *Events*: join an event code and see who's there. |
-| 🗓️ | **Events** | Real events from Luma, Eventbrite, Meetup and calendar feeds — location, dates, calendar, categories; "Going" opens the event's Radar. |
+| 🗓️ | **Events** | Auto-scrolling featured events, then real events from Luma, Eventbrite, Meetup and calendar feeds — location, dates, calendar, categories; "Going" opens the event's Radar. |
 | 🪪 | **Your card** | Premium credit-card-style digital card with your photo and a QR any phone camera can save; NFC write. |
-| 📅 | **Meetings** | Google Meet, a pasted link, or a free Jitsi room — sent with a real calendar invite (Accept/Decline in Gmail/Outlook). |
+| 📅 | **Meetings** | Google Meet (connect Google Calendar once — works on web and in the app), a pasted link, or a free Jitsi room — always with a real calendar invite (Accept/Decline). |
 | 🔔 | **Notifications** | In-app bell + push (Android via Expo/FCM, browsers via Web Push) for messages, calls, connections, reminders. |
 | ⚙️ | **Me** | Profile, card, organization, notifications, privacy & blocking, password & devices, appearance, data export, account. |
 
@@ -36,10 +36,11 @@ Everything shown is real data — no sample contacts, invented events or fake AI
 | Android | Expo WebView shell (`App.native.tsx` = `App.android.tsx`), EAS cloud builds |
 | Server | Node.js + Express (`server.js`, `api/*`) on **Render**, auto-deploys from `main` |
 | Data / auth / realtime | **Supabase** — Postgres with RLS, security-definer RPCs, Realtime channels, Storage |
-| AI | **Groq** — `qwen/qwen3.8-27b` and `openai/gpt-oss-120b/20b` (chat, extraction, drafting), `whisper-large-v3-turbo` (speech→text), Orpheus (text→speech), vision model for card scans |
+| AI | **Groq** — `qwen/qwen3.8-27b` and `openai/gpt-oss-120b/20b` (chat, extraction, drafting), `whisper-large-v3-turbo` (speech→text), vision for card scans · **ElevenLabs** natural voice (Groq Orpheus fallback) |
 | Email | **Resend** (SMTP fallback) |
 | Push | Expo Push → FCM (Android) · Web Push with VAPID (browsers) |
 | Calls | WebRTC peer-to-peer; signalling on private Supabase Realtime channels; optional TURN relay |
+| Google | Sign-in via networq.co.in (ID token → Supabase); Calendar/Meet via per-user encrypted refresh tokens on the server |
 | Marketing | `public/waitlist.html` served by `server.js`; marketing site in `landing/` (TanStack Start, on the Gemini branch) |
 
 ---
@@ -100,6 +101,7 @@ The APK wraps the live site, so most changes reach phones without a new APK. Reb
 | [docs/QA_REPORT.md](docs/QA_REPORT.md) | Everyone | Latest release-gate results |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Engineers | Why things are the way they are |
 | [CHANGELOG.md](CHANGELOG.md) | Everyone | What changed, release by release |
+| [docs/PROJECT_HISTORY.md](docs/PROJECT_HISTORY.md) | Everyone | Contributors (Gemini/Antigravity, Claude), full timeline, current status |
 
 ---
 

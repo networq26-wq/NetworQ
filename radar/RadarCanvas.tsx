@@ -4,22 +4,24 @@ import React, { useEffect, useRef } from "react";
 import { BUCKET_LABEL, type DistanceBucket } from "./proximity";
 import type { RadarPerson } from "./useEventRadar";
 
-// Inner ring keeps clear of the YOU marker (avatar 16px + marker 12px)
-const RING_FOR_BUCKET: Record<DistanceBucket, number> = {
-  very_close: 0.23,
-  "3m": 0.35,
-  "5m": 0.47,
-  "10m": 0.64,
-  "20m": 0.8,
-  far: 0.92,
-};
-const UNKNOWN_RING = 0.92;
+// One table for both the rings and where people are drawn, so a "~10 m" person always sits ON the 10 m ring.
+// Inner ring keeps clear of the YOU marker (avatar 16px + marker 12px).
+const RING_R = { m2: 0.3, m5: 0.5, m10: 0.7, m20: 0.88 } as const;
 const RINGS: { r: number; label: string }[] = [
-  { r: 0.30, label: "2 m" },
-  { r: 0.50, label: "5 m" },
-  { r: 0.70, label: "10 m" },
-  { r: 0.88, label: "20 m" },
+  { r: RING_R.m2, label: "2 m" },
+  { r: RING_R.m5, label: "5 m" },
+  { r: RING_R.m10, label: "10 m" },
+  { r: RING_R.m20, label: "20 m" },
 ];
+const RING_FOR_BUCKET: Record<DistanceBucket, number> = {
+  very_close: 0.22, // inside the 2 m ring
+  "3m": 0.4, // between 2 m and 5 m
+  "5m": RING_R.m5,
+  "10m": RING_R.m10,
+  "20m": RING_R.m20,
+  far: 0.96, // past 20 m, just inside the edge
+};
+const UNKNOWN_RING = 0.96;
 
 function hashAngle(id: string): number {
   let h = 2166136261;
@@ -84,6 +86,11 @@ export function RadarCanvas({
       const t = (now - start) / 1000;
       const c = size / 2;
       const R = size / 2 - 6;
+      // Not laid out yet (hidden tab, first frame, mid-resize): skip this frame instead of drawing with a negative radius
+      if (R < 24) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       ctx.clearRect(0, 0, size, size);
 
       // Field
@@ -163,9 +170,8 @@ export function RadarCanvas({
       const live = new Set<string>();
       for (const p of peopleRef.current) {
         live.add(p.userId);
-        const fallbackRings = [0.35, 0.47, 0.64, 0.8];
-        const hashIdx = Math.abs(Math.floor(hashAngle(p.userId) * 100)) % fallbackRings.length;
-        const target = p.bucket ? (RING_FOR_BUCKET[p.bucket] || UNKNOWN_RING) : fallbackRings[hashIdx];
+        // No distance reading → the outer band (never a ring that would suggest a distance we don't know)
+        const target = p.bucket ? (RING_FOR_BUCKET[p.bucket] || UNKNOWN_RING) : UNKNOWN_RING;
         let b = blips.current.get(p.userId);
         if (!b) {
           const home = hashAngle(p.userId);
@@ -290,3 +296,6 @@ export function RadarCanvas({
     </div>
   );
 }
+
+// exported for tests
+export { RING_FOR_BUCKET, RINGS };

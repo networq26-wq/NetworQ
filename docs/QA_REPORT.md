@@ -1,4 +1,17 @@
-# QA report — release gate, 2026-10-05
+# QA report
+
+## Latest — 2026-10-05 afternoon (Google Calendar/sign-in, ElevenLabs, card, hero)
+| Check | Result |
+|---|---|
+| Backend + database (`npm test`) | ✅ 184 tests; 2 port-collision flakes under load pass 23/23 ×3 when run alone |
+| End-to-end (desktop + phone) | ✅ 132 passed; 2 two-phone Radar BLE simulations time out only under heavy machine load (load avg 120+), pass when run alone — Radar code unchanged |
+| Live, real backend | ✅ voice copilot (Whisper → AI → **ElevenLabs** voice, confirmed in production) · voice note → saved with reminder · meeting invite email with calendar file (Resend) · Add to calendar · video call (ring instant, connect ~9 s) · messages · photo upload ×2 · radar · events · card |
+| Google on production | ✅ `/api/google/available` = true; sign-in redirects to Google with `redirect_uri=https://www.networq.co.in/api/google/callback` |
+| Sign-in layout | ✅ logo stays below a 36 px status bar on a short (keyboard-open) screen |
+
+---
+
+# Release gate, 2026-10-05 (night)
 
 **Verdict: GO.** Two independent QA agents (full test suite; backend/database/security audit), then fixes for everything they found, then a final full run.
 

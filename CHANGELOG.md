@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-10-05 (afternoon) — "Every user, every device" release
+
+### New
+- **App lock** — fingerprint / face with the phone's PIN, pattern or password as the passcode (like Google's apps); Lock after Immediately / 1 min / 5 min (Android app).
+- **Google Calendar & Meet for every user** — connect once (in the phone's browser in the app); NetworQ then creates Meet invites from the server; Google emails Accept/Decline. Works on web and in the Android app.
+- **Google sign-in on networq.co.in** — Google now shows "continue to networq.co.in" instead of the Supabase address (NetworQ name + logo after Google's branding review). Older app versions fall back automatically.
+- **Set-password email** — Google-only accounts get one "Set a password" email so they can also sign in with email.
+- **ElevenLabs voice** for the AI assistant (natural voice), Groq voice as fallback.
+- **Events hero** — auto-scrolling featured events (BookMyShow/District style), swipeable, India-first.
+- **Card** — circuit-trace network design, drawn by exact geometry, with signal pulses.
+- **Always-current app** — refreshes itself to the newest build when reopened.
+
+### Fixed
+- Profile photo upload ("new row violates row-level security") and re-picking a photo.
+- Back button: browser-history safety net (phone back gesture); no stale steps after reload/sign-out.
+- Sign-in screens no longer slide under the status bar.
+- Scrollbar lines removed from sideways strips; product-style search bars; one-tap meetings (tomorrow 10:00 pre-filled).
+- "Share" on the profile is now "Share card".
+
+
 ## 2026-10-05 — "Talk to your people" release
 
 ### New
