@@ -24,11 +24,16 @@ export function Waitlist() {
 
       let data: any = null;
       try {
-        const apiRes = await fetch("/api/waitlist/join", {
+        // Same-origin on networq.co.in; from any other host call the main site (8 s, then Supabase directly)
+        const sameOrigin = /^(www\.)?networq\.co\.in$|onrender\.com$|^localhost$|^127\.0\.0\.1$/.test(window.location.hostname);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const apiRes = await fetch(`${sameOrigin ? "" : "https://www.networq.co.in"}/api/waitlist/join`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: cleanEmail }),
-        });
+          signal: ctrl.signal,
+        }).finally(() => clearTimeout(timer));
         if (apiRes.ok) {
           data = await apiRes.json();
         }

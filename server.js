@@ -151,7 +151,9 @@ app.use(
         origin === "https://www.networq.co.in" ||
         origin === "https://networq.co.in" ||
         origin === "https://networq-epf0.onrender.com" ||
-        origin === "https://networq-app.surge.sh"
+        origin === "https://networq-app.surge.sh" ||
+        origin === "https://waitlist.networq.co.in" ||
+        origin === "https://networq-waitlist.pages.dev"
       ) {
         return callback(null, true);
       }

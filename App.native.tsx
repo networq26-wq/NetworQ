@@ -125,6 +125,11 @@ function Shell() {
   // mailto:, tel:, sms:, intent: etc. can't load inside the WebView — hand them to the OS
   const handleShouldStartLoad = useCallback((request: ShouldStartLoadRequest) => {
     if (/^(about|data|blob):/i.test(request.url)) return true;
+    // Chat photos/files (Supabase Storage links) open in the phone's own viewer, which can show PDFs and save files
+    if (request.isTopFrame && /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\//i.test(request.url)) {
+      Linking.openURL(request.url).catch(() => {});
+      return false;
+    }
     // Only NetworQ itself (and Supabase auth redirects) load inside the app, which has camera/mic access.
     // Any other site — event pages, Google Calendar, Meet links — opens in the phone's browser/apps.
     if (/^https:\/\/(([a-z0-9-]+\.)*networq\.co\.in|[a-z0-9-]+\.supabase\.co)(\/|$|\?|#)/i.test(request.url)) return true;
@@ -168,6 +173,15 @@ function Shell() {
           mediaCapturePermissionGrantType="grant"
           originWhitelist={["*"]}
           onShouldStartLoadWithRequest={handleShouldStartLoad}
+          // window.open / target=_blank: NetworQ pages stay in the app, anything else opens on the phone
+          onOpenWindow={(e) => {
+            const url = e.nativeEvent.targetUrl;
+            if (/^https:\/\/([a-z0-9-]+\.)*networq\.co\.in(\/|$|\?|#)/i.test(url)) {
+              webViewRef.current?.injectJavaScript(`window.location.href=${JSON.stringify(url)};true;`);
+            } else if (url) {
+              Linking.openURL(url).catch(() => {});
+            }
+          }}
           injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}\n${APPLOCK_CAPABILITY_JS}`}
           onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {

@@ -52,6 +52,26 @@ const IS_NATIVE_WEBVIEW = typeof window !== "undefined" && !!(window as any).Rea
 const NATIVE_GOOGLE_AUTH = IS_NATIVE_WEBVIEW && !!(window as any).__NETWORQ_SHELL__?.googleAuth;
 const GOOGLE_SIGNIN_AVAILABLE = !IS_NATIVE_WEBVIEW || NATIVE_GOOGLE_AUTH;
 
+// The app's WebView can't show new windows: window.open and target="_blank" links silently did nothing
+// (chat files, event pages, WhatsApp, mailto). Navigate instead — the shell opens other sites, mail and
+// WhatsApp in the phone's own apps, and files in the phone's viewer.
+if (IS_NATIVE_WEBVIEW && typeof document !== "undefined") {
+  window.open = ((url?: string | URL) => {
+    if (url) window.location.href = String(url);
+    return null;
+  }) as typeof window.open;
+  document.addEventListener(
+    "click",
+    (e) => {
+      const a = (e.target as Element | null)?.closest?.("a[target=_blank]") as HTMLAnchorElement | null;
+      if (!a || !a.href || e.defaultPrevented) return;
+      e.preventDefault();
+      window.location.href = a.href;
+    },
+    false // bubble: React's own onClick handlers (which may preventDefault) run first
+  );
+}
+
 const EMAIL_PROXY = process.env.EXPO_PUBLIC_EMAIL_PROXY_URL || AI_PROXY.replace(/\/api\/ai$/, "/api/email");
 installSignOutHook(supabase);
 

@@ -481,11 +481,18 @@
     try {
       let data = null;
       try {
-        const apiRes = await fetch('/api/waitlist/join', {
+        // On networq.co.in (Render) the API is same-origin; elsewhere (e.g. the Cloudflare copy at
+        // waitlist.networq.co.in) call the main site so the confirmation email goes out right away.
+        // If the server is slow to wake, fall back to Supabase directly after 8 s.
+        const sameOrigin = /^(www\.)?networq\.co\.in$|onrender\.com$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        const apiRes = await fetch((sameOrigin ? '' : 'https://www.networq.co.in') + '/api/waitlist/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email }),
-        });
+          signal: ctrl.signal,
+        }).finally(() => clearTimeout(timer));
         if (apiRes.ok) {
           data = await apiRes.json();
         }
