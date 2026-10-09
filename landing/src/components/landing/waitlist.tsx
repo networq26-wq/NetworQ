@@ -6,12 +6,33 @@ const SUPABASE_URL = "https://jpuxmkkuzqojqeatespa.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpwdXhta2t1enFvanFlYXRlc3BhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc5OTA5MDEsImV4cCI6MjEwMzU2NjkwMX0.eO4xWQyVlA0KzvnJugFADiVrahWXTRDEUq-k5uRcPp0";
 
+// Where this visit came from (UTM tags / ?ref= invite code / referring page) — sent with the sign-up
+function visitDetails(source: string) {
+  const p = new URLSearchParams(window.location.search);
+  let tz = "";
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+  } catch {
+    /* older browsers */
+  }
+  return {
+    source,
+    utm_source: p.get("utm_source") || "",
+    utm_medium: p.get("utm_medium") || "",
+    utm_campaign: p.get("utm_campaign") || "",
+    ref: p.get("ref") || "",
+    referrer: document.referrer && !document.referrer.startsWith(window.location.origin) ? document.referrer : "",
+    tz,
+  };
+}
+
 export function Waitlist() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "already" | "error">("idle");
   const [position, setPosition] = useState<number | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [copied, setCopied] = useState(false);
+  const [refCode, setRefCode] = useState<string | null>(null);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,7 +52,7 @@ export function Waitlist() {
         const apiRes = await fetch(`${sameOrigin ? "" : "https://www.networq.co.in"}/api/waitlist/join`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: cleanEmail }),
+          body: JSON.stringify({ email: cleanEmail, ...visitDetails("landing") }),
           signal: ctrl.signal,
         }).finally(() => clearTimeout(timer));
         if (apiRes.ok) {
@@ -57,6 +78,7 @@ export function Waitlist() {
         data = await res.json();
       }
       setPosition(data.position || null);
+      setRefCode(data.ref_code || null);
 
       if (data.already_exists) {
         setStatus("already");
@@ -72,7 +94,8 @@ export function Waitlist() {
 
   const handleShare = () => {
     const text = "I just reserved my early access spot for NetworQ — the AI networking and digital identity CRM. Check it out:";
-    const url = "https://www.networq.co.in/waitlist";
+    // Your own invite link: people who join through it move you up the invite queue
+    const url = `https://waitlist.networq.co.in/${refCode ? `?ref=${encodeURIComponent(refCode)}` : ""}`;
     if (navigator.share) {
       navigator.share({ title: "NetworQ Waitlist", text, url }).catch(() => {});
     } else if (navigator.clipboard) {

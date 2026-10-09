@@ -172,10 +172,26 @@ function waitlistConfirmation({ email, position, appUrl = "https://www.networq.c
   };
 }
 
+function waitlistInvite({ appUrl = "https://www.networq.co.in", apkUrl = "https://www.networq.co.in/download/NetworQ.apk" }) {
+  return {
+    subject: "Your NetworQ access is ready",
+    appUrl,
+    preview: "You're in. Create your NetworQ account today.",
+    heading: "You're in — welcome to NetworQ",
+    lines: [
+      "Thank you for waiting. Your early access to NetworQ is now open.",
+      "Create your account with this email address to keep your early-access spot. Scan business cards, remember every conversation, and follow up on time.",
+      `On Android? Install the app: ${apkUrl}`,
+    ],
+    cta: { label: "Create my account", url: appUrl },
+    footnote: "This invite is for you. Reply to this email if you have any questions.",
+  };
+}
+
 async function render(tpl) {
   const el = h(Layout, tpl);
   const [html, text] = await Promise.all([renderEmail(el), renderEmail(el, { plainText: true })]);
   return { subject: tpl.subject, html, text };
 }
 
-module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, waitlistConfirmation, render, setPassword };
+module.exports = { welcome, newSignIn, passwordChanged, deletionScheduled, connectionRequest, connectionAccepted, waitlistConfirmation, waitlistInvite, render, setPassword };

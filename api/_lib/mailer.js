@@ -1,5 +1,26 @@
 // Transactional sender: Resend → SMTP → dev log. Never throws on dev fallback.
-async function sendTransactional({ to, subject, html, text }) {
+const { recordEmail } = require("./health");
+
+function emailProvider() {
+  if (process.env.RESEND_API_KEY) return { name: "resend", from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev" };
+  if (process.env.SMTP_HOST) return { name: "smtp", from: process.env.SMTP_USER || "" };
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) return { name: "gmail", from: process.env.GMAIL_USER };
+  return { name: "none", from: "" };
+}
+
+// Counts sends / failures for the admin Health page
+async function sendTransactional(msg) {
+  try {
+    const r = await deliver(msg);
+    if (r.provider !== "dev") recordEmail(true);
+    return r;
+  } catch (err) {
+    recordEmail(false, { subject: msg.subject, error: err.message });
+    throw err;
+  }
+}
+
+async function deliver({ to, subject, html, text }) {
   if (process.env.RESEND_API_KEY) {
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
     const from = /</.test(fromEmail) ? fromEmail : `NetworQ <${fromEmail}>`;
@@ -26,4 +47,4 @@ async function sendTransactional({ to, subject, html, text }) {
   return { provider: "dev" };
 }
 
-module.exports = { sendTransactional };
+module.exports = { sendTransactional, emailProvider };

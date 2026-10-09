@@ -478,6 +478,18 @@
     }
 
     setLoading(true);
+    // Where this visit came from (UTM tags / ?ref= invite code / referring page / time zone)
+    function visitDetails() {
+      var p = new URLSearchParams(location.search), tz = '';
+      try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (_) {}
+      return {
+        source: 'waitlist-page',
+        utm_source: p.get('utm_source') || '', utm_medium: p.get('utm_medium') || '', utm_campaign: p.get('utm_campaign') || '',
+        ref: p.get('ref') || '',
+        referrer: document.referrer && document.referrer.indexOf(location.origin) !== 0 ? document.referrer : '',
+        tz: tz,
+      };
+    }
     try {
       let data = null;
       try {
@@ -490,7 +502,7 @@
         const apiRes = await fetch((sameOrigin ? '' : 'https://www.networq.co.in') + '/api/waitlist/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify(Object.assign({ email }, visitDetails())),
           signal: ctrl.signal,
         }).finally(() => clearTimeout(timer));
         if (apiRes.ok) {

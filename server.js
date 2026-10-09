@@ -23,6 +23,7 @@ const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
 const { isAllowedOrigin } = require("./api/_lib/cors");
 
 const app = express();
+app.use(require("./api/_lib/health").healthMiddleware); // request / 5xx counters for the admin Health page
 app.set("trust proxy", 1); // Render / Fly / Railway sit behind one proxy hop — needed for per-IP limits
 app.disable("x-powered-by");
 app.use(compression());
