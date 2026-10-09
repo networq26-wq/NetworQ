@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-10-09 — Waitlist site live, links & files in the Android app
+
+### Fixed
+- **waitlist.networq.co.in** was down (Cloudflare error 1001 / no HTTPS certificate): the custom domain on the Cloudflare Pages project `networq-waitlist` was stuck at "CNAME not set". Re-validated; HTTPS works and http redirects to https.
+- The subdomain now serves the **full landing page** (`landing/`: hero, problem, solution, features, recall, why, waitlist, footer) instead of the one-screen sign-up page. Published as static files: `vite build` in `landing/`, render `/` once with `wrangler dev`, deploy `index.html` plus `.output/public` with `wrangler pages deploy --project-name networq-waitlist`. **Don't redeploy `waitlist-deploy/` to that project**: it would replace the full page with the simple one.
+- Waitlist forms hosted off Render (the Cloudflare page and the landing site) call `https://www.networq.co.in/api/waitlist/join` (CORS allowed), so the confirmation email goes out immediately. After 8 s they fall back to Supabase directly.
+- **Android app:** `window.open` and `target=_blank` links did nothing (chat files, event pages, WhatsApp, prospect sources, settings links, mailto). In the app they now navigate, and the shell opens other sites in the phone's apps. Works in the installed app. The new APK also opens chat photos/files in the phone's own viewer.
+- Removed hand-written `declarations.d.ts` (it shadowed the real expo-local-authentication / expo-secure-store types).
+
 ## 2026-10-07 — Group calls & attachments
 
 ### New
