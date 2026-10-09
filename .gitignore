@@ -73,3 +73,4 @@ modules/*/android/build/
 modules/*/android/.cxx/
 .preview-metro.log
 .preview-api.log
+waitlist-deploy
