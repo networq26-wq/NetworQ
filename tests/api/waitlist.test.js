@@ -77,6 +77,7 @@ test("dashboard text is HTML-escaped", () => {
 function harness() {
   const app = express();
   app.use(express.json());
+  app.use(express.urlencoded({ extended: false }));
   app.use("/api/waitlist", (req, res) => waitlist(req, res));
   const server = app.listen(0);
   const base = `http://127.0.0.1:${server.address().port}/api/waitlist`;
@@ -105,16 +106,20 @@ test("dashboard and CSV export need the admin password", async () => {
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;
   const h = harness();
   try {
-    for (const p of ["/dashboard", "/export.csv"]) {
-      const none = await fetch(h.base + p);
-      assert.equal(none.status, 401, p);
-      assert.match(none.headers.get("www-authenticate") || "", /Basic/);
-      assert.equal((await fetch(h.base + p, { headers: basic("wrong") })).status, 401, p);
+    // the dashboard shows a sign-in form, never the list, without the right credentials
+    for (const headers of [{}, basic("wrong")]) {
+      const r = await fetch(h.base + "/dashboard", { headers });
+      assert.doesNotMatch(await r.text(), /waitlist-table/);
     }
+    const none = await fetch(h.base + "/export.csv");
+    assert.equal(none.status, 401);
+    assert.match(none.headers.get("www-authenticate") || "", /Basic/);
+    assert.equal((await fetch(h.base + "/export.csv", { headers: basic("wrong") })).status, 401);
+    // Basic auth (ID "admin" by default + password) still works for scripts
     const ok = await fetch(h.base + "/dashboard", { headers: basic("correct horse battery") });
     assert.equal(ok.status, 200);
     assert.equal(ok.headers.get("cache-control"), "no-store");
-    assert.match(await ok.text(), /Waitlist Dashboard/);
+    assert.match(await ok.text(), /waitlist-table/);
     // a crafted URL can't reach the export through the query string
     assert.doesNotMatch((await fetch(h.base + "/?x=/export")).headers.get("content-type") || "", /csv/);
     assert.equal((await fetch(h.base + "/nope/export")).status, 404);
@@ -136,5 +141,67 @@ test("join rejects invalid emails without touching the database", async () => {
     }
   } finally {
     h.close();
+  }
+});
+
+test("admin panel: ID + password sign-in, session cookie, CSV, sign-out; forged cookies rejected", async () => {
+  const saved = { user: process.env.WAITLIST_ADMIN_USER, pw: process.env.WAITLIST_ADMIN_PASSWORD, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  process.env.WAITLIST_ADMIN_USER = "founder";
+  process.env.WAITLIST_ADMIN_PASSWORD = "s3cret-pass phrase";
+  delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const h = harness();
+  const form = (body) => ({ method: "POST", redirect: "manual", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(body).toString() });
+  try {
+    // signed out → login form, never the list
+    const login = await fetch(h.base + "/admin");
+    assert.equal(login.status, 200);
+    const html = await login.text();
+    assert.match(html, /Admin ID/);
+    assert.doesNotMatch(html, /waitlist-table/);
+    assert.equal(login.headers.get("x-frame-options"), "DENY");
+    assert.equal((await fetch(h.base + "/admin/export.csv")).status, 401);
+
+    // wrong ID or wrong password
+    for (const body of [{ id: "admin", password: "s3cret-pass phrase" }, { id: "founder", password: "nope" }, {}]) {
+      const r = await fetch(h.base + "/admin/login", form(body));
+      assert.equal(r.status, 401);
+      assert.match(await r.text(), /Wrong ID or password/);
+      assert.equal(r.headers.get("set-cookie"), null);
+    }
+
+    // right ID + password → cookie → dashboard + CSV
+    const ok = await fetch(h.base + "/admin/login", form({ id: "founder", password: "s3cret-pass phrase" }));
+    assert.equal(ok.status, 303);
+    assert.equal(ok.headers.get("location"), "/api/waitlist/admin");
+    const setCookie = ok.headers.get("set-cookie");
+    assert.match(setCookie, /nq_wl_admin=\d+\.[\w-]+;.*HttpOnly; SameSite=Strict/);
+    const cookie = setCookie.split(";")[0];
+    const dash = await fetch(h.base + "/admin", { headers: { cookie } });
+    const dashHtml = await dash.text();
+    assert.match(dashHtml, /waitlist-table/);
+    assert.match(dashHtml, /Sign out/);
+    assert.equal((await fetch(h.base + "/admin/export.csv", { headers: { cookie } })).status, 503); // no DB key in tests → reached the export
+
+    // forged / expired cookies don't work
+    const [exp] = cookie.split("=")[1].split(".");
+    for (const bad of [`nq_wl_admin=${exp}.AAAA`, `nq_wl_admin=${Number(exp) + 1}.${cookie.split(".")[1]}`, `nq_wl_admin=1000.${cookie.split(".")[1]}`]) {
+      assert.doesNotMatch(await (await fetch(h.base + "/admin", { headers: { cookie: bad } })).text(), /waitlist-table/);
+    }
+
+    // changing the password signs existing sessions out
+    process.env.WAITLIST_ADMIN_PASSWORD = "a new password";
+    assert.doesNotMatch(await (await fetch(h.base + "/admin", { headers: { cookie } })).text(), /waitlist-table/);
+    process.env.WAITLIST_ADMIN_PASSWORD = "s3cret-pass phrase";
+
+    // sign out clears the cookie
+    const out = await fetch(h.base + "/admin/logout", { method: "POST", redirect: "manual", headers: { cookie } });
+    assert.equal(out.status, 303);
+    assert.match(out.headers.get("set-cookie"), /nq_wl_admin=; Max-Age=0/);
+  } finally {
+    h.close();
+    for (const [k, v] of [["WAITLIST_ADMIN_USER", saved.user], ["WAITLIST_ADMIN_PASSWORD", saved.pw], ["SUPABASE_SERVICE_ROLE_KEY", saved.key]]) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
   }
 });

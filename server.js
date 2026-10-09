@@ -226,6 +226,7 @@ app.get("/delete-account", (req, res) => res.sendFile(path.join(legalDir, "delet
 app.get("/bot", (req, res) => res.sendFile(path.join(legalDir, "bot.html")));
 
 // ── Waitlist & Admin Dashboard ────────────────────────────────────────────────
+app.use(["/waitlist", "/api/waitlist"], express.urlencoded({ extended: false, limit: "10kb" })); // admin sign-in form
 app.use("/waitlist", (req, res) => waitlistHandler(req, res));
 app.use("/api/waitlist", (req, res) => waitlistHandler(req, res));
 

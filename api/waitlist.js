@@ -1,7 +1,8 @@
-// Waitlist: public sign-up page + join API, a confirmation email per new sign-up, and a
-// password-protected admin dashboard / CSV export.
-//   • the dashboard and export list every email address, so they are OFF unless
-//     WAITLIST_ADMIN_PASSWORD is set, and then need HTTP Basic auth (any username + that password)
+// Waitlist: public sign-up page + join API, a confirmation email per new sign-up, and an
+// admin panel (ID + password) listing every sign-up with a CSV export.
+//   • the admin panel is OFF unless WAITLIST_ADMIN_PASSWORD is set; the ID is WAITLIST_ADMIN_USER
+//     (default "admin"). Sign-in sets a 12-hour signed, HttpOnly session cookie.
+//     Open it at https://www.networq.co.in/waitlist/admin
 //   • a row is "claimed" (notified=true) before its email is sent, so two servers / the join
 //     request and the background timer can never send the same person two emails
 //   • the background sender only looks at recent sign-ups, so a deploy never emails the whole list
@@ -42,26 +43,51 @@ function sha(s) {
   return crypto.createHash("sha256").update(String(s)).digest();
 }
 
-// true = allowed; otherwise the response has been sent
-function requireAdmin(req, res) {
+const SESSION_COOKIE = "nq_wl_admin";
+const SESSION_MS = 12 * 60 * 60 * 1000;
+
+function adminCreds() {
   const password = process.env.WAITLIST_ADMIN_PASSWORD;
+  return password ? { user: process.env.WAITLIST_ADMIN_USER || "admin", password } : null;
+}
+const safeEqual = (a, b) => crypto.timingSafeEqual(sha(a), sha(b));
+
+// Session = "<expiry>.<HMAC(expiry)>", keyed by the credentials + a server secret, so changing the
+// password signs everyone out and the cookie can't be forged
+function signSession(c, exp) {
+  const key = sha(`nq-wl-admin|${c.user}|${c.password}|${process.env.SUPABASE_SERVICE_ROLE_KEY || ""}`);
+  return `${exp}.${crypto.createHmac("sha256", key).update(String(exp)).digest("base64url")}`;
+}
+function readCookie(req, name) {
+  const m = new RegExp(`(?:^|;\\s*)${name}=([^;]+)`).exec(req.headers.cookie || "");
+  return m ? m[1] : "";
+}
+function hasSession(req, c) {
+  const raw = readCookie(req, SESSION_COOKIE);
+  const exp = Number(raw.split(".")[0]);
+  return !!raw && exp > Date.now() && safeEqual(raw, signSession(c, exp));
+}
+// Basic auth still works for scripts (e.g. a Google Sheets IMPORTDATA proxy): ID:password
+function hasBasic(req, c) {
+  const m = /^Basic\s+(.+)$/i.exec(req.headers.authorization || "");
+  if (!m) return false;
+  const d = Buffer.from(m[1], "base64").toString("utf8");
+  const i = d.indexOf(":");
+  if (i < 0) return false;
+  const userOk = safeEqual(d.slice(0, i), c.user);
+  const passOk = safeEqual(d.slice(i + 1), c.password);
+  return userOk && passOk;
+}
+function adminHeaders(res) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Robots-Tag", "noindex, nofollow");
-  if (!password) {
-    res.status(404).send("Not found");
-    return false;
-  }
-  const m = /^Basic\s+(.+)$/i.exec(req.headers.authorization || "");
-  let given = "";
-  if (m) {
-    const decoded = Buffer.from(m[1], "base64").toString("utf8");
-    given = decoded.slice(decoded.indexOf(":") + 1);
-  }
-  if (m && crypto.timingSafeEqual(sha(given), sha(password))) return true;
-  res.setHeader("WWW-Authenticate", 'Basic realm="NetworQ waitlist", charset="UTF-8"');
-  res.status(401).send("Sign in to see the waitlist.");
-  return false;
+  res.setHeader("X-Frame-Options", "DENY");
 }
+function cookieFlags(req) {
+  const secure = req.secure || req.headers["x-forwarded-proto"] === "https";
+  return `Path=/; HttpOnly; SameSite=Strict${secure ? "; Secure" : ""}`;
+}
+const adminBase = (req) => `${req.baseUrl || "/waitlist"}/admin`;
 
 /**
  * Claims the row (notified=false → true) and sends the confirmation; un-claims if sending fails.
@@ -120,8 +146,10 @@ async function processPendingWaitlistEmails(supabase = getAdmin(), opts = {}) {
  */
 function waitlistHandler(req, res) {
   const p = (req.path || "/").replace(/\/+$/, "") || "/";
-  if (req.method === "GET" && (p === "/export" || p === "/export.csv")) return handleCsvExport(req, res);
-  if (req.method === "GET" && p === "/dashboard") return handleDashboard(req, res);
+  if (req.method === "GET" && (p === "/admin" || p === "/dashboard")) return handleAdmin(req, res);
+  if (req.method === "POST" && p === "/admin/login") return handleLogin(req, res);
+  if (req.method === "POST" && p === "/admin/logout") return handleLogout(req, res);
+  if (req.method === "GET" && (p === "/admin/export.csv" || p === "/export" || p === "/export.csv")) return handleCsvExport(req, res);
   if (req.method === "POST" && (p === "/join" || p === "/")) return handleJoin(req, res);
   if (req.method === "GET" && p === "/") return servePage(req, res);
   return res.status(404).send("Not found");
@@ -177,7 +205,13 @@ async function loadRows() {
 }
 
 async function handleCsvExport(req, res) {
-  if (!requireAdmin(req, res)) return;
+  adminHeaders(res);
+  const c = adminCreds();
+  if (!c) return res.status(404).send("Not found");
+  if (!hasSession(req, c) && !hasBasic(req, c)) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="NetworQ waitlist", charset="UTF-8"');
+    return res.status(401).send("Sign in at /waitlist/admin first.");
+  }
   const { rows, error } = await loadRows();
   if (error) return res.status(503).send(error);
   let csv = "Position,Email,Joined At,Confirmation Sent,ID\r\n";
@@ -191,84 +225,142 @@ async function handleCsvExport(req, res) {
   return res.status(200).send(csv);
 }
 
-async function handleDashboard(req, res) {
-  if (!requireAdmin(req, res)) return;
-  const { rows, error: errorMsg } = await loadRows();
-  const count = rows.length;
-  const notifiedCount = rows.filter((r) => r.notified).length;
+async function handleAdmin(req, res) {
+  adminHeaders(res);
+  const c = adminCreds();
+  if (!c) return res.status(404).send(page("Admin not set up", `<div class="card narrow"><h1>Admin panel is off</h1><p class="muted">Set <b>WAITLIST_ADMIN_USER</b> and <b>WAITLIST_ADMIN_PASSWORD</b> on the server to turn it on.</p></div>`));
+  if (hasSession(req, c) || hasBasic(req, c)) return renderDashboard(req, res);
+  return res.status(200).send(loginPage(req));
+}
 
-  const html = `<!DOCTYPE html>
+async function handleLogin(req, res) {
+  adminHeaders(res);
+  const c = adminCreds();
+  if (!c) return res.status(404).send("Not found");
+  const userOk = safeEqual(String(req.body?.id ?? ""), c.user);
+  const passOk = safeEqual(String(req.body?.password ?? ""), c.password);
+  if (!userOk || !passOk) return res.status(401).send(loginPage(req, "Wrong ID or password."));
+  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=${signSession(c, Date.now() + SESSION_MS)}; Max-Age=${SESSION_MS / 1000}; ${cookieFlags(req)}`);
+  return res.redirect(303, adminBase(req));
+}
+
+function handleLogout(req, res) {
+  adminHeaders(res);
+  res.setHeader("Set-Cookie", `${SESSION_COOKIE}=; Max-Age=0; ${cookieFlags(req)}`);
+  return res.redirect(303, adminBase(req));
+}
+
+const STYLE = `
+    :root { --bg:#0C0E1A; --card:#151828; --border:#262B45; --text:#F3F4F8; --muted:#8E95AA; --accent:#8B5CF6; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
+    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 32px 16px; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    .brand { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+    .brand span { color: var(--accent); }
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+    .narrow { max-width: 400px; margin: 10vh auto 0; }
+    h1 { font-size: 22px; margin: 18px 0 6px; }
+    label { display: block; font-size: 13px; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
+    input { width: 100%; padding: 14px 16px; background: #0F1220; border: 1px solid var(--border); border-radius: 12px; color: #fff; font-size: 16px; outline: none; }
+    input:focus { border-color: var(--accent); }
+    .btn { background: var(--accent); color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer; min-height: 44px; }
+    .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+    .full { width: 100%; margin-top: 22px; }
+    .error { background: rgba(239,68,68,0.12); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.3); padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-top: 16px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .stat-label { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
+    .stat-val { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+    .search-box { margin-bottom: 16px; }
+    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
+    th { padding: 14px 18px; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
+    td { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #D1D5DB; white-space: nowrap; }
+    tr:last-child td { border-bottom: none; }
+    .pos-badge { background: rgba(139,92,246,0.15); color: #A78BFA; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; }
+    .status-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
+    .status-sent { background: rgba(16,185,129,0.15); color: #34D399; }
+    .status-pending { background: rgba(245,158,11,0.15); color: #FBBF24; }`;
+
+function page(title, body, script = "") {
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>NetworQ — Waitlist Dashboard</title>
-  <style>
-    :root {
-      --bg: #0C0E1A;
-      --card: #151828;
-      --border: #262B45;
-      --text: #F3F4F8;
-      --muted: #8E95AA;
-      --accent: #8B5CF6;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 32px 16px; }
-    .container { max-width: 980px; margin: 0 auto; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
-    .brand { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
-    .brand span { color: var(--accent); }
-    .actions { display: flex; gap: 12px; flex-wrap: wrap; }
-    .btn { background: var(--accent); color: #fff; text-decoration: none; padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
-    .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
-    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
-    .stat-label { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
-    .stat-val { font-size: 32px; font-weight: 800; color: #fff; letter-spacing: -0.03em; }
-    .search-box { width: 100%; padding: 12px 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; color: #fff; font-size: 15px; margin-bottom: 18px; outline: none; }
-    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-    th { padding: 14px 18px; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
-    td { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #D1D5DB; }
-    tr:last-child td { border-bottom: none; }
-    .pos-badge { background: rgba(139, 92, 246, 0.15); color: var(--accent); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; }
-    .status-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
-    .status-sent { background: rgba(16, 185, 129, 0.15); color: #34D399; }
-    .status-pending { background: rgba(245, 158, 11, 0.15); color: #FBBF24; }
-  </style>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <title>${escapeHtml(title)} — NetworQ</title>
+  <style>${STYLE}</style>
 </head>
 <body>
-  <div class="container">
+${body}
+${script}
+</body>
+</html>`;
+}
+
+function loginPage(req, error = "") {
+  return page(
+    "Waitlist admin",
+    `<form class="card narrow" method="post" action="${escapeHtml(adminBase(req))}/login">
+    <div class="brand">Networ<span>Q</span></div>
+    <h1>Waitlist admin</h1>
+    <p class="muted">Sign in to see everyone who joined the waitlist.</p>
+    ${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ""}
+    <label for="id">Admin ID</label>
+    <input id="id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required />
+    <button class="btn full" type="submit">Sign in</button>
+  </form>`
+  );
+}
+
+async function renderDashboard(req, res) {
+  const { rows, error: errorMsg } = await loadRows();
+  const base = adminBase(req);
+  const istDay = (d) => new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  const today = istDay(Date.now());
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const stats = [
+    ["Total sign-ups", rows.length, "#fff"],
+    ["Today", rows.filter((r) => r.created_at && istDay(r.created_at) === today).length, "#A78BFA"],
+    ["Last 7 days", rows.filter((r) => r.created_at && new Date(r.created_at).getTime() > weekAgo).length, "#A78BFA"],
+    ["Confirmation emails sent", rows.filter((r) => r.notified).length, "#34D399"],
+  ];
+  const body = `<div class="container">
     <div class="header">
       <div>
-        <div class="brand">Networ<span>Q</span> <span style="font-size:14px;font-weight:500;color:var(--muted);margin-left:8px;">Waitlist Dashboard</span></div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px;">Live sign-ups from the website</div>
+        <div class="brand">Networ<span>Q</span> <span class="muted" style="font-weight:500;margin-left:8px;">Waitlist admin</span></div>
+        <div class="muted" style="margin-top:4px;">${errorMsg ? `<span style="color:#FCA5A5">${escapeHtml(errorMsg)}</span>` : "Live sign-ups from waitlist.networq.co.in and networq.co.in"}</div>
       </div>
       <div class="actions">
-        <a href="/api/waitlist/export.csv" class="btn">Download CSV (Google Sheets)</a>
-        <a href="https://supabase.com/dashboard/project/jpuxmkkuzqojqeatespa/editor" target="_blank" rel="noopener" class="btn btn-secondary">Open Supabase</a>
+        <a href="${escapeHtml(base)}" class="btn btn-secondary">Refresh</a>
+        <a href="${escapeHtml(base)}/export.csv" class="btn">Download CSV (Google Sheets)</a>
+        <form method="post" action="${escapeHtml(base)}/logout"><button class="btn btn-secondary" type="submit">Sign out</button></form>
       </div>
     </div>
 
     <div class="stats-grid">
-      <div class="stat-card"><div class="stat-label">Total sign-ups</div><div class="stat-val">${count}</div></div>
-      <div class="stat-card"><div class="stat-label">Confirmation emails sent</div><div class="stat-val" style="color:#34D399;">${notifiedCount}</div></div>
-      <div class="stat-card"><div class="stat-label">Database</div><div class="stat-val" style="font-size:20px;color:${errorMsg ? "#EF4444" : "#34D399"};">${errorMsg ? escapeHtml(errorMsg) : "Live"}</div></div>
+      ${stats.map(([label, val, color]) => `<div class="card"><div class="stat-label">${label}</div><div class="stat-val" style="color:${color}">${val}</div></div>`).join("")}
     </div>
 
     <input type="search" id="search" class="search-box" placeholder="Search email or position" aria-label="Search the waitlist" />
 
     <div class="table-wrap">
       <table id="waitlist-table">
-        <thead><tr><th>Pos</th><th>Email</th><th>Joined</th><th>Email status</th></tr></thead>
+        <thead><tr><th>Pos</th><th>Email</th><th>Joined (IST)</th><th>Email status</th></tr></thead>
         <tbody>
           ${
             rows.length === 0
               ? `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted);">No sign-ups yet.</td></tr>`
               : rows
                   .map((r) => {
-                    const date = r.created_at ? new Date(r.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) + " IST" : "—";
+                    const date = r.created_at ? new Date(r.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—";
                     return `<tr>
                       <td><span class="pos-badge">#${escapeHtml(r.position ?? "—")}</span></td>
                       <td style="font-weight:600;color:#fff;">${escapeHtml(r.email || "—")}</td>
@@ -281,20 +373,17 @@ async function handleDashboard(req, res) {
         </tbody>
       </table>
     </div>
-  </div>
-  <script>
+  </div>`;
+  const script = `<script>
     document.getElementById('search').addEventListener('input', function (e) {
       var q = e.target.value.toLowerCase();
       document.querySelectorAll('#waitlist-table tbody tr').forEach(function (tr) {
         tr.style.display = tr.innerText.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
       });
     });
-  </script>
-</body>
-</html>`;
-
+  </script>`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(html);
+  return res.status(200).send(page("Waitlist admin", body, script));
 }
 
 module.exports = waitlistHandler;
