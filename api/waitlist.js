@@ -228,8 +228,8 @@ async function handleCsvExport(req, res) {
 async function handleAdmin(req, res) {
   adminHeaders(res);
   const c = adminCreds();
-  if (!c) return res.status(404).send(page("Admin not set up", `<div class="card narrow"><h1>Admin panel is off</h1><p class="muted">Set <b>WAITLIST_ADMIN_USER</b> and <b>WAITLIST_ADMIN_PASSWORD</b> on the server to turn it on.</p></div>`));
-  if (hasSession(req, c) || hasBasic(req, c)) return renderDashboard(req, res);
+  if (!c) return res.status(404).send(offPage());
+  if (hasSession(req, c) || hasBasic(req, c)) return renderDashboard(req, res, c);
   return res.status(200).send(loginPage(req));
 }
 
@@ -250,39 +250,104 @@ function handleLogout(req, res) {
   return res.redirect(303, adminBase(req));
 }
 
+// Admin UI — enterprise CRM look (light, dense, list view), official NetworQ wordmark
+const LOGO = "/brand/networq-wordmark.png";
 const STYLE = `
-    :root { --bg:#0C0E1A; --card:#151828; --border:#262B45; --text:#F3F4F8; --muted:#8E95AA; --accent:#8B5CF6; }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif; }
-    body { background: var(--bg); color: var(--text); min-height: 100vh; padding: 32px 16px; }
-    .container { max-width: 1000px; margin: 0 auto; }
-    .brand { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
-    .brand span { color: var(--accent); }
-    .muted { color: var(--muted); font-size: 14px; line-height: 1.5; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
-    .narrow { max-width: 400px; margin: 10vh auto 0; }
-    h1 { font-size: 22px; margin: 18px 0 6px; }
-    label { display: block; font-size: 13px; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
-    input { width: 100%; padding: 14px 16px; background: #0F1220; border: 1px solid var(--border); border-radius: 12px; color: #fff; font-size: 16px; outline: none; }
-    input:focus { border-color: var(--accent); }
-    .btn { background: var(--accent); color: #fff; text-decoration: none; padding: 12px 18px; border-radius: 12px; font-weight: 600; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; cursor: pointer; min-height: 44px; }
-    .btn-secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
-    .full { width: 100%; margin-top: 22px; }
-    .error { background: rgba(239,68,68,0.12); color: #FCA5A5; border: 1px solid rgba(239,68,68,0.3); padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-top: 16px; }
-    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px; }
-    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
-    .stat-label { font-size: 13px; color: var(--muted); font-weight: 500; margin-bottom: 6px; }
-    .stat-val { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
-    .search-box { margin-bottom: 16px; }
-    .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 14px; }
-    th { padding: 14px 18px; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); white-space: nowrap; }
-    td { padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); color: #D1D5DB; white-space: nowrap; }
-    tr:last-child td { border-bottom: none; }
-    .pos-badge { background: rgba(139,92,246,0.15); color: #A78BFA; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; }
-    .status-badge { font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; }
-    .status-sent { background: rgba(16,185,129,0.15); color: #34D399; }
-    .status-pending { background: rgba(245,158,11,0.15); color: #FBBF24; }`;
+    :root {
+      --brand: #4B3BEA; --brand-dark: #3A2BC9; --brand-soft: #EEECFD;
+      --page: #F3F3F3; --surface: #FFFFFF; --border: #DDDBDA; --border-strong: #C9C7C5;
+      --text: #181818; --text-2: #444444; --muted: #706E6B;
+      --ok-bg: #E3F5E9; --ok: #2E844A; --warn-bg: #FEF1E3; --warn: #A96404; --err-bg: #FDECEA; --err: #BA0517;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13px; color: var(--text); background: var(--page); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+    a { color: var(--brand); text-decoration: none; }
+    button { font: inherit; }
+
+    /* Global header + app nav */
+    .global { height: 52px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 12px; }
+    .global img { height: 24px; display: block; }
+    .user { display: flex; align-items: center; gap: 10px; color: var(--text-2); }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; text-transform: uppercase; }
+    .appnav { height: 44px; background: var(--surface); border-bottom: 3px solid var(--brand); display: flex; align-items: stretch; padding: 0 16px; gap: 20px; box-shadow: 0 2px 2px rgba(0,0,0,0.05); }
+    .appname { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; padding-right: 20px; border-right: 1px solid var(--border); }
+    .launcher { display: grid; grid-template-columns: repeat(3, 4px); gap: 3px; }
+    .launcher i { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+    .tab { display: flex; align-items: center; font-size: 13px; color: var(--text-2); border-bottom: 3px solid transparent; margin-bottom: -3px; padding: 0 4px; }
+    .tab.active { color: var(--text); font-weight: 700; border-bottom-color: var(--brand-dark); }
+
+    .wrap { padding: 12px; max-width: 1280px; margin: 0 auto; }
+    .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 2px rgba(0,0,0,0.04); }
+
+    /* List view header */
+    .lv-head { padding: 12px 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+    .lv-title { display: flex; gap: 12px; align-items: center; }
+    .icon-tile { width: 32px; height: 32px; border-radius: 4px; background: var(--brand); display: grid; place-items: center; flex: none; }
+    .eyebrow { font-size: 12px; color: var(--text-2); }
+    h1 { font-size: 18px; font-weight: 700; line-height: 1.25; }
+    .meta { font-size: 12px; color: var(--muted); padding: 0 16px 10px; }
+    .btn-group { display: flex; flex-wrap: wrap; gap: 0; }
+    .btn { height: 32px; padding: 0 14px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--brand); border-radius: 4px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+    .btn:hover { background: #F7F7F7; }
+    .btn-group .btn { border-radius: 0; margin-left: -1px; }
+    .btn-group .btn:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+    .btn-group .btn:last-child { border-radius: 0 4px 4px 0; }
+    .btn-brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+    .btn-brand:hover { background: var(--brand-dark); }
+    .btn-plain { border: none; background: none; color: var(--brand); padding: 0 6px; }
+
+    /* Highlights strip */
+    .highlights { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--border); }
+    .hl { padding: 10px 16px; border-right: 1px solid var(--border); }
+    .hl:last-child { border-right: none; }
+    .hl-label { font-size: 12px; color: var(--muted); }
+    .hl-val { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .hl-sub { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 4px; }
+
+    /* Toolbar + table */
+    .toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .search { position: relative; }
+    .search svg { position: absolute; left: 10px; top: 9px; }
+    .search input { height: 32px; width: 260px; max-width: 100%; border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 10px 0 30px; font-size: 13px; color: var(--text); background: var(--surface); outline: none; }
+    .search input:focus, .field input:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+    .table-wrap { overflow-x: auto; border-top: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #FAFAF9; text-align: left; font-size: 12px; font-weight: 700; color: var(--text-2); padding: 8px 12px; border-bottom: 1px solid var(--border); border-right: 1px solid #EBEBEB; white-space: nowrap; user-select: none; }
+    th[data-key] { cursor: pointer; }
+    th[data-key]:hover { background: #F3F3F3; }
+    th .arrow { color: var(--muted); font-size: 10px; margin-left: 4px; }
+    td { padding: 8px 12px; border-bottom: 1px solid #EBEBEB; white-space: nowrap; color: var(--text); }
+    tbody tr:hover td { background: #F3F3F3; }
+    td.num { color: var(--muted); width: 48px; text-align: right; }
+    td.email { color: var(--brand); font-weight: 500; }
+    .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 12px; }
+    .pill-ok { background: var(--ok-bg); color: var(--ok); }
+    .pill-warn { background: var(--warn-bg); color: var(--warn); }
+    .empty { padding: 48px 16px; text-align: center; color: var(--muted); }
+    .alert { margin: 0 16px 10px; padding: 8px 12px; border-radius: 4px; background: var(--err-bg); color: var(--err); font-size: 13px; }
+
+    /* Sign-in */
+    .login { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 10vh 16px 24px; }
+    .login img { height: 36px; margin-bottom: 24px; }
+    .login-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 24px; box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+    .login-card h1 { font-size: 16px; margin-bottom: 4px; }
+    .field { margin-top: 16px; }
+    .field label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: 4px; }
+    .field input { width: 100%; height: 40px; border: 1px solid var(--border-strong); border-radius: 4px; padding: 0 12px; font-size: 15px; color: var(--text); outline: none; background: #fff; }
+    .login .btn-brand { width: 100%; height: 40px; justify-content: center; margin-top: 20px; font-size: 14px; }
+    .login .alert { margin: 16px 0 0; }
+    .fine { font-size: 12px; color: var(--muted); margin-top: 16px; text-align: center; }
+
+    @media (max-width: 720px) {
+      .highlights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .hl:nth-child(2) { border-right: none; }
+      .hl:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+      .user .who { display: none; }
+      .search, .search input { width: 100%; }
+    }`;
+
+const USERS_ICON = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`;
+const SEARCH_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#706E6B" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>`;
 
 function page(title, body, script = "") {
   return `<!DOCTYPE html>
@@ -293,7 +358,7 @@ function page(title, body, script = "") {
   <meta name="robots" content="noindex, nofollow" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="icon" type="image/png" href="/favicon.png" />
-  <title>${escapeHtml(title)} — NetworQ</title>
+  <title>${escapeHtml(title)} | NetworQ</title>
   <style>${STYLE}</style>
 </head>
 <body>
@@ -303,87 +368,154 @@ ${script}
 </html>`;
 }
 
-function loginPage(req, error = "") {
+function offPage() {
   return page(
-    "Waitlist admin",
-    `<form class="card narrow" method="post" action="${escapeHtml(adminBase(req))}/login">
-    <div class="brand">Networ<span>Q</span></div>
-    <h1>Waitlist admin</h1>
-    <p class="muted">Sign in to see everyone who joined the waitlist.</p>
-    ${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ""}
-    <label for="id">Admin ID</label>
-    <input id="id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus />
-    <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required />
-    <button class="btn full" type="submit">Sign in</button>
-  </form>`
+    "Admin",
+    `<div class="login"><img src="${LOGO}" alt="NetworQ" />
+    <div class="login-card"><h1>Admin is not set up</h1>
+    <p class="fine" style="text-align:left">Add <b>WAITLIST_ADMIN_USER</b> and <b>WAITLIST_ADMIN_PASSWORD</b> in the server's environment settings to turn it on.</p></div></div>`
   );
 }
 
-async function renderDashboard(req, res) {
+function loginPage(req, error = "") {
+  return page(
+    "Log in",
+    `<main class="login">
+    <img src="${LOGO}" alt="NetworQ" />
+    <form class="login-card" method="post" action="${escapeHtml(adminBase(req))}/login">
+      <h1>Log in to NetworQ Admin</h1>
+      <p class="fine" style="text-align:left;margin-top:0">Waitlist sign-ups</p>
+      ${error ? `<div class="alert" role="alert">${escapeHtml(error)}</div>` : ""}
+      <div class="field"><label for="id">Admin ID</label>
+        <input id="id" name="id" autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus /></div>
+      <div class="field"><label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required /></div>
+      <button class="btn btn-brand" type="submit">Log In</button>
+    </form>
+    <p class="fine">Authorised NetworQ staff only · © ${new Date().getFullYear()} NetworQ</p>
+  </main>`
+  );
+}
+
+async function renderDashboard(req, res, c) {
   const { rows, error: errorMsg } = await loadRows();
   const base = adminBase(req);
   const istDay = (d) => new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
   const today = istDay(Date.now());
   const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
-  const stats = [
-    ["Total sign-ups", rows.length, "#fff"],
-    ["Today", rows.filter((r) => r.created_at && istDay(r.created_at) === today).length, "#A78BFA"],
-    ["Last 7 days", rows.filter((r) => r.created_at && new Date(r.created_at).getTime() > weekAgo).length, "#A78BFA"],
-    ["Confirmation emails sent", rows.filter((r) => r.notified).length, "#34D399"],
+  const total = rows.length;
+  const sent = rows.filter((r) => r.notified).length;
+  const highlights = [
+    ["Total sign-ups", total, ""],
+    ["Joined today", rows.filter((r) => r.created_at && istDay(r.created_at) === today).length, ""],
+    ["Last 7 days", rows.filter((r) => r.created_at && new Date(r.created_at).getTime() > weekAgo).length, ""],
+    ["Confirmation emails sent", sent, total ? `${Math.round((sent / total) * 100)}%` : ""],
   ];
-  const body = `<div class="container">
-    <div class="header">
-      <div>
-        <div class="brand">Networ<span>Q</span> <span class="muted" style="font-weight:500;margin-left:8px;">Waitlist admin</span></div>
-        <div class="muted" style="margin-top:4px;">${errorMsg ? `<span style="color:#FCA5A5">${escapeHtml(errorMsg)}</span>` : "Live sign-ups from waitlist.networq.co.in and networq.co.in"}</div>
+  const updated = new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" });
+  const who = c ? c.user : "admin";
+
+  const body = `<header class="global">
+    <img src="${LOGO}" alt="NetworQ" />
+    <div class="user">
+      <span class="who">${escapeHtml(who)}</span>
+      <span class="avatar" aria-hidden="true">${escapeHtml(who.slice(0, 2))}</span>
+      <form method="post" action="${escapeHtml(base)}/logout"><button class="btn btn-plain" type="submit">Log out</button></form>
+    </div>
+  </header>
+  <nav class="appnav" aria-label="Admin">
+    <div class="appname"><span class="launcher" aria-hidden="true">${"<i></i>".repeat(9)}</span>Admin</div>
+    <a class="tab active" href="${escapeHtml(base)}" aria-current="page">Waitlist</a>
+  </nav>
+
+  <main class="wrap">
+    <section class="panel">
+      <div class="lv-head">
+        <div class="lv-title">
+          <span class="icon-tile">${USERS_ICON}</span>
+          <div><div class="eyebrow">Waitlist</div><h1>All Sign-ups</h1></div>
+        </div>
+        <div class="btn-group">
+          <a class="btn" href="${escapeHtml(base)}">Refresh</a>
+          <a class="btn" href="${escapeHtml(base)}/export.csv">Export CSV</a>
+        </div>
       </div>
-      <div class="actions">
-        <a href="${escapeHtml(base)}" class="btn btn-secondary">Refresh</a>
-        <a href="${escapeHtml(base)}/export.csv" class="btn">Download CSV (Google Sheets)</a>
-        <form method="post" action="${escapeHtml(base)}/logout"><button class="btn btn-secondary" type="submit">Sign out</button></form>
+      <div class="meta"><span id="count">${total}</span> items · Sorted by Joined · Updated ${escapeHtml(updated)} IST</div>
+      ${errorMsg ? `<div class="alert" role="alert">${escapeHtml(errorMsg)}</div>` : ""}
+      <div class="highlights">
+        ${highlights.map(([l, v, sub]) => `<div class="hl"><div class="hl-label">${l}</div><div class="hl-val">${v}${sub ? `<span class="hl-sub">${sub}</span>` : ""}</div></div>`).join("")}
       </div>
-    </div>
+      <div class="toolbar">
+        <div class="search">${SEARCH_ICON}<input type="search" id="search" placeholder="Search this list…" aria-label="Search this list" /></div>
+        <span class="eyebrow">Sources: waitlist.networq.co.in · networq.co.in</span>
+      </div>
+      <div class="table-wrap">
+        <table id="waitlist-table">
+          <thead><tr>
+            <th style="text-align:right">#</th>
+            <th data-key="email" data-type="text">Email<span class="arrow"></span></th>
+            <th data-key="pos" data-type="num">Queue position<span class="arrow"></span></th>
+            <th data-key="joined" data-type="num">Joined (IST)<span class="arrow">▼</span></th>
+            <th data-key="status" data-type="text">Confirmation email<span class="arrow"></span></th>
+          </tr></thead>
+          <tbody>
+            ${
+              total === 0
+                ? `<tr><td colspan="5" class="empty">No sign-ups yet. They'll appear here as soon as someone joins.</td></tr>`
+                : rows
+                    .map((r, i) => {
+                      const t = r.created_at ? new Date(r.created_at).getTime() : 0;
+                      const date = t ? new Date(t).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+                      return `<tr data-email="${escapeHtml(r.email || "")}" data-pos="${Number(r.position) || 0}" data-joined="${t}" data-status="${r.notified ? "sent" : "queued"}">
+                        <td class="num">${i + 1}</td>
+                        <td class="email">${escapeHtml(r.email || "—")}</td>
+                        <td>${escapeHtml(r.position ?? "—")}</td>
+                        <td>${escapeHtml(date)}</td>
+                        <td>${r.notified ? `<span class="pill pill-ok">Sent</span>` : `<span class="pill pill-warn">Queued</span>`}</td>
+                      </tr>`;
+                    })
+                    .join("")
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>`;
 
-    <div class="stats-grid">
-      ${stats.map(([label, val, color]) => `<div class="card"><div class="stat-label">${label}</div><div class="stat-val" style="color:${color}">${val}</div></div>`).join("")}
-    </div>
-
-    <input type="search" id="search" class="search-box" placeholder="Search email or position" aria-label="Search the waitlist" />
-
-    <div class="table-wrap">
-      <table id="waitlist-table">
-        <thead><tr><th>Pos</th><th>Email</th><th>Joined (IST)</th><th>Email status</th></tr></thead>
-        <tbody>
-          ${
-            rows.length === 0
-              ? `<tr><td colspan="4" style="text-align:center;padding:32px;color:var(--muted);">No sign-ups yet.</td></tr>`
-              : rows
-                  .map((r) => {
-                    const date = r.created_at ? new Date(r.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—";
-                    return `<tr>
-                      <td><span class="pos-badge">#${escapeHtml(r.position ?? "—")}</span></td>
-                      <td style="font-weight:600;color:#fff;">${escapeHtml(r.email || "—")}</td>
-                      <td style="color:var(--muted);font-size:13px;">${escapeHtml(date)}</td>
-                      <td>${r.notified ? `<span class="status-badge status-sent">Sent</span>` : `<span class="status-badge status-pending">In queue</span>`}</td>
-                    </tr>`;
-                  })
-                  .join("")
-          }
-        </tbody>
-      </table>
-    </div>
-  </div>`;
   const script = `<script>
-    document.getElementById('search').addEventListener('input', function (e) {
-      var q = e.target.value.toLowerCase();
-      document.querySelectorAll('#waitlist-table tbody tr').forEach(function (tr) {
-        tr.style.display = tr.innerText.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+    (function () {
+      var tbody = document.querySelector('#waitlist-table tbody');
+      var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr[data-email]'));
+      var count = document.getElementById('count');
+      function renumber() {
+        var n = 0;
+        rows.forEach(function (tr) { if (tr.style.display !== 'none') tr.firstElementChild.textContent = ++n; });
+        count.textContent = n;
+      }
+      document.getElementById('search').addEventListener('input', function (e) {
+        var q = e.target.value.toLowerCase();
+        rows.forEach(function (tr) { tr.style.display = tr.innerText.toLowerCase().indexOf(q) !== -1 ? '' : 'none'; });
+        renumber();
       });
-    });
+      var sortKey = 'joined', dir = -1;
+      document.querySelectorAll('th[data-key]').forEach(function (th) {
+        th.addEventListener('click', function () {
+          var key = th.getAttribute('data-key'), num = th.getAttribute('data-type') === 'num';
+          dir = key === sortKey ? -dir : (num ? -1 : 1); sortKey = key;
+          rows.sort(function (a, b) {
+            var x = a.getAttribute('data-' + key), y = b.getAttribute('data-' + key);
+            return (num ? (Number(x) - Number(y)) : x.localeCompare(y)) * dir;
+          });
+          rows.forEach(function (tr) { tbody.appendChild(tr); });
+          document.querySelectorAll('th .arrow').forEach(function (s) { s.textContent = ''; });
+          th.querySelector('.arrow').textContent = dir > 0 ? '▲' : '▼';
+          document.querySelector('.meta').childNodes[1].textContent = ' items · Sorted by ' + th.childNodes[0].textContent + ' · ';
+          renumber();
+        });
+      });
+    })();
   </script>`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  return res.status(200).send(page("Waitlist admin", body, script));
+  return res.status(200).send(page("Waitlist sign-ups", body, script));
 }
 
 module.exports = waitlistHandler;

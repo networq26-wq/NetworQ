@@ -179,7 +179,7 @@ test("admin panel: ID + password sign-in, session cookie, CSV, sign-out; forged 
     const dash = await fetch(h.base + "/admin", { headers: { cookie } });
     const dashHtml = await dash.text();
     assert.match(dashHtml, /waitlist-table/);
-    assert.match(dashHtml, /Sign out/);
+    assert.match(dashHtml, /Log out/);
     assert.equal((await fetch(h.base + "/admin/export.csv", { headers: { cookie } })).status, 503); // no DB key in tests → reached the export
 
     // forged / expired cookies don't work
