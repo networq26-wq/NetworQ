@@ -2964,6 +2964,10 @@ Keep it punchy, sharp, and directly actionable.`;
     .nq-stagger > *:nth-child(2) { animation-delay: 25ms; } .nq-stagger > *:nth-child(3) { animation-delay: 50ms; }
     .nq-stagger > *:nth-child(n+4) { animation-delay: 75ms; }
     /* Sideways strips (chips, Coming up): swipe, but never show a scrollbar line */
+    /* Me: card on the left, settings on the right on wide screens */
+    .nq-me { display: grid; gap: 20px; align-items: start; }
+    .nq-me-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+    @media (min-width: 900px) { .nq-me { grid-template-columns: minmax(0, 400px) minmax(0, 1fr); } .nq-me-title { grid-column: 1 / -1; } .nq-me-left { position: sticky; top: 88px; } }
     .nq-chips { scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch; }
     .nq-chips::-webkit-scrollbar { display: none; width: 0; height: 0; background: transparent; }
     .nq-skeleton { background: linear-gradient(90deg, ${isDark ? "#1C1C1E 25%, #2C2C2E 50%, #1C1C1E 75%" : "#ECECF0 25%, #F7F7FA 50%, #ECECF0 75%"}); background-size: 200% 100%; animation: nqShimmer 1.4s linear infinite; border-radius: 12px; }
@@ -4327,7 +4331,8 @@ Keep it punchy, sharp, and directly actionable.`;
               paddingBottom: isMobile ? "calc(110px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 60,
               paddingLeft: isMobile ? "max(16px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 16px))" : "36px",
               paddingRight: isMobile ? "max(16px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 16px))" : "36px",
-              maxWidth: 1280,
+              // One column for every tab: 960px of content (+ 36px padding each side), centred
+              maxWidth: isMobile ? 1280 : 1032,
               width: "100%",
               margin: "0 auto",
               boxSizing: "border-box",
@@ -4337,7 +4342,7 @@ Keep it punchy, sharp, and directly actionable.`;
         {currentUser?.deletion_scheduled_at && (
           <div
             role="alert"
-            style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 auto 16px", maxWidth: 880, padding: "12px 16px", borderRadius: 16, background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.35)" }}
+            style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 0 16px", padding: "12px 16px", borderRadius: 16, background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.35)" }}
           >
             <div style={{ flex: "1 1 240px", fontSize: 14 }}>
               <strong>Your account is scheduled for deletion</strong> on {new Date(currentUser.deletion_scheduled_at).toLocaleDateString()}. All data will be permanently removed.
@@ -5504,7 +5509,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {/* ── SCAN TAB ── */}
         {tab === "scan" && (
-          <div style={{ maxWidth: 640, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 16 }}>
             <CameraCapture
               open={liveCameraOpen}
               onClose={closeCamera}
@@ -5708,7 +5713,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
         {/* ── ADD CONTACT TAB ── */}
         {tab === "add" && (
-          <div style={{ maxWidth: 620, margin: "0 auto" }}>
+          <div style={{ maxWidth: 720 }}>
             <h2 style={{ fontSize: 28, marginBottom: 4 }}>
               {editingContact ? "Edit Contact" : addStep === "form" ? "New Contact" : "Review Extracted Info"}
             </h2>

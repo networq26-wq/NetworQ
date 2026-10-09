@@ -261,7 +261,7 @@ export function SettingsScreen({
   );
 
   return (
-    <div style={{ maxWidth: 720, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
+    <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
       {!section && <h2 style={{ margin: "4px 0 0", fontSize: 28, letterSpacing: "-0.02em" }}>Settings</h2>}
       {section === "card" && cardSettings}
 

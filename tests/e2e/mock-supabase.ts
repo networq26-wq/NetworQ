@@ -149,6 +149,8 @@ export class MockSupabase {
 
   private rpc(fn: string, a: any, uid: string): unknown {
     switch (fn) {
+      case "my_direct_chats":
+        return []; // 1:1 chats aren't modelled here — an empty inbox, like a new account
       case "update_notification_prefs": {
         const prof = this.table("profiles").find((r) => r.id === uid)!;
         const cur = prof.notification_prefs || { login_alerts: true, reminder_emails: true, product_updates: false, connection_emails: true };

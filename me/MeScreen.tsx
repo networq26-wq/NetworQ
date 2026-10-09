@@ -62,7 +62,7 @@ export function MeScreen({
 
   if (section) {
     return (
-      <div key={section} className="nq-sheet-right" style={{ maxWidth: 680, margin: "0 auto" }}>
+      <div key={section} className="nq-sheet-right" style={{ maxWidth: 720 }}>
         <button onClick={() => onOpenSection(null)} aria-label="Back to Me" style={{ display: "inline-flex", alignItems: "center", gap: 2, border: "none", background: "none", color: "#7C3AED", fontSize: 17, fontWeight: 500, cursor: "pointer", padding: "8px 0", marginLeft: -6, minHeight: 44 }}>
           <I.ChevronLeft size={24} /> Me
         </button>
@@ -99,8 +99,9 @@ export function MeScreen({
   ];
 
   return (
-    <div style={{ maxWidth: 680, margin: "0 auto", display: "flex", flexDirection: "column", gap: 20 }}>
-      <h2 style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Me</h2>
+    <div className="nq-me">
+      <h2 className="nq-me-title" style={{ margin: "4px 0 0", fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Me</h2>
+      <div className="nq-me-col nq-me-left">
       <CardPass user={user} prefs={prefs} />
       <div style={{ display: "flex", gap: 10 }}>
         <button onClick={() => setQrOpen(true)} style={{ flex: 1, minHeight: 52, borderRadius: 16, border: "none", background: "#7C3AED", color: "#FFF", fontSize: 16, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
@@ -110,6 +111,8 @@ export function MeScreen({
           <I.ArrowRight size={18} style={{ transform: "rotate(-45deg)" }} /> Share card
         </button>
       </div>
+      </div>
+      <div className="nq-me-col">
 
       {groups.map((g, gi) => (
         <section key={gi} aria-label={g.title || undefined}>
@@ -136,6 +139,7 @@ export function MeScreen({
           </div>
         </section>
       ))}
+      </div>
       {qrOpen && <QrSheet user={user} prefs={prefs} onClose={() => setQrOpen(false)} />}
     </div>
   );

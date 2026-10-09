@@ -69,7 +69,7 @@ export function MessagesScreen({
   }, [supabase, userId, load]);
 
   return (
-    <div style={{ maxWidth: 680, margin: "0 auto" }}>
+    <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "4px 0 16px" }}>
         <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Messages</h2>
         <button

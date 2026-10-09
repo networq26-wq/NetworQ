@@ -260,7 +260,7 @@ export function EventsHub({
   }, [visible]);
 
   return (
-    <div style={{ maxWidth: 960, margin: "0 auto", display: "flex", flexDirection: "column", gap: 14, color: t.text }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, color: t.text }}>
       <header style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Events</h2>

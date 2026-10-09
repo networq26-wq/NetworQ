@@ -292,7 +292,7 @@ export function EventRadar({
 
   if (events === null) {
     return (
-      <div role="status" aria-label="Loading Radar" style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+      <div role="status" aria-label="Loading Radar" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <Skeleton w="100%" h={40} r={12} style={{ maxWidth: 360, alignSelf: "center" }} />
         <div style={{ ...card, display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <Skeleton w="50%" h={22} />
@@ -305,7 +305,7 @@ export function EventRadar({
   }
 
   return (
-    <div style={{ maxWidth: 880, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16, color: t.text, paddingBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 96px)" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, color: t.text, paddingBottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 96px)" }}>
       <ScopeSwitch t={t} scope={scope} onChange={setScope} />
       {scope === "nearby" ? (
         nearby === undefined ? (
