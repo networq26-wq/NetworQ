@@ -81,6 +81,8 @@ app.use(["/api/auth", "/api/account"], limiter(60 * 1000, 30));
 app.use("/api/events", limiter(60 * 1000, 20));
 app.use("/api/tts", limiter(60 * 1000, 30));
 app.use("/api/calls", limiter(60 * 1000, 10));
+// Waitlist: sign-ups (each sends an email) and admin password attempts; the public page itself is free
+app.use(["/waitlist", "/api/waitlist"], limiter(60 * 1000, 10, (req) => req.method === "GET" && /^\/?$/.test(req.path)));
 app.use("/api/google", limiter(60 * 1000, 30));
 app.use(["/api/prospect", "/api/organization"], limiter(60 * 1000, 20));
 
@@ -315,14 +317,14 @@ app.options("/api/email", (req, res) => res.status(200).end());
 // ── Serve web frontend build if dist directory exists ─────────────────────────
 const distPath = path.join(__dirname, "dist");
 if (fs.existsSync(distPath)) {
-  app.get(["/waitlist", "/waitlist.html"], (req, res) => waitlistHandler(req, res));
+  app.get("/waitlist.html", (req, res) => waitlistHandler.servePage(req, res));
 
   // Serve waitlist at root if on waitlist subdomain or if WAITLIST_MODE is set
   app.use((req, res, next) => {
     const host = req.headers.host || "";
     if (host.startsWith("waitlist.") || process.env.WAITLIST_MODE === "true" || process.env.SERVE_WAITLIST_AT_ROOT === "true") {
-      if (req.path === "/" || req.path === "/index.html") {
-        return waitlistHandler(req, res);
+      if (req.method === "GET" && (req.path === "/" || req.path === "/index.html")) {
+        return waitlistHandler.servePage(req, res);
       }
     }
     next();
@@ -400,6 +402,7 @@ function startServer() {
   // Only run on primary instance (not during Expo web build)
   let reminderTimer = null;
   let purgeTimer = null;
+  let waitlistTimer = null;
   let stopCrawler = null;
   // Background jobs touch real users (reminder emails, deletions, crawling) — production only,
   // unless explicitly enabled for local debugging with NETWORQ_JOBS=1.
@@ -414,7 +417,7 @@ function startServer() {
     }
     const { processPendingWaitlistEmails } = require("./api/waitlist");
     processPendingWaitlistEmails().catch(console.error);
-    var waitlistTimer = setInterval(() => processPendingWaitlistEmails().catch(console.error), 60 * 1000);
+    waitlistTimer = setInterval(() => processPendingWaitlistEmails().catch(console.error), 60 * 1000);
   }
 
   // ── Graceful shutdown: finish in-flight requests on deploy/restart ──────────
@@ -426,7 +429,7 @@ function startServer() {
     if (reminderTimer) clearInterval(reminderTimer);
     if (purgeTimer) clearInterval(purgeTimer);
     if (stopCrawler) stopCrawler();
-    if (typeof waitlistTimer !== "undefined" && waitlistTimer) clearInterval(waitlistTimer);
+    if (waitlistTimer) clearInterval(waitlistTimer);
     let open = servers.length;
     if (!open) process.exit(0);
     servers.forEach((srv) =>

@@ -58,7 +58,7 @@ if (__DEV__ && typeof window !== 'undefined' && /[?&]shell=android\b/.test(windo
 // Only the two preview accounts are accepted, and only in development builds.
 if (__DEV__ && typeof window !== 'undefined') {
   const who = new URLSearchParams(window.location.search).get('devLogin');
-  const accounts: Record<string, string> = { a: 'preview.a@networq.co.in', b: 'preview.b@networq.co.in' };
+  const accounts: Record<string, string> = { a: 'preview.a@networq.co.in', b: 'preview.b@networq.co.in', c: 'preview.c@networq.co.in' };
   if (who && accounts[who]) {
     import('./supabase').then(async ({ supabase }) => {
       const { data } = await supabase.auth.getSession();

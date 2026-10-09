@@ -15,8 +15,8 @@
 | 🎙️ | **Voice note** | Say who you met → Whisper writes it down → AI picks out name, company, next step → you check → saved with a reminder. |
 | ✉️ | **Follow-ups** | Personal AI drafts for one person or many; send all at once, paced to stay within limits. |
 | 🔬 | **AI prospect research** | Reads a company's public website and writes 3 fact-checked email drafts with sources. |
-| 💬 | **Messages** | Private 1:1 chat between connected people — live, with typing and read receipts. "New message" lists your contacts. |
-| 📞 | **Voice & video calls** | Call any connection; it rings on any screen and by push when the app is closed. Mute, camera, flip. |
+| 💬 | **Messages** | Private 1:1 chat between connected people — live, typing and read receipts, **photos & files** (📎, up to 10 MB). "New message" lists your contacts. |
+| 📞 | **Voice & video calls** | Call any connection — or a **group of up to 6** — it rings on any screen and by push when the app is closed. Mute, camera, flip. |
 | 📡 | **Radar** | *Nearby*: NetworQ people around you over Bluetooth (Android app). *Events*: join an event code and see who's there. |
 | 🗓️ | **Events** | Auto-scrolling featured events, then real events from Luma, Eventbrite, Meetup and calendar feeds — location, dates, calendar, categories; "Going" opens the event's Radar. |
 | 🪪 | **Your card** | Premium credit-card-style digital card with your photo and a QR any phone camera can save; NFC write. |
