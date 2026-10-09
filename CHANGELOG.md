@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-09 (evening) — NetworQ Admin
+
+### New
+- **Admin panel** at `https://www.networq.co.in/waitlist/admin`: Admin ID + password, light CRM design with the official logo.
+  - **Overview:** totals, today, last 7 days with growth, waiting / invited / joined the app, a 30-day chart, sources, latest sign-ups.
+  - **Sign-ups:** search, filters (dates, status, source, tag), 50 per page; bulk invite, resend, tag, delete; "invite the next N" (most referrals first); CSV export that follows the filters.
+  - **Person page:** every detail, the people they brought in, notes and tags.
+  - **Reports:** sources, campaigns, company vs personal emails, top referrers, devices, time zones, email health with "Retry failed".
+  - **App:** users, active users, contacts, messages, calls, events, AI use.
+  - **Health:** server errors and email problems since the last restart.
+  - **Activity log**, and **Admins** (the owner adds or disables admins).
+- Sign-ups record their source (UTM tags or the page they came from), referral code, device and time zone. Each person's share button shares their own invite link.
+- The invite email links to the app and the Android download. The website APK download is updated to today's build.
+- **Database:** `supabase/migrations/20261020_waitlist_admin.sql` (additive). Run it once in the Supabase SQL editor.
+
 ## 2026-10-09 — Waitlist site live, links & files in the Android app
 
 ### Fixed
