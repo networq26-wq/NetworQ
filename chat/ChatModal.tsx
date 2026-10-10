@@ -262,7 +262,7 @@ export function ChatModal({
                 {title}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: isDark ? "#9CA3AF" : "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div style={{ fontSize: 13, color: isDark ? "#9CA3AF" : "#6B7280", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {subtitle}
             </div>
           </div>
@@ -277,7 +277,7 @@ export function ChatModal({
                   aria-label={kind === "audio" ? `Call ${partner.name}` : `Video call ${partner.name}`}
                   title={kind === "audio" ? "Voice call" : "Video call"}
                   className="btn-press"
-                  style={{ width: 40, height: 40, borderRadius: 20, border: "none", background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)", color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+                  style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: isDark ? "rgba(124, 58, 237, 0.2)" : "rgba(124, 58, 237, 0.1)", color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
                 >
                   {kind === "audio" ? (
                     <I.Phone size={18} />
@@ -328,10 +328,10 @@ export function ChatModal({
           ) : messages.length === 0 ? (
             <div style={{ textAlign: "center", margin: "auto", padding: "20px", color: isDark ? "#6B7280" : "#9CA3AF" }}>
               <div style={{ width: 56, height: 56, borderRadius: 28, margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: "#7C3AED" }}><I.Mail size={26} /></div>
-              <div style={{ fontWeight: 600, fontSize: 14, color: isDark ? "#E5E7EB" : "#374151" }}>
+              <div style={{ fontWeight: 600, fontSize: 15, color: isDark ? "#E5E7EB" : "#374151" }}>
                 Direct Connection Active
               </div>
-              <p style={{ fontSize: 12, maxWidth: 280, margin: "6px auto 14px", lineHeight: 1.4 }}>
+              <p style={{ fontSize: 13, maxWidth: 280, margin: "6px auto 14px", lineHeight: 1.4 }}>
                 Send a message, or start a voice or video call.
               </p>
             </div>
@@ -360,7 +360,7 @@ export function ChatModal({
                         ? "#1F1F24"
                         : "#F3F4F6",
                       color: isMine ? "#FFFFFF" : isDark ? "#F3F4F6" : "#111827",
-                      fontSize: 14,
+                      fontSize: 15,
                       lineHeight: 1.45,
                       wordBreak: "break-word",
                       boxShadow: isMine ? "0 2px 8px rgba(124, 58, 237, 0.25)" : "none",
@@ -374,7 +374,7 @@ export function ChatModal({
                         alignItems: "center",
                         justifyContent: "flex-end",
                         gap: 4,
-                        fontSize: 10,
+                        fontSize: 12,
                         marginTop: 4,
                         opacity: isMine ? 0.8 : 0.6,
                       }}
@@ -393,7 +393,7 @@ export function ChatModal({
           )}
 
           {partnerTyping && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 12, fontStyle: "italic" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 13, fontStyle: "italic" }}>
               <span>{partner?.name || "Peer"} is typing</span>
               <span style={{ letterSpacing: 2 }}>...</span>
             </div>
@@ -423,7 +423,7 @@ export function ChatModal({
                 border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.1)" : "#E5E5EA"}`,
                 background: isDark ? "rgba(255, 255, 255, 0.04)" : "#FFFFFF",
                 color: isDark ? "#D1D5DB" : "#4B5563",
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: 600,
                 cursor: "pointer",
               }}
@@ -434,7 +434,7 @@ export function ChatModal({
         </div>
 
         {uploading && (
-          <div role="status" style={{ padding: "8px 16px", fontSize: 13, color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", gap: 8 }}>
+          <div role="status" style={{ padding: "8px 16px", fontSize: 15, color: isDark ? "#C4B5FD" : "#7C3AED", display: "flex", alignItems: "center", gap: 8 }}>
             <span className="nq-spin" style={{ width: 14, height: 14, borderRadius: 7, border: "2px solid rgba(124,58,237,0.3)", borderTopColor: "#7C3AED" }} />
             {uploading}
           </div>
@@ -495,7 +495,7 @@ export function ChatModal({
               border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.12)" : "#D1D5DB"}`,
               background: isDark ? "rgba(255, 255, 255, 0.05)" : "#F9FAFB",
               color: isDark ? "#FFFFFF" : "#111827",
-              fontSize: 14,
+              fontSize: 15,
               outline: "none",
             }}
           />
@@ -508,7 +508,7 @@ export function ChatModal({
               border: "none",
               background: "#7C3AED",
               color: "#FFFFFF",
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: 700,
               cursor: !inputText.trim() || sending ? "default" : "pointer",
               opacity: !inputText.trim() || sending ? 0.5 : 1,
@@ -566,10 +566,10 @@ function AttachmentView({ api, m, mine, isDark }: { api: ReturnType<typeof creat
   const ext = (m.attachment_name || "").split(".").pop()?.toUpperCase().slice(0, 4) || "FILE";
   return (
     <button onClick={open} aria-label={`Open ${m.attachment_name || "file"}`} style={{ all: "unset", boxSizing: "border-box", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, minWidth: 200, maxWidth: 260, padding: 10, margin: m.content ? "0 0 8px" : 0, borderRadius: 12, background: mine ? "rgba(255,255,255,0.16)" : isDark ? "rgba(255,255,255,0.06)" : "#FFFFFF" }}>
-      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, background: mine ? "rgba(255,255,255,0.22)" : "rgba(124,58,237,0.12)", color: mine ? "#FFF" : "#7C3AED" }}>{ext}</span>
+      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 800, background: mine ? "rgba(255,255,255,0.22)" : "rgba(124,58,237,0.12)", color: mine ? "#FFF" : "#7C3AED" }}>{ext}</span>
       <span style={{ minWidth: 0 }}>
-        <span style={{ display: "block", fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.attachment_name || "File"}</span>
-        <span style={{ display: "block", fontSize: 12, opacity: 0.75 }}>{size ? `${size} · ` : ""}Tap to open</span>
+        <span style={{ display: "block", fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.attachment_name || "File"}</span>
+        <span style={{ display: "block", fontSize: 13, opacity: 0.75 }}>{size ? `${size} · ` : ""}Tap to open</span>
       </span>
     </button>
   );

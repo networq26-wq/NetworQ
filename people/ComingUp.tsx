@@ -55,7 +55,7 @@ export function ComingUp({ supabase, isDark, onOpenEvents }: { supabase: Supabas
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
         <div>
           <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>Coming up{where}</h2>
-          <div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>Real events this week — great places to meet people</div>
+          <div style={{ fontSize: 15, color: t.muted, marginTop: 2 }}>Real events this week — great places to meet people</div>
         </div>
         <button onClick={onOpenEvents} style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", flexShrink: 0, minHeight: 32, padding: 0 }}>
           See all
@@ -79,7 +79,7 @@ export function ComingUp({ supabase, isDark, onOpenEvents }: { supabase: Supabas
               {e.image && <img src={e.image} alt="" loading="lazy" referrerPolicy="no-referrer" onError={(ev) => ((ev.target as HTMLImageElement).style.display = "none")} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />}
               <span aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.82) 100%)" }} />
               <span style={{ position: "absolute", left: 12, right: 12, bottom: 10 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>
                   <I.Calendar size={13} /> {when}
                 </span>
                 <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", fontSize: 15, fontWeight: 700, lineHeight: 1.25, marginTop: 4 } as React.CSSProperties}>{e.title}</span>

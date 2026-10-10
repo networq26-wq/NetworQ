@@ -1027,14 +1027,14 @@ function CommandPalette({
               
             }}
           />
-          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, fontSize: 11, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, fontSize: 13, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)", padding: "3px 7px", borderRadius: 6, fontWeight: 700 }}>
             ESC
           </span>
         </div>
 
         <div style={{ maxHeight: 340, overflowY: "auto", padding: 8 }}>
           {!q && (
-            <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", padding: "6px 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", padding: "6px 12px" }}>
               Quick Actions
             </div>
           )}
@@ -1057,7 +1057,7 @@ function CommandPalette({
                   cursor: "pointer",
                   background: isSel ? (isDark ? "#6D28D9" : "#8B5CF6") : "transparent",
                   color: isSel ? "#ffffff" : isDark ? "#f8fafc" : "#0f172a",
-                  fontSize: 13,
+                  fontSize: 15,
                   fontWeight: 600,
                 }}
               >
@@ -1069,7 +1069,7 @@ function CommandPalette({
 
           {filteredContacts.length > 0 && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", padding: "10px 12px 6px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#94a3b8" : "#64748b", padding: "10px 12px 6px" }}>
                 Contacts ({filteredContacts.length})
               </div>
               {filteredContacts.map((c, idx) => {
@@ -1092,15 +1092,15 @@ function CommandPalette({
                       cursor: "pointer",
                       background: isSel ? (isDark ? "rgba(167, 139, 250, 0.18)" : "rgba(124, 58, 237, 0.1)") : "transparent",
                       color: isSel ? (isDark ? "#A78BFA" : "#7C3AED") : isDark ? "#f8fafc" : "#0f172a",
-                      fontSize: 13,
+                      fontSize: 15,
                     }}
                   >
                     <ContactAvatar contact={c} size={26} radius={8} isDark={isDark} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontWeight: 700 }}>{c.name}</span>
-                      <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>{[c.title, c.company].filter(Boolean).join(" · ")}</span>
+                      <span style={{ marginLeft: 8, fontSize: 13, opacity: 0.7 }}>{[c.title, c.company].filter(Boolean).join(" · ")}</span>
                     </div>
-                    <span style={{ fontSize: 11, opacity: 0.6 }}>Open ↗</span>
+                    <span style={{ fontSize: 13, opacity: 0.6 }}>Open ↗</span>
                   </div>
                 );
               })}
@@ -3061,7 +3061,7 @@ Keep it punchy, sharp, and directly actionable.`;
         borderRadius: isMobile ? 12 : 10,
         padding: isMobile ? "12px 18px" : "10px 18px",
         minHeight: isMobile ? 44 : undefined,
-        fontSize: isMobile ? 15 : 13,
+        fontSize: isMobile ? 15 : 15,
         fontWeight: 600,
         cursor: "pointer",
         display: "inline-flex",
@@ -3075,7 +3075,7 @@ Keep it punchy, sharp, and directly actionable.`;
         borderRadius: isMobile ? 12 : 10,
         padding: isMobile ? "11px 16px" : "9px 16px",
         minHeight: isMobile ? 44 : undefined,
-        fontSize: isMobile ? 15 : 13,
+        fontSize: isMobile ? 15 : 15,
         fontWeight: 600,
         cursor: "pointer",
         display: "inline-flex",
@@ -3087,9 +3087,11 @@ Keep it punchy, sharp, and directly actionable.`;
       },
       btnSm: {
         border: "none",
-        borderRadius: 8,
-        padding: "7px 14px",
-        fontSize: 12,
+        borderRadius: 10,
+        minHeight: 44,
+        minWidth: 44,
+        padding: "0 14px",
+        fontSize: 13,
         fontWeight: 600,
         cursor: "pointer",
         display: "inline-flex",
@@ -3099,9 +3101,11 @@ Keep it punchy, sharp, and directly actionable.`;
         ...themeStyles.accentBtn,
       },
       btnSmOut: {
-        borderRadius: 8,
-        padding: "6px 12px",
-        fontSize: 12,
+        borderRadius: 10,
+        minHeight: 44,
+        minWidth: 44,
+        padding: "0 12px",
+        fontSize: 13,
         fontWeight: 500,
         cursor: "pointer",
         display: "inline-flex",
@@ -3114,13 +3118,13 @@ Keep it punchy, sharp, and directly actionable.`;
         width: "100%",
         borderRadius: 9,
         padding: "10px 14px",
-        fontSize: 13,
+        fontSize: 15,
         boxSizing: "border-box" as const,
         transition: "border 0.2s ease",
         ...themeStyles.input,
       },
       label: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 600,
         color: themeStyles.text,
         marginBottom: 6,
@@ -3174,7 +3178,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 justifyContent: "space-between",
                 alignItems: "center",
                 marginTop: 10,
-                fontSize: 11,
+                fontSize: 13,
                 color: themeStyles.textMuted,
                 fontWeight: 600,
               }}
@@ -3199,7 +3203,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <Icons.Mail size={26} color="#8B5CF6" />
             </div>
             <h2 style={{ fontSize: 26, marginBottom: 8 }}>Verify your email</h2>
-            <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.6, marginBottom: 24 }}>
+            <p style={{ color: themeStyles.textMuted, fontSize: 15, lineHeight: 1.6, marginBottom: 24 }}>
               A confirmation link was sent to <strong style={{ color: themeStyles.text }}>{form.email}</strong>. Open the link to activate your workspace.
             </p>
             <button style={{ ...S.btn, width: "100%" }} onClick={() => { setScreen("login"); setAuthMsg(null); }}>
@@ -3237,7 +3241,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <span />
           )}
           <Icons.Wordmark size={24} isDark={isDark} />
-          <span style={{ minWidth: 60, textAlign: "right", fontSize: 13, color: themeStyles.textMuted }}>{o.step} of {o.total}</span>
+          <span style={{ minWidth: 60, textAlign: "right", fontSize: 15, color: themeStyles.textMuted }}>{o.step} of {o.total}</span>
         </div>
         <div role="progressbar" aria-label="Sign-up progress" aria-valuemin={1} aria-valuemax={o.total} aria-valuenow={o.step} style={{ display: "flex", gap: 6, marginBottom: 28 }}>
           {Array.from({ length: o.total }, (_, i) => (
@@ -3311,7 +3315,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
             <div style={{ fontSize: 28 }}>Create New Password</div>
-            <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>Enter your updated password</div>
+            <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 15 }}>Enter your updated password</div>
           </div>
           <div style={S.card}>
             <div style={{ marginBottom: 18 }}>
@@ -3322,7 +3326,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div
                 style={{
                   color: authMsg.type === "error" ? "#ef4444" : "#10b981",
-                  fontSize: 13,
+                  fontSize: 15,
                   marginBottom: 14,
                   background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
                   padding: "10px 14px",
@@ -3354,7 +3358,7 @@ Keep it punchy, sharp, and directly actionable.`;
           <div style={{ textAlign: "center", marginBottom: 28 }}>
             <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
             <div style={{ fontSize: 28 }}>Account Recovery</div>
-            <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>We'll send a password recovery email</div>
+            <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 15 }}>We'll send a password recovery email</div>
           </div>
           <div style={S.card}>
             <div style={{ marginBottom: 18 }}>
@@ -3371,7 +3375,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div
                 style={{
                   color: authMsg.type === "error" ? "#ef4444" : "#10b981",
-                  fontSize: 13,
+                  fontSize: 15,
                   marginBottom: 14,
                   background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
                   border: `1px solid ${authMsg.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)"}`,
@@ -3389,7 +3393,7 @@ Keep it punchy, sharp, and directly actionable.`;
             >
               {authSubmitting ? "Sending Link…" : "Send Reset Link"}
             </button>
-            <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: themeStyles.textMuted }}>
+            <div style={{ textAlign: "center", marginTop: 18, fontSize: 15, color: themeStyles.textMuted }}>
               Remember your password?{" "}
               <span
                 style={{ color: "#6366f1", cursor: "pointer", fontWeight: 600 }}
@@ -3413,7 +3417,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
               <Icons.Wordmark size={32} isDark={isDark} />
             </div>
-            <div style={{ color: themeStyles.textMuted, fontSize: 13, fontWeight: 500 }}>
+            <div style={{ color: themeStyles.textMuted, fontSize: 15, fontWeight: 500 }}>
               Meet. Remember. Reconnect.
             </div>
           </div>
@@ -3426,7 +3430,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 ...S.btnOutline,
                 width: "100%",
                 marginBottom: 16,
-                fontSize: 13,
+                fontSize: 15,
                 opacity: googleLoading ? 0.7 : 1,
               }}
               onClick={handleGoogleSignIn}
@@ -3438,7 +3442,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
               <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
-              <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>OR</span>
+              <span style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>OR</span>
               <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
             </div>
             </>
@@ -3458,7 +3462,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                 <label style={{ ...S.label, marginBottom: 0 }}>Password</label>
                 <span
-                  style={{ fontSize: 12, color: "#6D35F5", cursor: "pointer", fontWeight: 600 }}
+                  style={{ fontSize: 13, color: "#6D35F5", cursor: "pointer", fontWeight: 600 }}
                   onClick={() => { setScreen("forgot_password"); setAuthMsg(null); }}
                 >
                   Forgot?
@@ -3478,7 +3482,7 @@ Keep it punchy, sharp, and directly actionable.`;
               <div
                 style={{
                   color: authMsg.type === "error" ? "#ef4444" : "#10b981",
-                  fontSize: 13,
+                  fontSize: 15,
                   marginBottom: 14,
                   background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
                   border: `1px solid ${authMsg.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)"}`,
@@ -3498,7 +3502,7 @@ Keep it punchy, sharp, and directly actionable.`;
               {authSubmitting ? "Authenticating…" : "Sign In"}
             </button>
 
-            <div style={{ textAlign: "center", marginTop: 18, fontSize: 13, color: themeStyles.textMuted }}>
+            <div style={{ textAlign: "center", marginTop: 18, fontSize: 15, color: themeStyles.textMuted }}>
               Don't have an account?{" "}
               <span
                 style={{ color: "#6D35F5", cursor: "pointer", fontWeight: 600 }}
@@ -3507,7 +3511,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 Create Account
               </span>
             </div>
-            <div style={{ textAlign: "center", marginTop: 14, fontSize: 12, color: themeStyles.textMuted }}>
+            <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: themeStyles.textMuted }}>
               <a href="/privacy" style={{ color: themeStyles.textMuted }}>Privacy</a>
               {" · "}
               <a href="/terms" style={{ color: themeStyles.textMuted }}>Terms</a>
@@ -3565,7 +3569,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 </button>
                 <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
                   <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }} />
-                  <span style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 600 }}>or</span>
+                  <span style={{ fontSize: 15, color: themeStyles.textMuted, fontWeight: 600 }}>or</span>
                   <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }} />
                 </div>
               </>
@@ -3584,7 +3588,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <label style={S.label} htmlFor="su-password">Password</label>
             <PasswordInput id="su-password" style={bigInput} label="Password" autoComplete="new-password" autoFocus placeholder="At least 8 characters" value={form.password} onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 15, color: ok ? "#059669" : themeStyles.textMuted }}>
-              <span aria-hidden style={{ width: 20, height: 20, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", background: ok ? "#059669" : isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", color: "#fff", fontSize: 12 }}>{ok ? "✓" : ""}</span>
+              <span aria-hidden style={{ width: 20, height: 20, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", background: ok ? "#059669" : isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", color: "#fff", fontSize: 13 }}>{ok ? "✓" : ""}</span>
               At least 8 characters
             </div>
           </>
@@ -3685,7 +3689,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <span
                   style={{
                     display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: isDark ? "#A78BFA" : "#7C3AED",
                     background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(124, 58, 237, 0.08)",
@@ -3699,7 +3703,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
 
               {/* SECTION: WORKSPACE */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, padding: "8px 12px 6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.textMuted, padding: "8px 12px 6px" }}>
                 Workspace
               </div>
 
@@ -3759,7 +3763,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       padding: "9px 12px",
                       borderRadius: 10,
                       border: "none",
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: item.isActive ? 600 : 500,
                       cursor: "pointer",
                       background: item.isActive
@@ -3780,7 +3784,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       <span
                         style={{
                           display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: 600,
                           padding: "1px 6px",
                           borderRadius: 8,
@@ -3796,7 +3800,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
 
               {/* SECTION: INTELLIGENCE & TOOLS */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, padding: "16px 12px 6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.textMuted, padding: "16px 12px 6px" }}>
                 Intelligence
               </div>
 
@@ -3860,7 +3864,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       padding: "9px 12px",
                       borderRadius: 10,
                       border: "none",
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: item.isActive ? 600 : 500,
                       cursor: "pointer",
                       background: item.isActive
@@ -3912,7 +3916,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <div style={{ minWidth: 0, textAlign: "left" }}>
                     <div
                       style={{
-                        fontSize: 13,
+                        fontSize: 15,
                         fontWeight: 600,
                         color: themeStyles.text,
                         whiteSpace: "nowrap",
@@ -3925,7 +3929,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     </div>
                     <div
                       style={{
-                        fontSize: 11,
+                        fontSize: 13,
                         color: themeStyles.textMuted,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -3986,7 +3990,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     ...S.input,
                     paddingLeft: 36,
                     paddingRight: 48,
-                    fontSize: 13,
+                    fontSize: 15,
                     background: isDark ? "rgba(255,255,255,0.04)" : "#F8F9FA",
                     border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB"}`,
                   }}
@@ -4003,7 +4007,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     background: isDark ? "rgba(255,255,255,0.08)" : "#E5E7EB",
                     borderRadius: 5,
                     padding: "2px 5px",
-                    fontSize: 10,
+                    fontSize: 12,
                     fontWeight: 700,
                     color: themeStyles.textMuted,
                     cursor: "pointer",
@@ -4020,8 +4024,8 @@ Keep it punchy, sharp, and directly actionable.`;
                 title="Global Professional Search"
                 aria-label="Global Professional Search"
                 style={{
-                  width: isMobile ? 44 : 36,
-                  height: isMobile ? 44 : 36,
+                  width: 44,
+                  height: 44,
                   borderRadius: 9,
                   border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
                   background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
@@ -4041,8 +4045,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   title="Professional Network Map"
                   aria-label="Professional Network Map"
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 44,
+                    height: 44,
                     borderRadius: 9,
                     border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
                     background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
@@ -4054,6 +4058,29 @@ Keep it punchy, sharp, and directly actionable.`;
                   }}
                 >
                   <I.Network size={18} />
+                </button>
+              )}
+
+              {/* AI assistant lives in the top bar (a floating button covered content) */}
+              {isMobile && (
+                <button
+                  onClick={() => setAiOpen(true)}
+                  title="AI Assistant"
+                  aria-label="AI Assistant"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 9,
+                    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
+                    background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
+                    color: "#7C3AED",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Icons.Sparkles size={18} color={isDark ? "#C4B5FD" : "#7C3AED"} />
                 </button>
               )}
 
@@ -4077,7 +4104,7 @@ Keep it punchy, sharp, and directly actionable.`;
               >
                 <Icons.Bell size={isMobile ? 18 : 16} />
                 {notif.unread > 0 ? (
-                  <span aria-hidden="true" key={notif.unread} className="nq-badge" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                  <span aria-hidden="true" key={notif.unread} className="nq-badge" style={{ position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, padding: "0 5px", borderRadius: 9, background: "#FF3B30", color: "#FFFFFF", fontSize: 13, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
                     {notif.unread > 9 ? "9+" : notif.unread}
                   </span>
                 ) : (
@@ -4091,8 +4118,8 @@ Keep it punchy, sharp, and directly actionable.`;
                 onClick={toggleTheme}
                 title={`Switch to ${isDark ? "Light" : "Dark"} mode`}
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 44,
+                  height: 44,
                   borderRadius: 9,
                   border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
                   background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
@@ -4109,7 +4136,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {!isMobile && (
                 <button
-                  style={{ ...S.btn, padding: "7px 14px", fontSize: 13 }}
+                  style={{ ...S.btn, padding: "7px 14px", fontSize: 15 }}
                   onClick={() => {
                     setTab("add");
                     setAddStep("form");
@@ -4129,9 +4156,12 @@ Keep it punchy, sharp, and directly actionable.`;
                 style={{
                   display: "flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: 8,
                   cursor: "pointer",
-                  padding: "4px 8px",
+                  minWidth: 44,
+                  minHeight: 44,
+                  padding: "0 4px",
                   borderRadius: 8,
                 }}
                 aria-current={tab === "me" ? "page" : undefined}
@@ -4142,7 +4172,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 </span>
                 {!isMobile && (
                   <div style={{ textAlign: "left" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: themeStyles.text, lineHeight: 1.2 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: themeStyles.text, lineHeight: 1.2 }}>
                       {currentUser?.name || "Member"}
                     </div>
                   </div>
@@ -4161,7 +4191,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 style={{
                   ...S.btnSmOut,
                   padding: "6px 10px",
-                  fontSize: 12,
+                  fontSize: 13,
                 }}
               >
                 Sign out
@@ -4193,7 +4223,7 @@ Keep it punchy, sharp, and directly actionable.`;
             role="alert"
             style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", margin: "0 0 16px", padding: "12px 16px", borderRadius: 16, background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.35)" }}
           >
-            <div style={{ flex: "1 1 240px", fontSize: 14 }}>
+            <div style={{ flex: "1 1 240px", fontSize: 15 }}>
               <strong>Your account is scheduled for deletion</strong> on {new Date(currentUser.deletion_scheduled_at).toLocaleDateString()}. All data will be permanently removed.
             </div>
             <button
@@ -4248,14 +4278,14 @@ Keep it punchy, sharp, and directly actionable.`;
               {[
                 { count: effectiveContacts.length, label: "People" },
                 { count: waitingCount, label: "To follow up", accent: waitingCount > 0 },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Opportunities" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Leads" },
                 { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
               ].map((m, i) => (
                 <div key={m.label} style={{ textAlign: "center", minWidth: 0, padding: "0 4px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
                   <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
                     {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
                   </div>
-                  <div style={{ fontSize: "clamp(10px, 3vw, 12px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
+                  <div style={{ fontSize: "clamp(12px, 3.4vw, 13px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
                 </div>
               ))}
             </div>
@@ -4293,7 +4323,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   >
                     <q.icon size={22} color="currentColor" />
                   </span>
-                  <span style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.2, whiteSpace: "nowrap" }}>{q.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2, whiteSpace: "nowrap" }}>{q.label}</span>
                 </button>
               ))}
             </section>
@@ -4340,7 +4370,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
                       Your people
                     </h2>
-                    <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 2 }}>
+                    <div style={{ color: themeStyles.textMuted, fontSize: 15, marginTop: 2 }}>
                       {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
                     </div>
                   </div>
@@ -4370,7 +4400,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     style={{ flex: 1, minWidth: 0, minHeight: 44, border: "none", outline: "none", background: "transparent", color: themeStyles.text, fontSize: 16, fontFamily: "inherit", padding: 0, boxShadow: "none" }}
                   />
                   {searchQ && (
-                    <button onClick={() => setSearchQ("")} aria-label="Clear search" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+                    <button onClick={() => setSearchQ("")} aria-label="Clear search" style={{ width: 44, height: 44, borderRadius: 16, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
                       <I.X size={14} />
                     </button>
                   )}
@@ -4418,7 +4448,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <button
                   style={{
                     ...S.btn,
-                    fontSize: 13,
+                    fontSize: 15,
                     padding: "0 16px",
                     minHeight: isMobile ? 44 : 40,
                     flex: isMobile ? "1 1 auto" : undefined,
@@ -4434,7 +4464,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
                 {!contactsLoading && contacts.length > 0 && (
                   <button
-                    style={{ ...S.btnOutline, fontSize: 13, padding: 0, width: 52, minHeight: 52, borderRadius: 16 }}
+                    style={{ ...S.btnOutline, fontSize: 15, padding: 0, width: 52, minHeight: 52, borderRadius: 16 }}
                     onClick={exportCSV}
                     aria-label={`Export ${filtered.length} contacts`}
                     title={`Export ${filtered.length} contacts`}
@@ -4451,13 +4481,13 @@ Keep it punchy, sharp, and directly actionable.`;
               const chipStyle = (active: boolean) => ({
                     flex: "0 0 auto",
                     scrollSnapAlign: "start",
-                    minHeight: 34,
+                    minHeight: 44,
                     padding: "0 14px",
                     borderRadius: 17,
                     border: active ? "1px solid transparent" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
                     background: active ? (isDark ? "#FFFFFF" : "#1C1C1E") : isDark ? "#1C1C1E" : "#FFFFFF",
                     color: active ? (isDark ? "#1C1C1E" : "#FFFFFF") : themeStyles.text,
-                    fontSize: 13,
+                    fontSize: 15,
                     fontWeight: active ? 600 : 500,
                     cursor: "pointer",
                     whiteSpace: "nowrap" as const,
@@ -4525,15 +4555,15 @@ Keep it punchy, sharp, and directly actionable.`;
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Icons.Bell size={16} color="#F59E0B" />
-                    <span style={{ fontWeight: 700, fontSize: 13, color: isDark ? "#fbbf24" : "#b45309" }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: isDark ? "#fbbf24" : "#b45309" }}>
                       {dueReminders.length} reminder{dueReminders.length > 1 ? "s" : ""} scheduled for today
                     </span>
-                    <span style={{ fontSize: 12, color: isDark ? "#fcd34d" : "#d97706" }}>
+                    <span style={{ fontSize: 13, color: isDark ? "#fcd34d" : "#d97706" }}>
                       {dueReminders.filter((c) => c.reminderDate < today).length > 0 &&
                         `· ${dueReminders.filter((c) => c.reminderDate < today).length} overdue`}
                     </span>
                   </div>
-                  <span style={{ fontSize: 12, color: isDark ? "#fcd34d" : "#d97706", fontWeight: 700 }}>
+                  <span style={{ fontSize: 13, color: isDark ? "#fcd34d" : "#d97706", fontWeight: 700 }}>
                     {remindersOpen ? "Hide" : "Show"}
                   </span>
                 </div>
@@ -4558,8 +4588,8 @@ Keep it punchy, sharp, and directly actionable.`;
                           onClick={() => setModal(c)}
                         >
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: themeStyles.text }}>{c.name}</div>
-                            <div style={{ fontSize: 12, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <div style={{ fontWeight: 700, fontSize: 15, color: themeStyles.text }}>{c.name}</div>
+                            <div style={{ fontSize: 13, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {c.reminder}
                             </div>
                           </div>
@@ -4570,7 +4600,7 @@ Keep it punchy, sharp, and directly actionable.`;
                               color: overdue ? "#ef4444" : "#f59e0b",
                               borderRadius: 6,
                               padding: "3px 8px",
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: 700,
                             }}
                           >
@@ -4585,7 +4615,7 @@ Keep it punchy, sharp, and directly actionable.`;
                               ...S.btnSm,
                               background: "rgba(16, 185, 129, 0.15)",
                               color: "#10b981",
-                              fontSize: 11,
+                              fontSize: 13,
                               padding: "4px 10px",
                               border: "1px solid rgba(16, 185, 129, 0.3)",
                             }}
@@ -4632,7 +4662,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <div style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 6 }}>
                   {searchQ ? "No matching contacts" : "No contacts in your network yet"}
                 </div>
-                <div style={{ fontSize: 13, color: themeStyles.textMuted }}>
+                <div style={{ fontSize: 15, color: themeStyles.textMuted }}>
                   {searchQ ? `No results found for "${searchQ}"` : "Scan a physical business card or add a contact manually."}
                 </div>
                 {!searchQ && (
@@ -4645,7 +4675,7 @@ Keep it punchy, sharp, and directly actionable.`;
             ) : viewMode === "table" && !isMobile ? (
               <div style={{ ...S.card, padding: 0, overflow: "hidden" }}>
                 <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 15 }}>
                     <thead>
                       <tr style={themeStyles.tableHeader}>
                         {[
@@ -4662,11 +4692,9 @@ Keep it punchy, sharp, and directly actionable.`;
                             style={{
                               padding: "12px 16px",
                               textAlign: "left",
-                              fontSize: 11,
+                              fontSize: 13,
                               fontWeight: 700,
                               color: sortCol === col ? "#6366f1" : themeStyles.textMuted,
-                              letterSpacing: "0.06em",
-                              textTransform: "uppercase",
                               cursor: "pointer",
                               userSelect: "none",
                             }}
@@ -4674,7 +4702,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             {label} {sortCol === col ? (sortDir === "asc" ? "↑" : "↓") : ""}
                           </th>
                         ))}
-                        <th style={{ padding: "12px 16px", fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                        <th style={{ padding: "12px 16px", fontSize: 13, fontWeight: 700, color: themeStyles.textMuted }}>
                           Actions
                         </th>
                       </tr>
@@ -4709,11 +4737,11 @@ Keep it punchy, sharp, and directly actionable.`;
                                     {c.name || "—"}
                                   </div>
                                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                                    {c.title && <span style={{ fontSize: 11, color: themeStyles.textMuted }}>{c.title}</span>}
+                                    {c.title && <span style={{ fontSize: 13, color: themeStyles.textMuted }}>{c.title}</span>}
                                     <span
                                       style={{
                                         display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                                        fontSize: 10,
+                                        fontSize: 12,
                                         fontWeight: 500,
                                         padding: "2px 7px",
                                         borderRadius: 6,
@@ -4736,7 +4764,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <a
                                   href={`mailto:${c.email}`}
                                   onClick={(e) => e.stopPropagation()}
-                                  style={{ color: isDark ? "#A78BFA" : "#7C3AED", textDecoration: "none", fontSize: 12, fontWeight: 500 }}
+                                  style={{ color: isDark ? "#A78BFA" : "#7C3AED", textDecoration: "none", fontSize: 13, fontWeight: 500 }}
                                 >
                                   {c.email}
                                 </a>
@@ -4744,7 +4772,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>
                               )}
                             </td>
-                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 12, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 13, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
                               {c.phone || <span style={{ opacity: 0.4 }}>—</span>}
                             </td>
                             <td style={{ padding: "12px 16px" }}>
@@ -4756,7 +4784,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                     color: "#818cf8",
                                     borderRadius: 6,
                                     padding: "2px 8px",
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: 600,
                                     marginBottom: 3,
                                   }}
@@ -4777,7 +4805,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                           color: tc.color,
                                           borderRadius: 6,
                                           padding: "1px 6px",
-                                          fontSize: 10,
+                                          fontSize: 12,
                                           fontWeight: 600,
                                         }}
                                       >
@@ -4789,7 +4817,7 @@ Keep it punchy, sharp, and directly actionable.`;
                               )}
                               {!c.event && !(c.tags || []).length && <span style={{ color: themeStyles.textMuted, opacity: 0.4 }}>—</span>}
                             </td>
-                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 11 }}>
+                            <td style={{ padding: "12px 16px", color: themeStyles.textMuted, fontSize: 13 }}>
                               {c.addedAt ? new Date(c.addedAt).toLocaleDateString() : "—"}
                             </td>
                             <td style={{ padding: "12px 16px" }} onClick={(e) => e.stopPropagation()}>
@@ -4797,7 +4825,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <button
                                   className="btn-press"
                                   onClick={() => openEmail(c)}
-                                  style={{ ...S.btnSm, padding: "5px 9px", fontSize: 11 }}
+                                  style={{ ...S.btnSm, padding: "5px 9px", fontSize: 13 }}
                                   title="Draft AI Email"
                                 >
                                   <Icons.Mail size={13} />
@@ -4805,7 +4833,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <button
                                   className="btn-press"
                                   onClick={() => { setMeetModal(c); setMeetSent(false); }}
-                                  style={{ ...S.btnSm, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "5px 9px", fontSize: 11 }}
+                                  style={{ ...S.btnSm, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", padding: "5px 9px", fontSize: 13 }}
                                   title="Schedule Meeting"
                                 >
                                   <Icons.Calendar size={13} />
@@ -4813,7 +4841,7 @@ Keep it punchy, sharp, and directly actionable.`;
                                 <button
                                   className="btn-press"
                                   onClick={() => openEdit(c)}
-                                  style={{ ...S.btnSmOut, padding: "5px 9px", fontSize: 11 }}
+                                  style={{ ...S.btnSmOut, padding: "5px 9px", fontSize: 13 }}
                                   title="Edit Contact"
                                 >
                                   <Icons.Edit size={13} />
@@ -4833,7 +4861,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 {filtered.map((c, i) => {
                   const due = c.reminder && c.reminderDate && !c.reminderDone && c.reminderDate <= today;
                   const sub = [c.title, c.company].filter(Boolean).join(" · ") || getContactRoleCategory(c);
-                  const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                  const iconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
                   return (
                     <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none", background: selectMode && selectedIds.has(c.id) ? (isDark ? "rgba(167,139,250,0.10)" : "rgba(124,58,237,0.05)") : "transparent" }}>
                       <button
@@ -4853,7 +4881,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
                             {due && <span title={c.reminderDate < today ? "Follow-up overdue" : "Follow-up due today"} style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: c.reminderDate < today ? "#FF3B30" : "#FF9F0A" }} />}
                           </span>
-                          <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
+                          <span style={{ display: "block", fontSize: 15, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub}</span>
                         </span>
                       </button>
                       {!selectMode && (
@@ -4894,13 +4922,13 @@ Keep it punchy, sharp, and directly actionable.`;
                             {c.name}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
-                            <span style={{ fontSize: 12, color: themeStyles.textMuted }}>
+                            <span style={{ fontSize: 13, color: themeStyles.textMuted }}>
                               {[c.title, c.company].filter(Boolean).join(" · ")}
                             </span>
                             <span
                               style={{
                                 display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                                fontSize: 10,
+                                fontSize: 12,
                                 fontWeight: 500,
                                 padding: "2px 7px",
                                 borderRadius: 6,
@@ -4916,13 +4944,13 @@ Keep it punchy, sharp, and directly actionable.`;
                       </div>
 
                       {c.email && (
-                        <div style={{ fontSize: 12, color: isDark ? "#A78BFA" : "#7C3AED", marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 13, color: isDark ? "#A78BFA" : "#7C3AED", marginBottom: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
                           <Icons.Mail size={12} color={isDark ? "#A78BFA" : "#7C3AED"} />
                           <span>{c.email}</span>
                         </div>
                       )}
                       {c.phone && (
-                        <div style={{ fontSize: 12, color: themeStyles.textMuted, marginBottom: 5, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ fontSize: 13, color: themeStyles.textMuted, marginBottom: 5, display: "flex", alignItems: "center", gap: 6 }}>
                           <Icons.Phone size={12} />
                           <span>{c.phone}</span>
                         </div>
@@ -4931,14 +4959,14 @@ Keep it punchy, sharp, and directly actionable.`;
                       <div style={{ display: "flex", gap: 6, marginTop: 12 }} onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => openEmail(c)}
-                          style={{ ...S.btnSm, flex: 1, fontSize: 11, padding: "7px 8px" }}
+                          style={{ ...S.btnSm, flex: 1, fontSize: 13, padding: "7px 8px" }}
                         >
                           <Icons.Mail size={12} />
                           <span>Email</span>
                         </button>
                         <button
                           onClick={() => { setMeetModal(c); setMeetSent(false); }}
-                          style={{ ...S.btnSm, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", flex: 1, fontSize: 11, padding: "7px 8px" }}
+                          style={{ ...S.btnSm, background: "rgba(16, 185, 129, 0.15)", color: isDark ? "#34D399" : "#047857", flex: 1, fontSize: 13, padding: "7px 8px" }}
                         >
                           <Icons.Calendar size={12} />
                           <span>Meet</span>
@@ -4993,7 +5021,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     <div style={{ fontSize: 18, fontWeight: 700, color: themeStyles.text }}>
                       {selectedContact.name}
                     </div>
-                    <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, fontWeight: 500 }}>
+                    <div style={{ fontSize: 15, color: themeStyles.textMuted, marginTop: 2, fontWeight: 500 }}>
                       {[selectedContact.title, selectedContact.company].filter(Boolean).join(" · ")}
                     </div>
                   </div>
@@ -5007,7 +5035,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       border: "none",
                       borderRadius: 10,
                       padding: "8px 16px",
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: 700,
                       cursor: "pointer",
                       display: "flex",
@@ -5064,7 +5092,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         border: "none",
                         borderBottom: isActive ? `2px solid ${isDark ? "#A78BFA" : "#7C3AED"}` : "2px solid transparent",
                         padding: "8px 10px",
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: isActive ? 700 : 500,
                         color: isActive ? (isDark ? "#ffffff" : "#7C3AED") : themeStyles.textMuted,
                         cursor: "pointer",
@@ -5080,36 +5108,36 @@ Keep it punchy, sharp, and directly actionable.`;
               {/* Tab Content */}
               {activeDetailTab === "overview" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                  <p style={{ fontSize: 13, color: themeStyles.textMuted, lineHeight: 1.5, margin: 0 }}>
+                  <p style={{ fontSize: 15, color: themeStyles.textMuted, lineHeight: 1.5, margin: 0 }}>
                     {selectedContact.bio || [selectedContact.title, selectedContact.company].filter(Boolean).join(" at ") || "No details yet."}
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
                     <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius: 12, padding: "10px 12px" }}>
-                      <div style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
                         <Icons.Send size={12} color={isDark ? "#A78BFA" : "#7C3AED"} /> Added
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
                         {selectedContact.addedAt ? relativeDay(selectedContact.addedAt) : "—"}
                       </div>
                     </div>
 
                     <div style={{ background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", borderRadius: 12, padding: "10px 12px" }}>
-                      <div style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                      <div style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
                         <Icons.Calendar size={12} color="#10B981" /> Next follow-up
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: themeStyles.text, marginTop: 4 }}>
                         {selectedContact.reminderDate && !selectedContact.reminderDone ? relativeDay(selectedContact.reminderDate) : <span style={{ color: themeStyles.textMuted, fontWeight: 500 }}>Not set</span>}
                       </div>
                     </div>
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.textMuted, marginBottom: 8 }}>
                       Tags
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {(selectedContact.tags || []).length === 0 && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>No tags yet</span>}
+                      {(selectedContact.tags || []).length === 0 && <span style={{ fontSize: 13, color: themeStyles.textMuted }}>No tags yet</span>}
                       {(selectedContact.tags || []).map((tag: string) => (
                         <span
                           key={tag}
@@ -5120,7 +5148,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             border: `1px solid ${isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.08)"}`,
                             padding: "3px 9px",
                             borderRadius: 8,
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: 500,
                           }}
                         >
@@ -5131,10 +5159,10 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
 
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.textMuted, marginBottom: 6 }}>
                       Notes
                     </div>
-                    <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 12, color: themeStyles.text, lineHeight: 1.5 }}>
+                    <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 13, color: themeStyles.text, lineHeight: 1.5 }}>
                       {selectedContact.reference || selectedContact.notes || <span style={{ color: themeStyles.textMuted }}>No notes yet. Add them from Edit contact.</span>}
                     </div>
                   </div>
@@ -5144,7 +5172,7 @@ Keep it punchy, sharp, and directly actionable.`;
               {activeDetailTab === "relationship" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                   <div style={{ background: isDark ? "rgba(255, 255, 255, 0.04)" : "#F5F5F7", borderRadius: 12, padding: 14, border: `1px solid ${themeStyles.tableRowBorder}` }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: themeStyles.text, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.text }}>
                       Relationship Stages
                     </div>
                     {(() => {
@@ -5157,7 +5185,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       return (
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, textAlign: "center" }}>
                           {stages.map((st) => (
-                            <div key={st.label} style={{ background: st.done ? "rgba(52, 199, 89, 0.15)" : isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: st.done ? "#34C759" : themeStyles.textMuted, borderRadius: 8, padding: "6px 4px", fontSize: 11, fontWeight: 700 }}>
+                            <div key={st.label} style={{ background: st.done ? "rgba(52, 199, 89, 0.15)" : isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: st.done ? "#34C759" : themeStyles.textMuted, borderRadius: 8, padding: "6px 4px", fontSize: 13, fontWeight: 700 }}>
                               {st.done && <I.Check size={12} strokeWidth={2.4} style={{ marginRight: 3, verticalAlign: "-2px" }} />}
                               {st.label}
                             </div>
@@ -5168,8 +5196,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: 10, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)" }}>
-                    <span style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 600 }}>Follow-up email</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: selectedContact.emailSent ? "#34C759" : themeStyles.textMuted }}>{selectedContact.emailSent ? "Sent" : "Not sent yet"}</span>
+                    <span style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 600 }}>Follow-up email</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: selectedContact.emailSent ? "#34C759" : themeStyles.textMuted }}>{selectedContact.emailSent ? "Sent" : "Not sent yet"}</span>
                   </div>
 
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -5213,7 +5241,7 @@ Keep it punchy, sharp, and directly actionable.`;
 
               {activeDetailTab === "notes" && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 13, lineHeight: 1.5, minHeight: 64, color: selectedContact.reference || selectedContact.notes ? themeStyles.text : themeStyles.textMuted }}>
+                  <div style={{ background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)", border: `1px solid ${themeStyles.tableRowBorder}`, borderRadius: 10, padding: 12, fontSize: 15, lineHeight: 1.5, minHeight: 64, color: selectedContact.reference || selectedContact.notes ? themeStyles.text : themeStyles.textMuted }}>
                     {selectedContact.reference || selectedContact.notes || "No notes yet."}
                   </div>
                   <div style={{ display: "flex", gap: 8 }}>
@@ -5235,12 +5263,12 @@ Keep it punchy, sharp, and directly actionable.`;
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     {opps.length ? (
                       opps.map((t: string) => (
-                        <div key={t} style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}`, fontSize: 13, fontWeight: 600 }}>
+                        <div key={t} style={{ padding: "12px 14px", borderRadius: 12, background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)", border: `1px solid ${themeStyles.tableRowBorder}`, fontSize: 15, fontWeight: 600 }}>
                           {t}
                         </div>
                       ))
                     ) : (
-                      <div style={{ textAlign: "center", padding: "18px 8px", color: themeStyles.textMuted, fontSize: 13, lineHeight: 1.5 }}>
+                      <div style={{ textAlign: "center", padding: "18px 8px", color: themeStyles.textMuted, fontSize: 15, lineHeight: 1.5 }}>
                         No opportunities yet. Tag this contact "opportunity", "client", "deal" or "partner" to track it here.
                       </div>
                     )}
@@ -5389,7 +5417,7 @@ Keep it punchy, sharp, and directly actionable.`;
               ].map((x, i) => (
                 <div key={x.text} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "0 6px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
                   <x.icon size={20} color={isDark ? "#C4B5FD" : "#7C3AED"} />
-                  <span style={{ fontSize: 13, color: themeStyles.textMuted, textAlign: "center" }}>{x.text}</span>
+                  <span style={{ fontSize: 15, color: themeStyles.textMuted, textAlign: "center" }}>{x.text}</span>
                 </div>
               ))}
             </div>
@@ -5444,8 +5472,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   >
                     <b.icon size={22} color={b.primary ? "#FFFFFF" : isDark ? "#A78BFA" : "#7C3AED"} />
                   </span>
-                  <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "-0.01em" }}>{b.label}</span>
-                  <span style={{ fontSize: 11, opacity: 0.75 }}>{b.sub}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: "-0.01em" }}>{b.label}</span>
+                  <span style={{ fontSize: 13, opacity: 0.75 }}>{b.sub}</span>
                 </button>
               ))}
             </div>
@@ -5456,7 +5484,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 { label: "Batch scan up to 25 cards", icon: I.Zap, act: () => { setBatchInitialFiles([]); setBatchScannerOpen(true); } },
                 { label: "Write NFC card", icon: I.Contact, act: () => setNfcWriterOpen(true) },
               ].map((l) => (
-                <button key={l.label} onClick={l.act} style={{ background: "transparent", border: "none", color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 12px", minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <button key={l.label} onClick={l.act} style={{ background: "transparent", border: "none", color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: "8px 12px", minHeight: 40, display: "inline-flex", alignItems: "center", gap: 6 }}>
                   <l.icon size={15} />
                   {l.label}
                 </button>
@@ -5472,13 +5500,13 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
                 )}
                 {scanning && (
-                  <div role="status" style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 14 }}>
+                  <div role="status" style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontWeight: 600, fontSize: 15 }}>
                     Reading the card…
-                    <div style={{ color: themeStyles.textMuted, fontWeight: 400, fontSize: 12, marginTop: 4 }}>Usually takes a few seconds</div>
+                    <div style={{ color: themeStyles.textMuted, fontWeight: 400, fontSize: 13, marginTop: 4 }}>Usually takes a few seconds</div>
                   </div>
                 )}
                 {scanErr && (
-                  <div role="alert" style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 10, color: "#ef4444", fontSize: 13, display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}>
+                  <div role="alert" style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 10, color: "#ef4444", fontSize: 15, display: "flex", alignItems: "center", gap: 8, textAlign: "left" }}>
                     <Icons.AlertCircle size={15} />
                     <span>{scanErr}</span>
                     <button aria-label="Dismiss" onClick={() => { setScanErr(""); setScanPreview(null); }} style={{ marginLeft: "auto", background: "none", border: "none", color: "#ef4444", cursor: "pointer", display: "flex" }}>
@@ -5507,7 +5535,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <div style={{ background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, textAlign: "center", padding: "28px 20px", color: themeStyles.textMuted }}>
                   <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}><I.Contact size={30} /></div>
                   <div style={{ fontWeight: 600, fontSize: 16, color: themeStyles.text, marginBottom: 4 }}>No cards yet</div>
-                  <div style={{ fontSize: 14, lineHeight: 1.45, maxWidth: 300, margin: "0 auto 16px" }}>
+                  <div style={{ fontSize: 15, lineHeight: 1.45, maxWidth: 300, margin: "0 auto 16px" }}>
                     Scan a card with your camera, or record a short voice note after meeting someone.
                   </div>
                   <button onClick={() => setVoiceDebriefOpen(true)} style={{ minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -5517,14 +5545,14 @@ Keep it punchy, sharp, and directly actionable.`;
               ) : (
                 <ul style={{ listStyle: "none", margin: 0, padding: 0, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, borderRadius: 20, overflow: "hidden" }}>
                   {contacts.slice(0, 5).map((c, i) => {
-                    const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+                    const iconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
                     return (
                       <li key={c.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px 10px 16px", minHeight: 68, borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
                         <button onClick={() => setModal(c)} aria-label={`Open ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                           <ContactAvatar contact={c} size={44} radius={22} isDark={isDark} />
                           <span style={{ flex: 1, minWidth: 0 }}>
                             <span style={{ display: "block", fontSize: 16, fontWeight: 600, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
-                            <span style={{ display: "block", fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <span style={{ display: "block", fontSize: 15, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {[c.title || c.role, c.company].filter(Boolean).join(" · ") || "Added from a card"}
                             </span>
                           </span>
@@ -5580,7 +5608,7 @@ Keep it punchy, sharp, and directly actionable.`;
             <h2 style={{ fontSize: 28, marginBottom: 4 }}>
               {editingContact ? "Edit Contact" : addStep === "form" ? "New Contact" : "Review Extracted Info"}
             </h2>
-            <p style={{ color: themeStyles.textMuted, fontSize: 13, marginBottom: 20 }}>
+            <p style={{ color: themeStyles.textMuted, fontSize: 15, marginBottom: 20 }}>
               {editingContact ? "Update the contact record." : "Enter details manually or review extracted card data."}
             </p>
 
@@ -5683,7 +5711,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         background: "none",
                         border: "none",
                         color: isDark ? "#A78BFA" : "#7C3AED",
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: 600,
                         cursor: "pointer",
                         padding: 0,
@@ -5711,7 +5739,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <div style={{ gridColumn: "1/-1" }}>
                   <label style={S.label}>Notes & Context</label>
                   <textarea
-                    style={{ ...S.input, height: 70, resize: "none", fontFamily: "inherit", fontSize: 13 }}
+                    style={{ ...S.input, height: 70, resize: "none", fontFamily: "inherit", fontSize: 15 }}
                     value={addForm.notes || ""}
                     onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
                     placeholder="Conversation notes, mutual connections, or project details…"
@@ -5734,7 +5762,7 @@ Keep it punchy, sharp, and directly actionable.`;
                             color: tc.color,
                             borderRadius: 12,
                             padding: "3px 10px",
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: 600,
                             display: "inline-flex",
                             alignItems: "center",
@@ -5754,7 +5782,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
                 )}
                 <input
-                  style={{ ...S.input, fontSize: 13 }}
+                  style={{ ...S.input, fontSize: 15 }}
                   placeholder="Type a tag & press Enter (e.g. founder, investor, client…)"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
@@ -5776,14 +5804,14 @@ Keep it punchy, sharp, and directly actionable.`;
               {/* Event Context, Notes & Voice Note */}
               <div style={{ borderTop: `1px solid ${themeStyles.tableRowBorder}`, paddingTop: 14 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: themeStyles.textMuted, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: themeStyles.textMuted }}>
                     Event & Follow-Up Context
                   </div>
                   <button
                     onClick={toggleVoiceNote}
                     style={{
                       ...S.btnSmOut,
-                      fontSize: 11,
+                      fontSize: 13,
                       color: isRecordingVoice ? "#ef4444" : "#6366f1",
                       borderColor: isRecordingVoice ? "#ef4444" : "rgba(124, 58, 237, 0.3)",
                       background: isRecordingVoice ? "rgba(239, 68, 68, 0.1)" : "transparent",
@@ -5835,7 +5863,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
 
               {saveErr && (
-                <div style={{ marginBottom: 14, padding: "10px 14px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 10, color: "#ef4444", fontSize: 12 }}>
+                <div style={{ marginBottom: 14, padding: "10px 14px", background: "rgba(239, 68, 68, 0.1)", borderRadius: 10, color: "#ef4444", fontSize: 13 }}>
                   {saveErr}
                 </div>
               )}
@@ -5907,7 +5935,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <ContactAvatar contact={modal} size={50} radius={14} isDark={isDark} />
                 <div>
                   <div style={{ fontSize: 24 }}>{modal.name}</div>
-                  <div style={{ color: themeStyles.textMuted, fontSize: 13, marginTop: 1 }}>
+                  <div style={{ color: themeStyles.textMuted, fontSize: 15, marginTop: 1 }}>
                     {[modal.title, modal.company].filter(Boolean).join(" · ")}
                   </div>
                 </div>
@@ -5947,9 +5975,9 @@ Keep it punchy, sharp, and directly actionable.`;
             {/* Executive Briefing Section */}
             <div style={{ background: isDark ? "rgba(167, 139, 250, 0.08)" : "rgba(124, 58, 237, 0.05)", border: `1px solid ${isDark ? "rgba(167, 139, 250, 0.2)" : "rgba(124, 58, 237, 0.15)"}`, borderRadius: 14, padding: "12px 16px", marginBottom: 14 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: prepBrief ? 8 : 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED", display: "flex", alignItems: "center", gap: 6, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#A78BFA" : "#7C3AED", display: "flex", alignItems: "center", gap: 6 }}>
                   <Icons.FileText size={14} color={isDark ? "#A78BFA" : "#7C3AED"} />
-                  <span>EXECUTIVE BRIEFING & NOTES</span>
+                  <span>Briefing & notes</span>
                 </div>
                 <button
                   onClick={() => generateAIPrepBrief(modal)}
@@ -5958,8 +5986,10 @@ Keep it punchy, sharp, and directly actionable.`;
                     background: "none",
                     border: "none",
                     color: isDark ? "#A78BFA" : "#7C3AED",
-                    fontSize: 11,
+                    fontSize: 15,
                     fontWeight: 600,
+                    minHeight: 44,
+                    padding: "0 4px",
                     cursor: "pointer",
                   }}
                 >
@@ -5968,7 +5998,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
 
               {prepBrief ? (
-                <div style={{ fontSize: 12, lineHeight: 1.6, color: themeStyles.text, whiteSpace: "pre-wrap", borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, paddingTop: 8 }}>
+                <div style={{ fontSize: 13, lineHeight: 1.6, color: themeStyles.text, whiteSpace: "pre-wrap", borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, paddingTop: 8 }}>
                   {prepBrief}
                 </div>
               ) : (
@@ -5983,7 +6013,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
                     }}
                   />
-                  <div style={{ fontSize: 12, color: themeStyles.textMuted }}>
+                  <div style={{ fontSize: 13, color: themeStyles.textMuted }}>
                     Generate structured talking points, past interaction history, and relationship notes.
                   </div>
                 </div>
@@ -5999,11 +6029,11 @@ Keep it punchy, sharp, and directly actionable.`;
               ].map(({ label, val, icon: FieldIcon }) =>
                 val ? (
                   <div key={label} style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "10px 12px" }}>
-                    <div style={{ fontSize: 10, color: themeStyles.textMuted, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
+                    <div style={{ fontSize: 12, color: themeStyles.textMuted, fontWeight: 700, marginBottom: 3, display: "flex", alignItems: "center", gap: 5 }}>
                       <FieldIcon size={11} />
                       <span>{label}</span>
                     </div>
-                    <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {val}
                     </div>
                   </div>
@@ -6013,19 +6043,19 @@ Keep it punchy, sharp, and directly actionable.`;
 
             {modal.event && (
               <div style={{ background: "rgba(124, 58, 237, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: "#818cf8", letterSpacing: "0.06em", textTransform: "uppercase" }}>EVENT</span>
-                <div style={{ fontWeight: 600, fontSize: 13, marginTop: 2 }}>{modal.event}</div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? "#A5B4FC" : "#4F46E5" }}>Event</span>
+                <div style={{ fontWeight: 600, fontSize: 15, marginTop: 2 }}>{modal.event}</div>
               </div>
             )}
 
             {(modal.tags || []).length > 0 && (
               <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: themeStyles.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>TAGS</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: themeStyles.textMuted }}>Tags</span>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
                   {(modal.tags || []).map((t: string) => {
                     const tc = tagColor(t, isDark);
                     return (
-                      <span key={t} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 11, fontWeight: 600 }}>
+                      <span key={t} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0, background: tc.bg, color: tc.color, borderRadius: 8, padding: "3px 8px", fontSize: 13, fontWeight: 600 }}>
                         {t}
                       </span>
                     );
@@ -6036,16 +6066,16 @@ Keep it punchy, sharp, and directly actionable.`;
 
             {modal.reference && (
               <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: themeStyles.textMuted, letterSpacing: "0.06em", textTransform: "uppercase" }}>NOTES</span>
-                <div style={{ marginTop: 3, fontSize: 13, lineHeight: 1.5 }}>{modal.reference}</div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: themeStyles.textMuted }}>Notes</span>
+                <div style={{ marginTop: 3, fontSize: 15, lineHeight: 1.5 }}>{modal.reference}</div>
               </div>
             )}
 
             {modal.reminder && (
               <div style={{ background: "rgba(245, 158, 11, 0.1)", borderRadius: 10, padding: "10px 12px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
                 <div>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: "#f59e0b", letterSpacing: "0.06em", textTransform: "uppercase" }}>REMINDER</span>
-                  <div style={{ marginTop: 2, fontSize: 13 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>Reminder</span>
+                  <div style={{ marginTop: 2, fontSize: 15 }}>
                     {modal.reminder} {modal.reminderDate && <span style={{ color: themeStyles.textMuted }}>· {modal.reminderDate}</span>}
                   </div>
                 </div>
@@ -6077,37 +6107,44 @@ Keep it punchy, sharp, and directly actionable.`;
               onFollowUp={() => { setModal(null); openEmail(modal, "Follow-up"); }}
             />
 
-            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            {/* Main actions, then labelled secondary actions — two even rows, nothing wraps */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 14 }}>
               <button
-                style={{ ...S.btn, flex: 1, fontSize: 12, padding: "9px 12px" }}
+                style={{ ...S.btn, fontSize: 15, minHeight: 48, padding: "0 12px", whiteSpace: "nowrap" }}
                 onClick={() => { setModal(null); openEmail(modal); }}
               >
-                <Icons.Mail size={13} />
-                <span>Write Email</span>
+                <Icons.Mail size={17} />
+                <span>Write email</span>
               </button>
               <button
-                style={{ ...S.btn, background: "rgba(16, 185, 129, 0.15)", color: "#10b981", flex: 1, fontSize: 12, padding: "9px 12px" }}
+                style={{ ...S.btn, background: "rgba(16, 185, 129, 0.15)", color: isDark ? "#34D399" : "#047857", fontSize: 15, minHeight: 48, padding: "0 12px", whiteSpace: "nowrap" }}
                 onClick={() => { setModal(null); setMeetModal(modal); setMeetSent(false); }}
               >
-                <Icons.Calendar size={13} />
+                <Icons.Calendar size={17} />
                 <span>Meet</span>
               </button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 8 }}>
               <button
-                style={{ ...S.btnSmOut, padding: "9px 12px" }}
-                title="Download vCard (.vcf)"
+                style={{ ...S.btnSmOut, fontSize: 15, whiteSpace: "nowrap" }}
+                title="Save to your phone's contacts (.vcf)"
+                aria-label="Save contact to phone"
                 onClick={() => downloadVCard(modal)}
               >
-                <Icons.Download size={13} />
+                <Icons.Download size={16} />
+                <span>Save</span>
               </button>
-              <button style={S.btnSmOut} onClick={() => openEdit(modal)} title="Edit contact" aria-label="Edit contact">
-                <Icons.Edit size={13} />
+              <button style={{ ...S.btnSmOut, fontSize: 15, whiteSpace: "nowrap" }} onClick={() => openEdit(modal)} title="Edit contact" aria-label="Edit contact">
+                <Icons.Edit size={16} />
+                <span>Edit</span>
               </button>
               <button
                 style={{
                   ...S.btnSmOut,
-                  color: confirmDeleteId === modal.id ? "#FFFFFF" : "#ef4444",
-                  background: confirmDeleteId === modal.id ? "#ef4444" : (S.btnSmOut as any).background,
+                  color: confirmDeleteId === modal.id ? "#FFFFFF" : isDark ? "#F87171" : "#DC2626",
+                  background: confirmDeleteId === modal.id ? "#DC2626" : (S.btnSmOut as any).background,
                   borderColor: "rgba(239, 68, 68, 0.3)",
+                  whiteSpace: "nowrap",
                 }}
                 title={confirmDeleteId === modal.id ? "Tap again to delete" : "Delete contact"}
                 aria-label={confirmDeleteId === modal.id ? "Confirm delete" : "Delete contact"}
@@ -6120,8 +6157,8 @@ Keep it punchy, sharp, and directly actionable.`;
                   }
                 }}
               >
-                <Icons.Trash size={13} />
-                {confirmDeleteId === modal.id && <span style={{ fontSize: 12, fontWeight: 600 }}>Confirm</span>}
+                <Icons.Trash size={16} />
+                <span style={{ fontSize: 15, fontWeight: 600 }}>{confirmDeleteId === modal.id ? "Confirm" : "Delete"}</span>
               </button>
             </div>
           </div>
@@ -6179,12 +6216,12 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ textAlign: "center", padding: "20px 0 4px" }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}><SuccessCheck size={60} /></div>
                 <div style={{ fontSize: 20, fontWeight: 700 }}>Invite sent</div>
-                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 13, lineHeight: 1.45 }}>
+                <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 15, lineHeight: 1.45 }}>
                   {meetResult.via === "google"
                     ? `Google Calendar emailed ${meetModal.email} an invite with the Meet link. It's in your calendar too.`
                     : `${meetModal.email} got an email with the link and a calendar invite to accept.`}
                 </div>
-                <div style={{ margin: "16px 0 0", padding: "10px 12px", borderRadius: 12, background: themeStyles.subtleBg, fontSize: 13, wordBreak: "break-all", textAlign: "left" }}>{meetResult.link}</div>
+                <div style={{ margin: "16px 0 0", padding: "10px 12px", borderRadius: 12, background: themeStyles.subtleBg, fontSize: 15, wordBreak: "break-all", textAlign: "left" }}>{meetResult.link}</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
                   <button style={{ ...S.btnSmOut, padding: "9px 14px" }} onClick={() => { navigator.clipboard?.writeText(meetResult.link).then(() => showToast("Link copied.", "success"), () => {}); }}>Copy link</button>
                   {meetResult.ics && (
@@ -6206,7 +6243,7 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
             ) : (
               <>
-                <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 12 }}>
+                <div style={{ background: themeStyles.subtleBg, borderRadius: 10, padding: "10px 12px", marginBottom: 14, fontSize: 13 }}>
                   Meeting with <strong>{meetModal.name}</strong> · <span style={{ color: themeStyles.textMuted }}>{meetModal.email}</span>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
@@ -6231,7 +6268,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <label style={S.label}>Length</label>
                 <div role="radiogroup" aria-label="Meeting length" style={{ display: "flex", gap: 6, marginBottom: 14 }}>
                   {[15, 30, 45, 60].map((m) => (
-                    <button key={m} role="radio" aria-checked={meetDuration === m} onClick={() => setMeetDuration(m)} style={{ flex: 1, minHeight: 40, borderRadius: 10, border: `1px solid ${meetDuration === m ? "#7C3AED" : themeStyles.tableRowBorder}`, background: meetDuration === m ? "rgba(124,58,237,0.1)" : "transparent", color: meetDuration === m ? "#7C3AED" : themeStyles.text, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                    <button key={m} role="radio" aria-checked={meetDuration === m} onClick={() => setMeetDuration(m)} style={{ flex: 1, minHeight: 40, borderRadius: 10, border: `1px solid ${meetDuration === m ? "#7C3AED" : themeStyles.tableRowBorder}`, background: meetDuration === m ? "rgba(124,58,237,0.1)" : "transparent", color: meetDuration === m ? "#7C3AED" : themeStyles.text, fontWeight: 600, fontSize: 15, cursor: "pointer" }}>
                       {m} min
                     </button>
                   ))}
@@ -6243,12 +6280,12 @@ Keep it punchy, sharp, and directly actionable.`;
                     { k: "paste", l: "Paste link" },
                     { k: "jitsi", l: "Free room" },
                   ] as const).map((o) => (
-                    <button key={o.k} role="radio" aria-checked={meetMode === o.k} onClick={() => setMeetMode(o.k as any)} style={{ flex: 1, minHeight: 36, borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: meetMode === o.k ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent", color: meetMode === o.k ? themeStyles.text : themeStyles.textMuted, boxShadow: meetMode === o.k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+                    <button key={o.k} role="radio" aria-checked={meetMode === o.k} onClick={() => setMeetMode(o.k as any)} style={{ flex: 1, minHeight: 44, borderRadius: 9, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", background: meetMode === o.k ? (isDark ? "#2C2C2E" : "#FFFFFF") : "transparent", color: meetMode === o.k ? themeStyles.text : themeStyles.textMuted, boxShadow: meetMode === o.k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
                       {o.l}
                     </button>
                   ))}
                 </div>
-                <div style={{ fontSize: 12, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, color: themeStyles.textMuted, lineHeight: 1.45, marginBottom: 16 }}>
                   {meetMode === "google" ? (
                     gcal?.connected ? (
                       <>Creates a Google Meet in your calendar{gcal.email ? ` (${gcal.email})` : ""} and Google emails the invite with Accept / Decline.</>
@@ -6359,7 +6396,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <span className={`nq-tab-icon${active ? " is-active" : ""}`}>
                   <MobileIcon size={20} color="currentColor" />
                 </span>
-                <span style={{ fontSize: 10, fontWeight: active ? 700 : 500 }}>{label}</span>
+                <span style={{ fontSize: 12, fontWeight: active ? 700 : 500 }}>{label}</span>
                 {t === "messages" && notif.items.some((n) => n.type === "message" && !n.read_at) && (
                   <span aria-label="Unread messages" className="nq-badge" style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 9, height: 9, borderRadius: 5, background: "#FF3B30", boxShadow: "0 0 0 2px rgba(255,255,255,0.9)" }} />
                 )}
@@ -6374,7 +6411,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       borderRadius: "50%",
                       width: 14,
                       height: 14,
-                      fontSize: 8,
+                      fontSize: 11,
                       fontWeight: 700,
                       display: "flex",
                       alignItems: "center",
@@ -6389,37 +6426,6 @@ Keep it punchy, sharp, and directly actionable.`;
           })}
           </div>
         </nav>
-      )}
-
-      {/* ── AI: a quiet floating button; the assistant slides up as a bottom sheet ── */}
-      {isMobile && screen === "app" && !aiOpen && !(tab === "contacts" && selectMode) && (tab === "contacts" || tab === "events" || tab === "messages") && (
-        <button
-          onClick={() => setAiOpen(true)}
-          aria-label="AI Assistant"
-          title="AI Assistant"
-          className="nq-pop"
-          style={{
-            position: "fixed",
-            right: "max(18px, calc(var(--safe-right, 0px) + 18px))",
-            bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 90px)",
-            width: 52,
-            height: 52,
-            borderRadius: 26,
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(124,58,237,0.16)"}`,
-            background: isDark ? "rgba(28,28,30,0.86)" : "rgba(255,255,255,0.92)",
-            backdropFilter: "blur(16px) saturate(180%)",
-            WebkitBackdropFilter: "blur(16px) saturate(180%)",
-            color: "#7C3AED",
-            zIndex: 190,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: isDark ? "0 10px 24px rgba(0,0,0,0.5)" : "0 10px 24px rgba(60, 30, 120, 0.16)",
-            cursor: "pointer",
-          }}
-        >
-          <Icons.Sparkles size={22} color={isDark ? "#C4B5FD" : "#7C3AED"} />
-        </button>
       )}
 
       {/* ── SELECT MODE BAR: act on everyone you ticked ── */}
@@ -6461,7 +6467,7 @@ Keep it punchy, sharp, and directly actionable.`;
               )}
             </div>
             {picked.length > 0 && (picked.length > withEmail || picked.length > onApp) && (
-              <div style={{ fontSize: 12, color: themeStyles.textMuted, padding: "8px 4px 0", lineHeight: 1.4 }}>
+              <div style={{ fontSize: 13, color: themeStyles.textMuted, padding: "8px 4px 0", lineHeight: 1.4 }}>
                 {picked.length > withEmail && `${picked.length - withEmail} without email. `}
                 {picked.length > onApp && `${picked.length - onApp} not on NetworQ, so they can't get messages or calls.`}
                 {onApp > 5 && " Group calls are up to 5 people plus you."}
@@ -6524,11 +6530,11 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <h3 style={{ fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", lineHeight: 1.2 }}>Follow-up emails</h3>
-                  <span style={{ display: "inline-flex", alignItems: "center", height: 22, padding: "0 9px", borderRadius: 11, background: isDark ? "rgba(167,139,250,0.15)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 12, fontWeight: 600, lineHeight: 1 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", height: 22, padding: "0 9px", borderRadius: 11, background: isDark ? "rgba(167,139,250,0.15)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 13, fontWeight: 600, lineHeight: 1 }}>
                     {bulkDrafts.filter((d) => d.status !== "sent").length} to send
                   </span>
                 </div>
-                <p style={{ color: themeStyles.textMuted, fontSize: 14, lineHeight: 1.4, margin: "6px 0 0" }}>
+                <p style={{ color: themeStyles.textMuted, fontSize: 15, lineHeight: 1.4, margin: "6px 0 0" }}>
                   A personal draft for each person. Edit any, then send them all.
                 </p>
               </div>
@@ -6558,20 +6564,20 @@ Keep it punchy, sharp, and directly actionable.`;
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 600, fontSize: 15, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.name}</div>
                       {(d.contact.title || d.contact.company) && (
-                        <div style={{ fontSize: 13, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 15, color: themeStyles.textMuted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {[d.contact.title, d.contact.company].filter(Boolean).join(" · ")}
                         </div>
                       )}
-                      <div style={{ fontSize: 13, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.email}</div>
+                      <div style={{ fontSize: 15, color: isDark ? "#A78BFA" : "#7C3AED", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{d.contact.email}</div>
                     </div>
 
                     <div>
                       {d.status === "sent" ? (
-                        <span style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ background: "rgba(52, 199, 89, 0.15)", color: "#34C759", fontSize: 13, fontWeight: 700, padding: "3px 8px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <Icons.Check size={12} /> Sent
                         </span>
                       ) : d.status === "sending" ? (
-                        <span style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 11, fontWeight: 600 }}>
+                        <span style={{ color: isDark ? "#A78BFA" : "#7C3AED", fontSize: 13, fontWeight: 600 }}>
                           Dispatching…
                         </span>
                       ) : (
@@ -6581,7 +6587,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           rel="noreferrer"
                           style={{
                             display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                            fontSize: 11,
+                            fontSize: 13,
                             color: themeStyles.textMuted,
                             textDecoration: "none",
                             padding: "4px 8px",
@@ -6596,7 +6602,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   </div>
 
                   <input
-                    style={{ ...S.input, fontSize: 12, padding: "6px 10px", marginBottom: 8, fontWeight: 600 }}
+                    style={{ ...S.input, fontSize: 13, padding: "6px 10px", marginBottom: 8, fontWeight: 600 }}
                     value={d.subject}
                     onChange={(e) => {
                       const newSub = e.target.value;
@@ -6606,7 +6612,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   />
 
                   <textarea
-                    style={{ ...S.input, height: 75, resize: "none", fontSize: 12, lineHeight: 1.5, fontFamily: "inherit" }}
+                    style={{ ...S.input, height: 75, resize: "none", fontSize: 13, lineHeight: 1.5, fontFamily: "inherit" }}
                     value={d.body}
                     onChange={(e) => {
                       const newBody = e.target.value;
@@ -6675,7 +6681,7 @@ Keep it punchy, sharp, and directly actionable.`;
               border: "1px solid rgba(255, 255, 255, 0.25)",
               boxShadow: "0 10px 28px rgba(124, 58, 237, 0.35)",
               cursor: "pointer",
-              fontSize: 13,
+              fontSize: 15,
               fontWeight: 600,
               transition: "transform 0.15s ease, box-shadow 0.15s ease",
               userSelect: "none",
@@ -6752,11 +6758,11 @@ Keep it punchy, sharp, and directly actionable.`;
               </div>
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: themeStyles.text }}>NetworQ Assistant</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: themeStyles.text }}>NetworQ Assistant</span>
                   <span
                     style={{
                       display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: 700,
                       color: isDark ? "#A78BFA" : "#7C3AED",
                       background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(124, 58, 237, 0.08)",
@@ -6767,7 +6773,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     AI Active
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: themeStyles.textMuted }}>Voice & Intelligence Engine</div>
+                <div style={{ fontSize: 13, color: themeStyles.textMuted }}>Voice & Intelligence Engine</div>
               </div>
             </div>
 
@@ -6777,8 +6783,8 @@ Keep it punchy, sharp, and directly actionable.`;
                 onClick={toggleSpeechPlayback}
                 title={voiceReplyEnabled ? "Disable Voice Audio Responses" : "Enable Voice Audio Responses"}
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 44,
+                  height: 44,
                   borderRadius: 8,
                   border: "none",
                   cursor: "pointer",
@@ -6835,7 +6841,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                fontSize: 11,
+                fontSize: 13,
                 color: "#7C3AED",
                 fontWeight: 600,
               }}
@@ -6853,7 +6859,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   border: "none",
                   background: "transparent",
                   color: "#EF4444",
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: 700,
                   cursor: "pointer",
                   padding: "2px 6px",
@@ -6877,7 +6883,7 @@ Keep it punchy, sharp, and directly actionable.`;
           >
             {/* Quick Action Suggestion Chips */}
             <div style={{ marginBottom: 4 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: themeStyles.textMuted, marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: themeStyles.textMuted, marginBottom: 8 }}>
                 Suggested Prompts:
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -6892,7 +6898,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     onClick={() => sendAiQuery(prompt)}
                     disabled={aiLoading}
                     style={{
-                      fontSize: 11,
+                      fontSize: 13,
                       fontWeight: 500,
                       padding: "5px 10px",
                       borderRadius: 980,
@@ -6932,7 +6938,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       ? "#242426"
                       : "#F0F0F2",
                     color: m.role === "user" ? "#FFFFFF" : isDark ? "#F5F5F7" : "#1D1D1F",
-                    fontSize: 13,
+                    fontSize: 15,
                     lineHeight: 1.55,
                     whiteSpace: "pre-wrap",
                     wordBreak: "break-word",
@@ -6958,7 +6964,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         background: "none",
                         border: "none",
                         color: themeStyles.textMuted,
-                        fontSize: 11,
+                        fontSize: 13,
                         cursor: "pointer",
                         padding: 0,
                       }}
@@ -6979,7 +6985,7 @@ Keep it punchy, sharp, and directly actionable.`;
                           background: "none",
                           border: "none",
                           color: isSpeakingReply ? "#EF4444" : "#7C3AED",
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: 600,
                           cursor: "pointer",
                           padding: 0,
@@ -6991,7 +6997,7 @@ Keep it punchy, sharp, and directly actionable.`;
                         {isSpeakingReply ? "■ Stop" : "▶ Listen"}
                       </button>
                     )}
-                    {m.time && <span style={{ fontSize: 10, color: themeStyles.textMuted }}>{m.time}</span>}
+                    {m.time && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>{m.time}</span>}
                   </div>
                 )}
               </div>
@@ -7013,13 +7019,13 @@ Keep it punchy, sharp, and directly actionable.`;
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7C3AED", animation: "pulse 0.9s ease 0s infinite" }} />
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7C3AED", animation: "pulse 0.9s ease 0.2s infinite" }} />
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#7C3AED", animation: "pulse 0.9s ease 0.4s infinite" }} />
-                <span style={{ fontSize: 12, color: themeStyles.textMuted, marginLeft: 4 }}>Thinking…</span>
+                <span style={{ fontSize: 13, color: themeStyles.textMuted, marginLeft: 4 }}>Thinking…</span>
               </div>
             )}
 
             {/* Listening Wave Banner */}
             {aiVoice.state === "transcribing" && (
-              <div role="status" style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(124, 58, 237, 0.08)", fontSize: 13, fontWeight: 600, color: "#7C3AED" }}>
+              <div role="status" style={{ padding: "10px 14px", borderRadius: 12, background: "rgba(124, 58, 237, 0.08)", fontSize: 15, fontWeight: 600, color: "#7C3AED" }}>
                 Writing down what you said…
               </div>
             )}
@@ -7037,7 +7043,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 }}
               >
                 <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 10px #EF4444" }} />
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#7C3AED" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#7C3AED" }}>
                   {aiVoice.heard || aiVoice.elapsed < 3500 ? "Listening… tap the mic again when you're done" : "We can't hear you yet — speak closer to the phone"}
                 </div>
               </div>
@@ -7062,8 +7068,8 @@ Keep it punchy, sharp, and directly actionable.`;
               onClick={toggleMicListening}
               title={aiListening ? "Stop Listening" : "Speak to Assistant"}
               style={{
-                width: 38,
-                height: 38,
+                width: 44,
+                height: 44,
                 borderRadius: 10,
                 border: "none",
                 cursor: "pointer",
@@ -7088,7 +7094,7 @@ Keep it punchy, sharp, and directly actionable.`;
               style={{
                 ...S.input,
                 flex: 1,
-                fontSize: 13,
+                fontSize: 15,
                 padding: "9px 12px",
                 borderRadius: 10,
                 border: isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(0, 0, 0, 0.12)",
@@ -7109,8 +7115,8 @@ Keep it punchy, sharp, and directly actionable.`;
               onClick={() => sendAiQuery()}
               disabled={!aiInput.trim() || aiLoading}
               style={{
-                width: 38,
-                height: 38,
+                width: 44,
+                height: 44,
                 borderRadius: 10,
                 border: "none",
                 cursor: !aiInput.trim() || aiLoading ? "default" : "pointer",
@@ -7338,7 +7344,7 @@ Keep it punchy, sharp, and directly actionable.`;
             color: "#ffffff",
             padding: "10px 20px",
             borderRadius: 12,
-            fontSize: 13,
+            fontSize: 15,
             fontWeight: 700,
             zIndex: 600,
             animation: "nqToastIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both",
@@ -7394,7 +7400,7 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
         }}
       >
         <div style={{ fontSize: 22, fontWeight: 700 }}>Something went wrong</div>
-        <div style={{ fontSize: 14, color: "#AEAEB2", maxWidth: 360 }}>
+        <div style={{ fontSize: 15, color: "#AEAEB2", maxWidth: 360 }}>
           Your data is safe. Reload to continue where you left off.
         </div>
         <button

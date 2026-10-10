@@ -75,7 +75,7 @@ export function MessagesScreen({
         <button
           onClick={() => setPicking(true)}
           className="btn-press"
-          style={{ minHeight: 40, padding: "0 16px", borderRadius: 20, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+          style={{ minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
         >
           <I.UserPlus size={17} /> New message
         </button>
@@ -137,12 +137,12 @@ export function MessagesScreen({
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                     <span style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: c.unread ? 700 : 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                    <span style={{ fontSize: 13, color: c.unread ? "#7C3AED" : t.muted, flexShrink: 0 }}>{when(c.last_message_at)}</span>
+                    <span style={{ fontSize: 15, color: c.unread ? "#7C3AED" : t.muted, flexShrink: 0 }}>{when(c.last_message_at)}</span>
                   </span>
                   <span style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: c.unread ? t.text : t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.last_message || "Say hello"}</span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 15, color: c.unread ? t.text : t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.last_message || "Say hello"}</span>
                     {c.unread > 0 && (
-                      <span style={{ minWidth: 22, height: 22, padding: "0 7px", borderRadius: 11, background: "#7C3AED", color: "#FFF", fontSize: 12, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{c.unread}</span>
+                      <span style={{ minWidth: 22, height: 22, padding: "0 7px", borderRadius: 11, background: "#7C3AED", color: "#FFF", fontSize: 13, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{c.unread}</span>
                     )}
                   </span>
                 </span>
@@ -197,11 +197,11 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
       </span>
     );
   const sub = (c: Contact) => [c.title, c.company].filter(Boolean).join(" · ");
-  const iconBtn: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
+  const iconBtn: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", background: isDark ? "rgba(167,139,250,0.14)" : "rgba(124,58,237,0.08)", color: isDark ? "#C4B5FD" : "#7C3AED" };
   const section = (title: string, hint: string) => (
     <div style={{ margin: "18px 4px 8px" }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: t.muted, textTransform: "uppercase", letterSpacing: "0.04em" }}>{title}</div>
-      <div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>{hint}</div>
+      <div style={{ fontSize: 15, fontWeight: 600, color: t.muted }}>{title}</div>
+      <div style={{ fontSize: 15, color: t.muted, marginTop: 2 }}>{hint}</div>
     </div>
   );
 
@@ -213,7 +213,7 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
           <div aria-hidden style={{ width: 36, height: 5, borderRadius: 3, background: t.line, margin: "0 auto 12px" }} />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>New message</h3>
-            <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+            <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
               <I.X size={16} />
             </button>
           </div>
@@ -241,7 +241,7 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
                     {avatar(c)}
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 16, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                      {sub(c) && <span style={{ display: "block", fontSize: 13, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
+                      {sub(c) && <span style={{ display: "block", fontSize: 15, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
                     </span>
                   </button>
                   <button onClick={() => (onClose(), placeCall({ id: c.linkedUserId!, name: c.name || "NetworQ member", avatar_url: c.image || null }, "audio"))} aria-label={`Call ${c.name}`} style={iconBtn}>
@@ -259,9 +259,9 @@ function ContactPicker({ contacts, isDark, inviterName, onClose, onChat }: { con
                   {avatar(c)}
                   <span style={{ flex: 1, minWidth: 0 }}>
                     <span style={{ display: "block", fontSize: 16, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
-                    {sub(c) && <span style={{ display: "block", fontSize: 13, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
+                    {sub(c) && <span style={{ display: "block", fontSize: 15, color: t.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{sub(c)}</span>}
                   </span>
-                  <button onClick={() => invite(c)} aria-label={`Invite ${c.name}`} style={{ flexShrink: 0, minHeight: 36, padding: "0 14px", borderRadius: 18, border: `1px solid ${isDark ? "rgba(167,139,250,0.4)" : "rgba(124,58,237,0.3)"}`, background: "transparent", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                  <button onClick={() => invite(c)} aria-label={`Invite ${c.name}`} style={{ flexShrink: 0, minHeight: 44, padding: "0 14px", borderRadius: 18, border: `1px solid ${isDark ? "rgba(167,139,250,0.4)" : "rgba(124,58,237,0.3)"}`, background: "transparent", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
                     {copied === c.id ? "Copied ✓" : "Invite"}
                   </button>
                 </li>

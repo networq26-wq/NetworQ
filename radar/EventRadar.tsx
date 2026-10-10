@@ -212,7 +212,7 @@ export function EventRadar({
                     <Avatar url={r.avatar} size={40} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 600 }}>{r.name}</div>
-                      <div style={{ color: t.muted, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ color: t.muted, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {[r.title, r.company].filter(Boolean).join(" · ") || "Attendee"}
                       </div>
                     </div>
@@ -246,12 +246,12 @@ export function EventRadar({
                   <RadarCanvas people={radar.people} isDark={isDark} onSelect={setSelected} scanning={radar.status === "scanning" || radar.status === "scan_only"} />
                 )}
                 {!(radar.mode === "web" && scope === "nearby") && (
-                  <p style={{ textAlign: "center", color: t.muted, fontSize: 12, margin: radar.mode === "native" ? "10px 0 0" : 0 }}>
+                  <p style={{ textAlign: "center", color: t.muted, fontSize: 13, margin: radar.mode === "native" ? "10px 0 0" : 0 }}>
                     {radar.mode === "native" ? "Rings show approximate distance, not direction. Walls and crowds affect accuracy." : "Attendees active at this event in the last 15 minutes."}
                   </p>
                 )}
                 {radar.hiddenCount > 0 && (
-                  <p style={{ textAlign: "center", fontSize: 13, margin: "10px 0 0" }}>
+                  <p style={{ textAlign: "center", fontSize: 15, margin: "10px 0 0" }}>
                     {radar.hiddenCount} {radar.hiddenCount === 1 ? "person is" : "people are"} nearby. Turn on visibility to see who.
                   </p>
                 )}
@@ -260,7 +260,7 @@ export function EventRadar({
               <div style={{ textAlign: "center", padding: "16px 12px" }}>
                 <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={false} />
                 <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is off</div>
-                <div style={{ color: t.muted, fontSize: 13, marginBottom: 14 }}>Turn on Radar to discover people around you.</div>
+                <div style={{ color: t.muted, fontSize: 15, marginBottom: 14 }}>Turn on Radar to discover people around you.</div>
                 <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => radar.updateSettings({ radar_on: true })}>
                   Turn on Radar
                 </button>
@@ -321,7 +321,7 @@ export function EventRadar({
               <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={busy} />
               <div style={{ textAlign: "center", padding: "16px 12px 6px" }}>
                 <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 6 }}>Find people near you</div>
-                <div style={{ color: t.muted, fontSize: 14, maxWidth: 440, margin: "0 auto 16px", lineHeight: 1.5 }}>
+                <div style={{ color: t.muted, fontSize: 15, maxWidth: 440, margin: "0 auto 16px", lineHeight: 1.5 }}>
                   See NetworQ users within Bluetooth range — at a café, a meetup or an office — and send a request, like AirDrop. No event needed.
                 </div>
                 <button
@@ -331,7 +331,7 @@ export function EventRadar({
                 >
                   {busy ? "Turning on…" : "Turn on Nearby"}
                 </button>
-                <p style={{ color: t.muted, fontSize: 12, lineHeight: 1.45, maxWidth: 360, margin: "14px auto 0" }}>
+                <p style={{ color: t.muted, fontSize: 13, lineHeight: 1.45, maxWidth: 360, margin: "14px auto 0" }}>
                   You'll be discoverable to people close by. Your phone shares a random ID that changes every 15 minutes — never your location — and nobody can browse a list of who's on Nearby.
                 </p>
               </div>
@@ -343,7 +343,7 @@ export function EventRadar({
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <h2 style={{ margin: 0, fontSize: 22, letterSpacing: "-0.01em" }}>Nearby</h2>
-                  <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>NetworQ people within range — live proximity radar.</div>
+                  <div style={{ color: t.muted, fontSize: 15, marginTop: 2 }}>NetworQ people within range — live proximity radar.</div>
                 </div>
                 <ConfirmLink t={t} label="Turn off" confirmLabel="Turn off?" ariaLabel="Turn off Nearby" onConfirm={() => setNearbyOn(false)} />
               </div>
@@ -429,7 +429,7 @@ export function EventRadar({
             <div style={{ fontSize: 20, fontWeight: 700 }}>{selectedPerson.name}</div>
             <div style={{ color: t.muted }}>{[selectedPerson.title, selectedPerson.company].filter(Boolean).join(" · ") || "Attendee"}</div>
             <DistanceChip t={t} person={selectedPerson} />
-            <p style={{ color: t.muted, fontSize: 13, maxWidth: 320 }}>
+            <p style={{ color: t.muted, fontSize: 15, maxWidth: 320 }}>
               Contact details are shared only if {selectedPerson.name.split(" ")[0]} accepts your request.
             </p>
             {radar.outgoing.get(selectedPerson.userId) === "accepted" ? (
@@ -494,7 +494,7 @@ function ScopeSwitch({ t, scope, onChange }: { t: Theme; scope: "nearby" | "even
           role="tab"
           aria-selected={scope === k}
           onClick={() => onChange(k)}
-          style={{ flex: 1, minHeight: 34, borderRadius: 9, border: "none", fontSize: 14, fontWeight: 600, cursor: "pointer", background: scope === k ? t.surface : "transparent", color: scope === k ? t.text : t.muted, boxShadow: scope === k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}
+          style={{ flex: 1, minHeight: 44, borderRadius: 9, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", background: scope === k ? t.surface : "transparent", color: scope === k ? t.text : t.muted, boxShadow: scope === k ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}
         >
           {k === "nearby" ? "Nearby" : "Events"}
         </button>
@@ -509,7 +509,7 @@ function btn(t: Theme, kind: "primary" | "ghost" | "danger"): React.CSSPropertie
     minHeight: 44,
     padding: "10px 16px",
     borderRadius: 12,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: 600,
     cursor: "pointer",
     border: "none",
@@ -539,7 +539,7 @@ function Avatar({ url, size }: { url: string | null; size: number }) {
 function DistanceChip({ t, person }: { t: Theme; person: RadarPerson }) {
   const label = person.bucket ? BUCKET_LABEL[person.bucket] : "Nearby";
   return (
-    <span style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: t.raised, color: person.faded ? t.muted : t.text, whiteSpace: "nowrap" }}>
+    <span style={{ fontSize: 13, fontWeight: 600, padding: "4px 10px", borderRadius: 999, background: t.raised, color: person.faded ? t.muted : t.text, whiteSpace: "nowrap" }}>
       {person.faded ? `${label} · moving away` : label}
     </span>
   );
@@ -575,7 +575,7 @@ function ConfirmLink({ t, label, confirmLabel, ariaLabel, onConfirm }: { t: Them
       onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
       onBlur={() => setArmed(false)}
       aria-label={armed ? `Confirm: ${ariaLabel}` : ariaLabel}
-      style={{ minHeight: 44, padding: "0 16px", borderRadius: 22, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 14, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
+      style={{ minHeight: 44, padding: "0 16px", borderRadius: 22, border: `1px solid ${armed ? "#FF453A" : "rgba(255,69,58,0.35)"}`, background: armed ? "#FF453A" : "transparent", color: armed ? "#FFFFFF" : "#FF453A", fontSize: 15, fontWeight: 600, cursor: "pointer", flexShrink: 0, alignSelf: "center", transition: "background 0.15s ease, color 0.15s ease" }}
     >
       {armed ? confirmLabel : label}
     </button>
@@ -648,7 +648,7 @@ function NoEvent({
         </button>
       </form>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0", color: t.muted, fontSize: 12, fontWeight: 600 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0", color: t.muted, fontSize: 13, fontWeight: 600 }}>
         <div style={{ flex: 1, height: 1, background: t.border }} /> OR <div style={{ flex: 1, height: 1, background: t.border }} />
       </div>
 
@@ -713,7 +713,7 @@ function EventHeader({
     <section style={{ ...card, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: PURPLE, fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Live at</div>
+          <div style={{ color: PURPLE, fontSize: 13, fontWeight: 700 }}>Live at</div>
           {events.length > 1 ? (
             <select
               aria-label="Switch event"
@@ -731,12 +731,12 @@ function EventHeader({
           ) : (
             <div style={{ fontSize: 20, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{event.name}</div>
           )}
-          <div style={{ color: t.muted, fontSize: 13, marginTop: 2 }}>
+          <div style={{ color: t.muted, fontSize: 15, marginTop: 2 }}>
             {[event.venue, event.attendee_count ? `${event.attendee_count} joined` : null].filter(Boolean).join(" · ")}
           </div>
         </div>
         <button
-          style={{ ...btn(t, "danger"), minHeight: 36, padding: "6px 12px", fontSize: 13, whiteSpace: "nowrap", flex: "none" }}
+          style={{ ...btn(t, "danger"), minHeight: 44, padding: "6px 12px", fontSize: 15, whiteSpace: "nowrap", flex: "none" }}
           onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
           onBlur={() => setConfirmLeave(false)}
           aria-label={confirmLeave ? "Confirm leave event" : "Leave event"}
@@ -747,7 +747,7 @@ function EventHeader({
       <div style={{ display: "flex", gap: 8 }}>
         {onOpenRoomChat && (
           <button
-            style={{ ...btn(t, "primary"), flex: 1, minWidth: 0, fontSize: 13 }}
+            style={{ ...btn(t, "primary"), flex: 1, minWidth: 0, fontSize: 15 }}
             onClick={onOpenRoomChat}
             aria-label="Open Event Room Chat"
           >
@@ -784,7 +784,7 @@ function StatusBanner({ t, status, mode, nearby, onBluetooth, onRetry }: { t: Th
   if (mode === "web" && status === "scanning") {
     if (nearby) return null; // the Nearby list says it once
     return (
-      <div role="status" style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 16, padding: "12px 16px", fontSize: 14 }}>
+      <div role="status" style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 16, padding: "12px 16px", fontSize: 15 }}>
         <strong>Live distance works in the NetworQ Android app.</strong> <span style={{ color: t.muted }}>Here you can see who's at the event and connect.</span>
       </div>
     );
@@ -795,7 +795,7 @@ function StatusBanner({ t, status, mode, nearby, onBluetooth, onRetry }: { t: Th
     <div role="status" style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: "12px 16px" }}>
       <div style={{ flex: "1 1 240px" }}>
         <div style={{ fontWeight: 600 }}>{copy.title}</div>
-        <div style={{ color: t.muted, fontSize: 13 }}>{copy.body}</div>
+        <div style={{ color: t.muted, fontSize: 15 }}>{copy.body}</div>
       </div>
       {copy.action === "bluetooth" && (
         <button style={btn(t, "primary")} onClick={onBluetooth}>
@@ -836,7 +836,7 @@ function NearbyList({
     <section style={card}>
       <h3 style={{ margin: "0 0 12px", fontSize: 16 }}>{mode === "native" || nearbyScope ? "Nearby" : "At this event"} · {people.length}</h3>
       {people.length === 0 ? (
-        <div style={{ color: t.muted, fontSize: 14, padding: "8px 0" }}>
+        <div style={{ color: t.muted, fontSize: 15, padding: "8px 0" }}>
           {mode === "native"
             ? nearbyScope
               ? "Looking for NetworQ people around you… They need Nearby on and Discoverable."
@@ -857,7 +857,7 @@ function NearbyList({
                 <Avatar url={p.avatar} size={40} />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
-                  <div style={{ color: t.muted, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ color: t.muted, fontSize: 15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {[p.title, p.company].filter(Boolean).join(" · ") || "Attendee"}
                   </div>
                 </div>
@@ -877,7 +877,7 @@ function Switch({ t, label, hint, checked, onChange, disabled }: { t: Theme; lab
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", opacity: disabled ? 0.45 : 1 }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 600, fontSize: 15 }}>{label}</div>
-        <div style={{ color: t.muted, fontSize: 13 }}>{hint}</div>
+        <div style={{ color: t.muted, fontSize: 15 }}>{hint}</div>
       </div>
       <button
         role="switch"
@@ -905,7 +905,7 @@ function PrivacyPanel({ t, card, settings, onChange, nearby }: { t: Theme; card:
       )}
       <Switch t={t} label="Show distance" hint="Let others see roughly how far away you are." checked={settings.show_distance} onChange={(v) => onChange({ show_distance: v })} disabled={!settings.radar_on || !settings.visible} />
       <Switch t={t} label="Show profile" hint="Off shows only your first name and title." checked={settings.show_profile} onChange={(v) => onChange({ show_profile: v })} disabled={!settings.radar_on || !settings.visible} />
-      <p style={{ color: t.muted, fontSize: 12, margin: "8px 0 0" }}>
+      <p style={{ color: t.muted, fontSize: 13, margin: "8px 0 0" }}>
         Your phone broadcasts a random ID that changes every 15 minutes. Your location is never collected.
       </p>
     </section>
@@ -952,7 +952,7 @@ function ShareSheet({ t, event, onClose, showToast }: { t: Theme; event: RadarEv
         <div style={{ background: "#FFFFFF", padding: 12, borderRadius: 16 }}>
           {qr ? <img src={qr} alt={`QR code to join ${event.name}`} width={220} height={220} /> : <div style={{ width: 220, height: 220 }} />}
         </div>
-        <div style={{ color: t.muted, fontSize: 13 }}>Scan with a phone camera, or enter the code in Radar</div>
+        <div style={{ color: t.muted, fontSize: 15 }}>Scan with a phone camera, or enter the code in Radar</div>
         <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 28, fontWeight: 700, letterSpacing: "0.08em" }}>{event.join_code}</div>
         <button
           style={{ ...btn(t, "primary"), width: "100%" }}

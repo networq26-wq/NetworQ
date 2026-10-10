@@ -72,25 +72,25 @@ export function WhoNext({
   return (
     <section aria-label="Who's next" style={{ marginBottom: 28 }}>
       <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: "0 0 2px" }}>Who's next</h2>
-      <div style={{ fontSize: 13, color: t.muted, margin: "0 0 12px" }}>People waiting to hear from you</div>
+      <div style={{ fontSize: 15, color: t.muted, margin: "0 0 12px" }}>People waiting to hear from you</div>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, background: t.surface, border: `1px solid ${t.sep}`, borderRadius: 20, overflow: "hidden" }}>
         {next.map(({ c, urgent, reason }, i) => {
           const canEmail = !!c.email;
           const canMessage = !canEmail && !!c.linkedUserId;
           return (
             <li key={c.id || i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 12px 12px 16px", minHeight: 64, borderTop: i ? `1px solid ${t.sep}` : "none" }}>
-              <button onClick={() => onOpen(c)} aria-label={`Open ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
+              <button onClick={() => onOpen(c)} aria-label={`Open ${c.name}`} style={{ all: "unset", boxSizing: "border-box", flex: 1, minWidth: 0, minHeight: 44, cursor: "pointer", display: "flex", alignItems: "center", gap: 12 }}>
                 <span aria-hidden style={{ width: 8, height: 8, borderRadius: 4, flexShrink: 0, background: urgent ? "#FF3B30" : reason.startsWith("Follow-up") ? "#FF9F0A" : "#7C3AED" }} />
                 <span style={{ minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 16, fontWeight: 600, color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name || "Unnamed"}</span>
-                  <span style={{ display: "block", fontSize: 13, color: urgent ? "#FF3B30" : t.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
+                  <span style={{ display: "block", fontSize: 15, color: urgent ? "#FF3B30" : t.muted, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{reason}</span>
                 </span>
               </button>
               {(canEmail || canMessage) && (
                 <button
                   onClick={() => (canEmail ? onEmail(c) : onMessage(c))}
                   className="btn-press"
-                  style={{ flexShrink: 0, minHeight: 36, padding: "0 16px", borderRadius: 18, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
+                  style={{ flexShrink: 0, minHeight: 44, padding: "0 16px", borderRadius: 18, border: "none", background: "#7C3AED", color: "#FFFFFF", fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
                 >
                   <I.Mail size={16} />
                   {canEmail ? "Email" : "Message"}
@@ -158,11 +158,11 @@ export function GroupMessageSheet({
         <div aria-hidden style={{ width: 36, height: 5, borderRadius: 3, background: t.sep, margin: "0 auto 14px" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Message {reachable.length} {reachable.length === 1 ? "person" : "people"}</h3>
-          <button onClick={onClose} disabled={sending} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button onClick={onClose} disabled={sending} aria-label="Close" style={{ width: 44, height: 44, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <I.X size={16} />
           </button>
         </div>
-        <p style={{ margin: "6px 0 14px", fontSize: 14, color: t.muted, lineHeight: 1.45 }}>
+        <p style={{ margin: "6px 0 14px", fontSize: 15, color: t.muted, lineHeight: 1.45 }}>
           Each person gets it as a private message in NetworQ.
           {people.length > reachable.length && ` ${people.length - reachable.length} of the people you picked aren't on NetworQ yet — email them instead.`}
         </p>
@@ -178,7 +178,7 @@ export function GroupMessageSheet({
               autoFocus
               style={{ width: "100%", boxSizing: "border-box", resize: "none", borderRadius: 16, border: `1px solid ${t.sep}`, background: t.raised, color: t.text, padding: "12px 14px", fontSize: 16, lineHeight: 1.4, fontFamily: "inherit", outline: "none" }}
             />
-            {error && <div role="alert" style={{ color: "#FF3B30", fontSize: 14, marginTop: 8 }}>{error}</div>}
+            {error && <div role="alert" style={{ color: "#FF3B30", fontSize: 15, marginTop: 8 }}>{error}</div>}
             <button
               onClick={send}
               disabled={!text.trim() || sending}

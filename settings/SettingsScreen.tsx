@@ -83,7 +83,7 @@ export function SettingsScreen({
   const t = theme(isDark);
   const card: React.CSSProperties = { background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: 20 };
   const input: React.CSSProperties = { minHeight: 44, padding: "10px 14px", borderRadius: 12, border: `1px solid ${t.border}`, background: t.raised, color: t.text, fontSize: 16, width: "100%", boxSizing: "border-box" };
-  const label: React.CSSProperties = { display: "block", fontSize: 13, fontWeight: 600, color: t.muted, margin: "0 0 6px" };
+  const label: React.CSSProperties = { display: "block", fontSize: 15, fontWeight: 600, color: t.muted, margin: "0 0 6px" };
   const btn = (kind: "primary" | "ghost" | "danger"): React.CSSProperties => ({
     minHeight: 44,
     padding: "10px 18px",
@@ -238,7 +238,7 @@ export function SettingsScreen({
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 600 }}>{title}</div>
-        <div style={{ color: t.muted, fontSize: 13 }}>{hint}</div>
+        <div style={{ color: t.muted, fontSize: 15 }}>{hint}</div>
       </div>
       <button
         role="switch"
@@ -287,7 +287,7 @@ export function SettingsScreen({
               {uploading ? "Uploading…" : avatar ? "Change photo" : "Add photo"}
             </button>
             <input ref={fileRef} type="file" accept="image/*" aria-label="Upload profile photo" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) uploadAvatar(f); }} />
-            <div style={{ color: t.muted, fontSize: 12, marginTop: 6 }}>Shown on Event Radar and to people you connect with.</div>
+            <div style={{ color: t.muted, fontSize: 13, marginTop: 6 }}>Shown on Event Radar and to people you connect with.</div>
           </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
@@ -328,7 +328,7 @@ export function SettingsScreen({
         <>
       <section style={card} aria-labelledby="settings-security">
         <h3 id="settings-security" style={{ margin: "0 0 4px", fontSize: 18 }}>Security</h3>
-        <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Signed in as {currentUser?.email}</div>
+        <div style={{ color: t.muted, fontSize: 15, marginBottom: 16 }}>Signed in as {currentUser?.email}</div>
 
         <h4 style={{ margin: "0 0 10px", fontSize: 15 }}>{hasPassword ? "Change password" : "Set a password"}</h4>
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -376,7 +376,7 @@ export function SettingsScreen({
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600 }}>Dark mode</div>
-            <div style={{ color: t.muted, fontSize: 13 }}>Easier on the eyes at evening events.</div>
+            <div style={{ color: t.muted, fontSize: 15 }}>Easier on the eyes at evening events.</div>
           </div>
           <button
             role="switch"
@@ -391,7 +391,7 @@ export function SettingsScreen({
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600 }}>Vibration</div>
-            <div style={{ color: t.muted, fontSize: 13 }}>A light buzz for requests, accepts and the camera shutter.</div>
+            <div style={{ color: t.muted, fontSize: 15 }}>A light buzz for requests, accepts and the camera shutter.</div>
           </div>
           <button
             role="switch"
@@ -449,7 +449,7 @@ export function SettingsScreen({
 
       <section style={{ ...card, borderColor: "rgba(255,59,48,0.35)" }} aria-labelledby="settings-delete">
         <h3 id="settings-delete" style={{ margin: "0 0 6px", fontSize: 18, color: "#FF3B30" }}>Delete account</h3>
-        <p style={{ color: t.muted, fontSize: 14, margin: "0 0 12px" }}>
+        <p style={{ color: t.muted, fontSize: 15, margin: "0 0 12px" }}>
           Permanently deletes your profile, contacts, scans, events and connections after a 7-day grace period. You'll be signed out everywhere and can cancel by signing in again before then.
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

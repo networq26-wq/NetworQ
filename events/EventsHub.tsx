@@ -266,7 +266,7 @@ export function EventsHub({
           <h2 style={{ margin: 0, fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em" }}>Events</h2>
           <p style={{ color: t.muted, margin: "4px 0 0", fontSize: 15 }}>Real events near you, each linked to its official page.</p>
         </div>
-        <button onClick={() => setAddOpen(true)} aria-label="Add an event" className="btn-press" style={{ ...btn(true), minHeight: 40, padding: "0 16px", borderRadius: 20, flexShrink: 0 }}>
+        <button onClick={() => setAddOpen(true)} aria-label="Add an event" className="btn-press" style={{ ...btn(true), minHeight: 44, padding: "0 18px", borderRadius: 22, flexShrink: 0 }}>
           <span aria-hidden style={{ fontSize: 20, lineHeight: 1, marginTop: -2 }}>+</span> Add
         </button>
       </header>
@@ -279,10 +279,10 @@ export function EventsHub({
           <div style={{ display: "flex", alignItems: "center", gap: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: "4px 4px 4px 14px", minHeight: 52, boxSizing: "border-box" }}>
             <span aria-hidden style={{ color: t.muted, display: "flex" }}><I.Search size={18} /></span>
             <input aria-label="Search events" placeholder="Search events" className="nq-search-input" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "transparent", color: t.text, fontSize: 16, padding: "0 10px", fontFamily: "inherit", minHeight: 44 }} />
-            <button onClick={() => setCityOpen(true)} aria-label={`Location: ${cityLabel}`} style={{ flexShrink: 0, minHeight: 44, maxWidth: 170, padding: "0 12px", borderRadius: 12, border: "none", background: t.raised, color: t.text, fontSize: 14, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <button onClick={() => setCityOpen(true)} aria-label={`Location: ${cityLabel}`} style={{ flexShrink: 0, minHeight: 44, maxWidth: 170, padding: "0 12px", borderRadius: 12, border: "none", background: t.raised, color: t.text, fontSize: 15, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
               <I.MapPin size={16} />
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cityLabel}</span>
-              <span aria-hidden style={{ fontSize: 10, opacity: 0.6 }}>▼</span>
+              <span aria-hidden style={{ fontSize: 12, opacity: 0.6 }}>▼</span>
             </button>
           </div>
 
@@ -292,13 +292,13 @@ export function EventsHub({
               {(["Any time", "Today", "This weekend", "This week"] as const).map((d) => {
                 const on = dateFilter === d;
                 return (
-                  <button key={d} onClick={() => setDateFilter(d)} aria-pressed={on} style={{ minHeight: 40, borderRadius: 11, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", background: on ? t.surface : "transparent", color: on ? t.text : t.muted, boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "background 0.15s ease, color 0.15s ease" }}>
+                  <button key={d} onClick={() => setDateFilter(d)} aria-pressed={on} style={{ minHeight: 44, borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", background: on ? t.surface : "transparent", color: on ? t.text : t.muted, boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "background 0.15s ease, color 0.15s ease" }}>
                     {d === "Any time" ? "All" : d === "This weekend" ? "Weekend" : d}
                   </button>
                 );
               })}
             </div>
-            <button onClick={() => setCalOpen(true)} aria-label={dateFilter === "Pick" ? `Date: ${dateLabel}` : "Pick a date"} aria-pressed={dateFilter === "Pick"} style={{ flexShrink: 0, minWidth: 46, minHeight: 46, padding: dateFilter === "Pick" ? "0 12px" : 0, borderRadius: 14, border: "none", cursor: "pointer", background: dateFilter === "Pick" ? PURPLE : t.raised, color: dateFilter === "Pick" ? "#FFFFFF" : t.text, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 13, fontWeight: 600 }}>
+            <button onClick={() => setCalOpen(true)} aria-label={dateFilter === "Pick" ? `Date: ${dateLabel}` : "Pick a date"} aria-pressed={dateFilter === "Pick"} style={{ flexShrink: 0, minWidth: 46, minHeight: 46, padding: dateFilter === "Pick" ? "0 12px" : 0, borderRadius: 14, border: "none", cursor: "pointer", background: dateFilter === "Pick" ? PURPLE : t.raised, color: dateFilter === "Pick" ? "#FFFFFF" : t.text, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 15, fontWeight: 600 }}>
               <I.Calendar size={18} />
               {dateFilter === "Pick" && dateLabel}
             </button>
@@ -309,21 +309,21 @@ export function EventsHub({
             {[["All", base.length] as const, ...categories].map(([c, n]) => {
               const on = category === c;
               return (
-                <button key={c} onClick={() => setCategory(c)} aria-pressed={on} style={{ flexShrink: 0, minHeight: 34, padding: "0 12px", borderRadius: 17, fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", border: "none", background: on ? (isDark ? "#FFFFFF" : "#1C1C1E") : t.surface, color: on ? (isDark ? "#1C1C1E" : "#FFFFFF") : t.text, boxShadow: on ? "none" : `inset 0 0 0 1px ${t.border}` }}>
+                <button key={c} onClick={() => setCategory(c)} aria-pressed={on} style={{ flexShrink: 0, minHeight: 44, padding: "0 12px", borderRadius: 17, fontSize: 15, fontWeight: on ? 600 : 500, cursor: "pointer", whiteSpace: "nowrap", border: "none", background: on ? (isDark ? "#FFFFFF" : "#1C1C1E") : t.surface, color: on ? (isDark ? "#1C1C1E" : "#FFFFFF") : t.text, boxShadow: on ? "none" : `inset 0 0 0 1px ${t.border}` }}>
                   {c} · {n}
                 </button>
               );
             })}
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", fontSize: 14, color: t.muted, padding: "0 2px" }}>
+          <div style={{ display: "flex", alignItems: "center", fontSize: 15, color: t.muted, padding: "0 2px" }}>
             <span style={{ flex: 1 }} aria-live="polite">
               {visible.length} event{visible.length === 1 ? "" : "s"}
               {city !== "All" ? ` · ${cityLabel}` : ""}
               {dateLabel ? ` · ${dateLabel}` : ""}
             </span>
             {filtered && (
-              <button onClick={() => { setCity("All"); setDateFilter("Any time"); setPickedDay(null); setCategory("All"); setQuery(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 600, fontSize: 14, cursor: "pointer", minHeight: 32 }}>
+              <button onClick={() => { setCity("All"); setDateFilter("Any time"); setPickedDay(null); setCategory("All"); setQuery(""); }} style={{ background: "none", border: "none", color: PURPLE, fontWeight: 600, fontSize: 15, cursor: "pointer", minHeight: 32 }}>
                 Clear filters
               </button>
             )}
@@ -348,7 +348,7 @@ export function EventsHub({
             <I.Alert size={24} />
           </div>
           <div style={{ fontSize: 17, fontWeight: 600, marginBottom: 4 }}>Couldn't load events</div>
-          <div style={{ color: t.muted, fontSize: 14, marginBottom: 16 }}>Check your connection and try again.</div>
+          <div style={{ color: t.muted, fontSize: 15, marginBottom: 16 }}>Check your connection and try again.</div>
           <button style={btn(true)} onClick={() => { setEvents(null); load(); }}>Try again</button>
         </div>
       ) : visible.length === 0 ? (
@@ -357,7 +357,7 @@ export function EventsHub({
             {events.length ? <I.Search size={24} /> : <I.Calendar size={24} />}
           </div>
           <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 6 }}>{events.length ? "No events match your filters" : "No upcoming events yet"}</div>
-          <div style={{ color: t.muted, fontSize: 14, maxWidth: 420, margin: "0 auto 16px" }}>
+          <div style={{ color: t.muted, fontSize: 15, maxWidth: 420, margin: "0 auto 16px" }}>
             {events.length ? "Try another date, category or city." : "Add an event you're going to — everyone on NetworQ will see it, with a link to the official page."}
           </div>
           {!events.length && <button style={btn(true)} onClick={() => setAddOpen(true)}>Add an event</button>}
@@ -386,7 +386,7 @@ export function EventsHub({
               {importing ? "Adding…" : "Add event"}
             </button>
           </form>
-          <p style={{ color: t.muted, fontSize: 13, margin: "12px 0 0" }}>Hosting your own? Create it in Radar to get a join code.</p>
+          <p style={{ color: t.muted, fontSize: 15, margin: "12px 0 0" }}>Hosting your own? Create it in Radar to get a join code.</p>
         </Sheet>
       )}
 
@@ -406,7 +406,7 @@ export function EventsHub({
               return (
                 <button key={o.v} role="radio" aria-checked={on} onClick={() => { setCity(o.v); setCityOpen(false); }} style={{ all: "unset", boxSizing: "border-box", display: "flex", alignItems: "center", gap: 12, minHeight: 52, padding: "0 4px", borderTop: i ? `1px solid ${t.border}` : "none", cursor: "pointer", color: t.text }}>
                   <span style={{ flex: 1, fontSize: 16, fontWeight: on ? 600 : 400 }}>{o.label}</span>
-                  <span style={{ color: t.muted, fontSize: 14 }}>{n}</span>
+                  <span style={{ color: t.muted, fontSize: 15 }}>{n}</span>
                   <span aria-hidden style={{ width: 22, color: PURPLE, display: "flex", justifyContent: "flex-end" }}>{on && <I.Check size={20} strokeWidth={2.4} />}</span>
                 </button>
               );
@@ -480,16 +480,16 @@ function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent;
         <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 30%, rgba(0,0,0,0.25) 55%, rgba(0,0,0,0.82) 100%)" }} />
         {/* Date tile */}
         <div style={{ position: "absolute", top: 14, left: 14, width: 52, borderRadius: 14, overflow: "hidden", textAlign: "center", background: "rgba(255,255,255,0.94)", color: "#1C1C1E", boxShadow: "0 4px 12px rgba(0,0,0,0.2)" }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: "#7C3AED", color: "#FFFFFF", padding: "3px 0" }}>{d.toLocaleDateString([], { month: "short" })}</div>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: "#7C3AED", color: "#FFFFFF", padding: "3px 0" }}>{d.toLocaleDateString([], { month: "short" })}</div>
           <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1, padding: "5px 0 2px" }}>{d.getDate()}</div>
-          <div style={{ fontSize: 10, fontWeight: 600, color: "#6E6E73", paddingBottom: 4 }}>{d.toLocaleDateString([], { weekday: "short" })}</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: "#6E6E73", paddingBottom: 4 }}>{d.toLocaleDateString([], { weekday: "short" })}</div>
         </div>
         {ev.category && (
-          <span style={{ position: "absolute", top: 14, right: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 12, fontWeight: 600, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#FFFFFF" }}>{ev.category}</span>
+          <span style={{ position: "absolute", top: 14, right: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 13, fontWeight: 600, background: "rgba(0,0,0,0.35)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", color: "#FFFFFF" }}>{ev.category}</span>
         )}
         <div style={{ position: "absolute", left: 16, right: 16, bottom: 14 }}>
           <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.2, letterSpacing: "-0.01em", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 6px rgba(0,0,0,0.35)" } as React.CSSProperties}>{ev.title}</h3>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 13, color: "rgba(255,255,255,0.88)", overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 15, color: "rgba(255,255,255,0.88)", overflow: "hidden" }}>
             <I.Clock size={14} /> <span style={{ flexShrink: 0 }}>{time}</span>
             {place && (
               <>
@@ -500,10 +500,10 @@ function EventCard({ ev, t, isDark, onAttend, onAddContact }: { ev: PublicEvent;
             )}
           </div>
           {(ev.organizer || ev.verified) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 12, color: "rgba(255,255,255,0.75)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 13, color: "rgba(255,255,255,0.75)" }}>
               {ev.organizer && (
                 <>
-                  <span aria-hidden style={{ width: 18, height: 18, borderRadius: 9, background: "rgba(255,255,255,0.25)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: "#FFFFFF" }}>{ev.organizer.trim().charAt(0).toUpperCase()}</span>
+                  <span aria-hidden style={{ width: 18, height: 18, borderRadius: 9, background: "rgba(255,255,255,0.25)", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#FFFFFF" }}>{ev.organizer.trim().charAt(0).toUpperCase()}</span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>By {ev.organizer}</span>
                 </>
               )}
@@ -547,7 +547,7 @@ function Sheet({ title, t, onClose, children }: { title: string; t: ReturnType<t
         <div aria-hidden style={{ width: 36, height: 5, borderRadius: 3, background: t.border, margin: "0 auto 12px" }} />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{title}</h3>
-          <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button onClick={onClose} aria-label="Close" style={{ width: 44, height: 44, borderRadius: 16, border: "none", background: t.raised, color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <I.X size={16} />
           </button>
         </div>
@@ -567,7 +567,7 @@ function MonthPicker({ t, isDark, selected, busyDays, onPick }: { t: ReturnType<
   const cells = [...Array(lead).fill(null), ...Array.from({ length: daysIn }, (_, i) => i + 1)];
   const key = (d: number) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
   const canPrev = month.getFullYear() > today.getFullYear() || month.getMonth() > today.getMonth();
-  const nav: React.CSSProperties = { width: 40, height: 40, borderRadius: 20, border: "none", background: t.raised, color: t.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
+  const nav: React.CSSProperties = { width: 44, height: 44, borderRadius: 22, border: "none", background: t.raised, color: t.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" };
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
@@ -581,7 +581,7 @@ function MonthPicker({ t, isDark, selected, busyDays, onPick }: { t: ReturnType<
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, textAlign: "center" }}>
         {["M", "T", "W", "T", "F", "S", "S"].map((w, i) => (
-          <div key={i} style={{ fontSize: 12, color: t.muted, fontWeight: 600, padding: "4px 0" }}>{w}</div>
+          <div key={i} style={{ fontSize: 13, color: t.muted, fontWeight: 600, padding: "4px 0" }}>{w}</div>
         ))}
         {cells.map((d, i) => {
           if (d === null) return <div key={`b${i}`} />;
@@ -598,7 +598,7 @@ function MonthPicker({ t, isDark, selected, busyDays, onPick }: { t: ReturnType<
           );
         })}
       </div>
-      <p style={{ fontSize: 13, color: t.muted, margin: "12px 0 0", textAlign: "center" }}>Days with a dot have events.</p>
+      <p style={{ fontSize: 15, color: t.muted, margin: "12px 0 0", textAlign: "center" }}>Days with a dot have events.</p>
     </div>
   );
 }
@@ -666,12 +666,12 @@ function HeroCarousel({ events, cityMatch, isDark, onAttend }: { events: PublicE
               <div style={{ position: "relative", aspectRatio: "16 / 10", borderRadius: 24, overflow: "hidden", background: "linear-gradient(135deg, #3B1A7A, #7C3AED)", color: "#FFFFFF", boxShadow: isDark ? "0 16px 36px -18px rgba(0,0,0,0.9)" : "0 18px 40px -20px rgba(40,20,90,0.55)" }}>
                 <img src={ev.image!} alt="" referrerPolicy="no-referrer" loading={i === 0 ? "eager" : "lazy"} onError={(e) => ((e.target as HTMLImageElement).style.display = "none")} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
                 <div aria-hidden style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.35) 55%, rgba(0,0,0,0.88) 100%)" }} />
-                <span style={{ position: "absolute", top: 14, left: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 12, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", background: "rgba(124,58,237,0.92)" }}>Featured</span>
+                <span style={{ position: "absolute", top: 14, left: 14, display: "inline-flex", alignItems: "center", height: 28, padding: "0 12px", borderRadius: 14, fontSize: 13, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", background: "rgba(124,58,237,0.92)" }}>Featured</span>
                 <div style={{ position: "absolute", left: 18, right: 18, bottom: 16, display: "flex", alignItems: "flex-end", gap: 12 }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{when}</div>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "rgba(255,255,255,0.9)" }}>{when}</div>
                     <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.2, marginTop: 4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textShadow: "0 1px 8px rgba(0,0,0,0.4)" } as React.CSSProperties}>{ev.title}</div>
-                    {place && <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{place}</div>}
+                    {place && <div style={{ fontSize: 15, color: "rgba(255,255,255,0.8)", marginTop: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{place}</div>}
                   </div>
                   <button onClick={() => onAttend(ev)} aria-label={`Going to ${ev.title} — opens its Radar`} className="btn-press" style={{ flexShrink: 0, minHeight: 44, padding: "0 18px", borderRadius: 22, border: "none", background: "#FFFFFF", color: "#1C1C1E", fontSize: 15, fontWeight: 700, cursor: "pointer" }}>
                     Going

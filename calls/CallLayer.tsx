@@ -135,7 +135,7 @@ function RoundButton({ label, onClick, tone = "glass", active, children, size = 
       >
         {children}
       </button>
-      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>{label}</span>
+      <span style={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }}>{label}</span>
     </span>
   );
 }

@@ -14,13 +14,13 @@ test.describe("Android app behaviour", () => {
     await login(page, "asha@acme.test");
     await page.getByRole("button", { name: "Radar", exact: true }).last().click();
     await page.getByRole("button", { name: "Events", exact: true }).last().click();
-    await page.getByRole("button", { name: "AI Assistant" }).click(); // the quiet AI button shows on People, Messages, Events
+    await page.getByRole("button", { name: "AI Assistant" }).click(); // the AI button lives in the top bar on every screen
     await expect(page.getByText("NetworQ Assistant")).toBeVisible();
 
     expect(await back(page)).toBe(true); // closes AI
     await expect(page.getByText("NetworQ Assistant")).toHaveCount(0);
     expect(await back(page)).toBe(true); // Events → Radar
-    await expect(page.getByRole("button", { name: "AI Assistant" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "AI Assistant" })).toBeVisible(); // top bar, nothing floating over content
     expect(await back(page)).toBe(true); // Radar → People
     await expect(page.getByText("Your people")).toBeVisible();
     expect(await back(page)).toBe(false); // home: shell shows "press back again to exit"

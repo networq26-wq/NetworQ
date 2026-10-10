@@ -27,23 +27,23 @@ export function BlockedUsers({ supabase, t, card, showToast }: { supabase: Supab
   return (
     <section style={card} aria-labelledby="settings-blocked">
       <h3 id="settings-blocked" style={{ margin: "0 0 4px", fontSize: 18 }}>Blocked people</h3>
-      <div style={{ color: t.muted, fontSize: 13, marginBottom: 6 }}>Blocked people can't see you on Radar or send you requests, and you won't see them.</div>
+      <div style={{ color: t.muted, fontSize: 15, marginBottom: 6 }}>Blocked people can't see you on Radar or send you requests, and you won't see them.</div>
       {rows === null ? (
         <div role="status" aria-label="Loading blocked people" style={{ display: "flex", flexDirection: "column", gap: 10, padding: "10px 0" }}>
           <Skeleton w="60%" h={14} />
           <Skeleton w="40%" h={11} />
         </div>
       ) : rows.length === 0 ? (
-        <div style={{ color: t.muted, fontSize: 14, padding: "10px 0" }}>You haven't blocked anyone.</div>
+        <div style={{ color: t.muted, fontSize: 15, padding: "10px 0" }}>You haven't blocked anyone.</div>
       ) : (
         <ul aria-label="Blocked people" style={{ listStyle: "none", margin: 0, padding: 0 }}>
           {rows.map((r) => (
             <li key={r.user_id} style={rowStyle(t)}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600 }}>{r.name}</div>
-                <div style={{ color: t.muted, fontSize: 12 }}>Blocked {new Date(r.blocked_at).toLocaleDateString([], { dateStyle: "medium" })}</div>
+                <div style={{ color: t.muted, fontSize: 13 }}>Blocked {new Date(r.blocked_at).toLocaleDateString([], { dateStyle: "medium" })}</div>
               </div>
-              <button onClick={() => unblock(r.user_id, r.name)} aria-label={`Unblock ${r.name}`} style={{ minHeight: 36, padding: "6px 14px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.raised, color: t.text, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={() => unblock(r.user_id, r.name)} aria-label={`Unblock ${r.name}`} style={{ minHeight: 44, padding: "6px 14px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.raised, color: t.text, fontWeight: 600, cursor: "pointer" }}>
                 Unblock
               </button>
             </li>
@@ -76,14 +76,14 @@ export function RecentDevices({ supabase, t, onSignOutEverywhere, btn }: { supab
   return (
     <>
       <h4 style={{ margin: "22px 0 6px", fontSize: 15 }}>Devices</h4>
-      <div style={{ color: t.muted, fontSize: 13, marginBottom: 6 }}>Where your account has signed in recently. Don't recognise one? Sign out everywhere and change your password.</div>
+      <div style={{ color: t.muted, fontSize: 15, marginBottom: 6 }}>Where your account has signed in recently. Don't recognise one? Sign out everywhere and change your password.</div>
       {rows && rows.length > 0 && (
         <ul aria-label="Recent devices" style={{ listStyle: "none", margin: "0 0 10px", padding: 0 }}>
           {rows.map((d) => (
             <li key={d.device_hash} style={rowStyle(t)}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{deviceLabel(d.user_agent)}</div>
-                <div style={{ color: t.muted, fontSize: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 15 }}>{deviceLabel(d.user_agent)}</div>
+                <div style={{ color: t.muted, fontSize: 13 }}>
                   Last active {new Date(d.last_seen).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} · first seen {new Date(d.first_seen).toLocaleDateString([], { dateStyle: "medium" })}
                 </div>
               </div>
@@ -125,14 +125,14 @@ export function HelpAbout({ t, card, btn, userEmail, apiBaseUrl = "" }: { t: The
         {link("/bot", "About our event crawler", true)}
       </div>
       <div style={{ ...rowStyle(t), marginTop: 16 }}>
-        <div style={{ flex: 1, color: t.muted, fontSize: 14 }}>Version</div>
-        <div style={{ fontSize: 14, fontWeight: 600 }} aria-label="App version">
+        <div style={{ flex: 1, color: t.muted, fontSize: 15 }}>Version</div>
+        <div style={{ fontSize: 15, fontWeight: 600 }} aria-label="App version">
           {APP_VERSION} · {shell}
         </div>
       </div>
       <div style={rowStyle(t)}>
-        <div style={{ flex: 1, color: t.muted, fontSize: 14 }}>Server</div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: server ? (server.ok ? "#34C759" : "#FF3B30") : t.muted }}>{server ? (server.ok ? `Online · ${server.version}` : "Unreachable") : "Checking…"}</div>
+        <div style={{ flex: 1, color: t.muted, fontSize: 15 }}>Server</div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: server ? (server.ok ? "#34C759" : "#FF3B30") : t.muted }}>{server ? (server.ok ? `Online · ${server.version}` : "Unreachable") : "Checking…"}</div>
       </div>
     </section>
   );
@@ -153,7 +153,7 @@ export function PushSwitch({ supabase, t, apiBaseUrl = "", showToast }: { supaba
     <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0" }}>
       <div style={{ flex: 1 }}>
         <div style={{ fontWeight: 600 }}>Push notifications</div>
-        <div style={{ color: t.muted, fontSize: 13 }}>{hint}</div>
+        <div style={{ color: t.muted, fontSize: 15 }}>{hint}</div>
       </div>
       <button
         role="switch"
@@ -224,7 +224,7 @@ export function AppLockSetting({ t, showToast }: { t: Theme; showToast: (m: stri
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600 }}>App lock</div>
-          <div style={{ color: t.muted, fontSize: 13 }}>
+          <div style={{ color: t.muted, fontSize: 15 }}>
             {state && !state.supported ? "Set up a fingerprint or a screen lock in your phone's settings to use App lock." : `${how} to open NetworQ.`}
           </div>
         </div>
@@ -241,7 +241,7 @@ export function AppLockSetting({ t, showToast }: { t: Theme; showToast: (m: stri
       </div>
       {on && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 13, color: t.muted, marginBottom: 6 }}>Lock after</div>
+          <div style={{ fontSize: 15, color: t.muted, marginBottom: 6 }}>Lock after</div>
           <div role="radiogroup" aria-label="Lock after" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4, background: t.raised, padding: 3, borderRadius: 12 }}>
             {[
               { ms: 0, label: "Immediately" },
@@ -250,7 +250,7 @@ export function AppLockSetting({ t, showToast }: { t: Theme; showToast: (m: stri
             ].map((o) => {
               const sel = state?.timeoutMs === o.ms;
               return (
-                <button key={o.ms} role="radio" aria-checked={sel} disabled={busy} onClick={() => set({ timeoutMs: o.ms })} style={{ minHeight: 38, borderRadius: 9, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", background: sel ? t.surface : "transparent", color: sel ? t.text : t.muted, boxShadow: sel ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
+                <button key={o.ms} role="radio" aria-checked={sel} disabled={busy} onClick={() => set({ timeoutMs: o.ms })} style={{ minHeight: 38, borderRadius: 9, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", background: sel ? t.surface : "transparent", color: sel ? t.text : t.muted, boxShadow: sel ? "0 1px 3px rgba(0,0,0,0.12)" : "none" }}>
                   {o.label}
                 </button>
               );

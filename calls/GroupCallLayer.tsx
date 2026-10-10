@@ -49,7 +49,7 @@ function Tile({ stream, name, muted, mirror, video }: { stream: MediaStream | nu
           </span>
         </span>
       )}
-      <span style={{ position: "absolute", left: 10, bottom: 10, maxWidth: "80%", padding: "4px 10px", borderRadius: 12, background: "rgba(0,0,0,0.55)", color: "#FFF", fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
+      <span style={{ position: "absolute", left: 10, bottom: 10, maxWidth: "80%", padding: "4px 10px", borderRadius: 12, background: "rgba(0,0,0,0.55)", color: "#FFF", fontSize: 15, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</span>
     </div>
   );
 }
@@ -61,7 +61,7 @@ function Btn({ label, onClick, tone = "glass", active, children }: { label: stri
       <button onClick={onClick} aria-label={label} aria-pressed={tone === "glass" ? !!active : undefined} className="btn-press" style={{ width: 60, height: 60, borderRadius: 30, border: "none", background: bg, color: tone === "glass" && active ? "#1C1C1E" : "#FFFFFF", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
         {children}
       </button>
-      <span style={{ fontSize: 12, color: "rgba(255,255,255,0.85)" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)" }}>{label}</span>
     </span>
   );
 }
@@ -365,7 +365,7 @@ export function GroupCallLayer({ supabase, me, apiBaseUrl, showToast }: { supaba
         <div style={{ fontSize: 20, fontWeight: 700 }}>{phase === "incoming" ? call.hostName : "Group call"}</div>
         <div role="status" aria-live="polite" style={{ fontSize: 15, color: "rgba(255,255,255,0.75)", marginTop: 4, fontVariantNumeric: "tabular-nums" }}>{status}</div>
         {phase !== "incoming" && others.length > 0 && (
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>{others.map((m) => names[m.user_id] || "…").join(" · ")}</div>
+          <div style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>{others.map((m) => names[m.user_id] || "…").join(" · ")}</div>
         )}
       </div>
 

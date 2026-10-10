@@ -140,7 +140,7 @@ export function ContactAutopilot({
             ? `All ${step} follow-ups sent.`
             : "They unsubscribed — no more follow-ups.";
 
-  const small: React.CSSProperties = { minHeight: 36, padding: "0 12px", borderRadius: 10, border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`, background: "transparent", color: isDark ? "#FFF" : "#1C1C1E", fontSize: 14, fontWeight: 600, cursor: "pointer" };
+  const small: React.CSSProperties = { minHeight: 44, padding: "0 14px", borderRadius: 12, border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`, background: "transparent", color: isDark ? "#FFF" : "#1C1C1E", fontSize: 15, fontWeight: 600, cursor: "pointer" };
   return (
     <div role="group" aria-label="Follow-up autopilot for this person" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 12px", borderRadius: 14, background: isDark ? "rgba(255,255,255,0.05)" : "#F6F6F8", marginBottom: 14 }}>
       <I.Zap size={16} color={status === "active" && person.email ? "#7C3AED" : muted} />

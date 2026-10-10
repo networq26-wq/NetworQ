@@ -120,7 +120,7 @@ export function MeScreen({
 
       {groups.map((g, gi) => (
         <section key={gi} aria-label={g.title || undefined}>
-          {g.title && <div style={{ fontSize: 13, fontWeight: 600, color: t.muted, textTransform: "uppercase", letterSpacing: "0.04em", margin: "0 0 8px 16px" }}>{g.title}</div>}
+          {g.title && <div style={{ fontSize: 15, fontWeight: 600, color: t.muted, margin: "0 0 8px 16px" }}>{g.title}</div>}
           <div style={{ background: t.surface, borderRadius: 18, border: `1px solid ${t.border}`, overflow: "hidden" }}>
             {g.rows.map((r, i) => (
               <button
@@ -133,7 +133,7 @@ export function MeScreen({
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ display: "block", fontSize: 16, color: t.text }}>{r.label}</span>
-                  {r.hint && <span style={{ display: "block", fontSize: 13, color: t.muted, marginTop: 1 }}>{r.hint}</span>}
+                  {r.hint && <span style={{ display: "block", fontSize: 15, color: t.muted, marginTop: 1 }}>{r.hint}</span>}
                 </span>
                 <span aria-hidden style={{ color: t.muted, display: "flex" }}>
                   <I.ChevronLeft size={18} style={{ transform: "rotate(180deg)" }} />

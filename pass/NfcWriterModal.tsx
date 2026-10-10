@@ -102,7 +102,7 @@ export function NfcWriterModal({
             <I.Contact size={24} />
             <div>
               <div style={{ fontSize: 18, fontWeight: 800 }}>Program NFC Smart Card</div>
-              <div style={{ fontSize: 12, color: textMuted }}>Turn any blank card or sticker into a NetworQ Pass</div>
+              <div style={{ fontSize: 13, color: textMuted }}>Turn any blank card or sticker into a NetworQ Pass</div>
             </div>
           </div>
           <button
@@ -166,7 +166,7 @@ export function NfcWriterModal({
               : "Ready to write your Digital Pass"}
           </div>
 
-          <div style={{ fontSize: 12, color: textMuted, maxWidth: 360 }}>
+          <div style={{ fontSize: 13, color: textMuted, maxWidth: 360 }}>
             Payload: <code style={{ color: "#7C3AED" }}>{passUrl}</code>
           </div>
 
@@ -179,7 +179,7 @@ export function NfcWriterModal({
                 border: "1px solid rgba(239, 68, 68, 0.3)",
                 borderRadius: 10,
                 color: "#EF4444",
-                fontSize: 12,
+                fontSize: 13,
                 textAlign: "left",
               }}
             >
@@ -211,7 +211,7 @@ export function NfcWriterModal({
           {writing ? "Writing... Hold Card Close" : success ? "Write another card" : "Write to NFC Card Now"}
         </button>
 
-        <div style={{ fontSize: 11, color: textMuted, textAlign: "center" }}>
+        <div style={{ fontSize: 13, color: textMuted, textAlign: "center" }}>
           Works with all standard NTAG213, NTAG215, NTAG216, metal, or smart cards.
         </div>
       </div>

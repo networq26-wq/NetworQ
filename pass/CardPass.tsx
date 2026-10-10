@@ -182,7 +182,7 @@ export function CardPass({ user, prefs }: { user: User; prefs: PassPrefs }) {
           </div>
         </div>
       </button>
-      <div style={{ textAlign: "center", fontSize: 12, color: "rgba(127,127,135,0.9)", marginTop: 10 }}>{flipped ? "Tap the card to flip back" : "Tap the card to show your QR"}</div>
+      <div style={{ textAlign: "center", fontSize: 13, color: "#6E6E73", marginTop: 10 }}>{flipped ? "Tap the card to flip back" : "Tap the card to show your QR"}</div>
     </div>
   );
 }
