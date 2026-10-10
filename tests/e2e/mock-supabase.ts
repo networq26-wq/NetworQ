@@ -33,6 +33,7 @@ export class MockSupabase {
   requests: RequestRow[] = [];
   blocks: { blocker: string; blocked: string }[] = [];
   pushTokens: { token: string; user_id: string; platform: string }[] = [];
+  autopilotCalls: any[] = [];
 
   private notify(user: string, type: string, title: string, body: string, data: Record<string, unknown>) {
     this.table("notifications").unshift({ id: randomUUID(), user_id: user, type, title, body, data, read_at: null, created_at: new Date().toISOString() });
@@ -151,6 +152,20 @@ export class MockSupabase {
     switch (fn) {
       case "my_direct_chats":
         return []; // 1:1 chats aren't modelled here — an empty inbox, like a new account
+      case "set_autopilot": {
+        const prof = this.table("profiles").find((r) => r.id === uid)!;
+        prof.autopilot_enabled = !!a.p_enabled;
+        if (Array.isArray(a.p_days)) prof.autopilot_days = a.p_days;
+        if (typeof a.p_signature === "string") prof.autopilot_signature = a.p_signature.trim() || null;
+        this.autopilotCalls.push({ ...a });
+        return { enabled: prof.autopilot_enabled, days: prof.autopilot_days || [1, 7, 30], signature: prof.autopilot_signature || null };
+      }
+      case "set_contact_autopilot": {
+        const c = this.table("contacts").find((r) => r.id === a.p_contact && r.user_id === uid);
+        if (!c) throw new RpcError("not_found");
+        if (c.autopilot_status !== "opted_out") c.autopilot_status = a.p_status;
+        return { status: c.autopilot_status, step: c.autopilot_step || 0, next_at: c.autopilot_next_at || null };
+      }
       case "update_notification_prefs": {
         const prof = this.table("profiles").find((r) => r.id === uid)!;
         const cur = prof.notification_prefs || { login_alerts: true, reminder_emails: true, product_updates: false, connection_emails: true };

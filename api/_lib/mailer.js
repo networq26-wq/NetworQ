@@ -20,14 +20,18 @@ async function sendTransactional(msg) {
   }
 }
 
-async function deliver({ to, subject, html, text }) {
+// Optional: fromName (shown as the sender, e.g. "Asha Rao via NetworQ"), replyTo, extra headers
+const bareAddress = (s) => (/<([^>]+)>/.exec(s || "") || [null, s || ""])[1].trim();
+const cleanName = (s) => String(s || "").replace(/[\r\n"<>]/g, "").trim().slice(0, 80);
+
+async function deliver({ to, subject, html, text, fromName, replyTo, headers }) {
   if (process.env.RESEND_API_KEY) {
     const fromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-    const from = /</.test(fromEmail) ? fromEmail : `NetworQ <${fromEmail}>`;
+    const from = fromName ? `${cleanName(fromName)} <${bareAddress(fromEmail)}>` : /</.test(fromEmail) ? fromEmail : `NetworQ <${fromEmail}>`;
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html, text }),
+      body: JSON.stringify({ from, to, subject, html, text, ...(replyTo ? { reply_to: replyTo } : {}), ...(headers ? { headers } : {}) }),
     });
     if (!res.ok) {
       const d = await res.json().catch(() => ({}));
@@ -40,7 +44,7 @@ async function deliver({ to, subject, html, text }) {
     const transporter = process.env.SMTP_HOST
       ? nodemailer.createTransport({ host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || "587"), secure: process.env.SMTP_SECURE === "true", auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } })
       : nodemailer.createTransport({ service: "gmail", auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD } });
-    await transporter.sendMail({ from: `"NetworQ" <${process.env.GMAIL_USER || process.env.SMTP_USER}>`, to, subject, html, text });
+    await transporter.sendMail({ from: `"${cleanName(fromName) || "NetworQ"}" <${process.env.GMAIL_USER || process.env.SMTP_USER}>`, to, subject, html, text, ...(replyTo ? { replyTo } : {}), ...(headers ? { headers } : {}) });
     return { provider: "smtp" };
   }
   console.log(`[Email:dev] To ${to} — ${subject}`);

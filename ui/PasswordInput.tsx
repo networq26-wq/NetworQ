@@ -9,6 +9,8 @@ export function PasswordInput({
   onEnter,
   label,
   autoComplete = "current-password",
+  id,
+  autoFocus,
 }: {
   style: React.CSSProperties;
   value: string;
@@ -17,12 +19,16 @@ export function PasswordInput({
   onEnter?: () => void;
   label?: string;
   autoComplete?: "current-password" | "new-password";
+  id?: string;
+  autoFocus?: boolean;
 }) {
   const [visible, setVisible] = useState(false);
   return (
     <div style={{ position: "relative" }}>
       <input
         style={{ ...style, paddingRight: 52 }}
+        id={id}
+        autoFocus={autoFocus}
         type={visible ? "text" : "password"}
         placeholder={placeholder}
         value={value}

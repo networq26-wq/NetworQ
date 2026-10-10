@@ -262,6 +262,26 @@ const evDeps = eventsDeps();
 if (evDeps) app.use("/api", createEventsRouter(evDeps));
 else app.all("/api/events/*splat", (req, res) => res.status(503).json({ error: "Events service is not configured on this server." }));
 
+// ── Follow-up autopilot: unsubscribe links (public, signed) + preview (signed-in) ─
+if (process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  const { createFollowupsRouter } = require("./api/followups");
+  const fuAdmin = createSupabaseClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+  app.use("/api/followups", limiter(60 * 1000, 20));
+  app.use(
+    "/api",
+    createFollowupsRouter({
+      express,
+      supabase: fuAdmin,
+      appUrl: process.env.PUBLIC_APP_URL || "https://www.networq.co.in",
+      getUser: async (token) => {
+        if (!token) return null;
+        const { data, error } = await fuAdmin.auth.getUser(token);
+        return error ? null : data.user.id;
+      },
+    })
+  );
+}
+
 // ── Voice typing (Whisper) ────────────────────────────────────────────────────
 const trDeps = transcribeDeps();
 if (trDeps) app.use("/api", createTranscribeRouter(trDeps));
@@ -407,6 +427,7 @@ function startServer() {
   let reminderTimer = null;
   let purgeTimer = null;
   let waitlistTimer = null;
+  let followupTimer = null;
   let stopCrawler = null;
   // Background jobs touch real users (reminder emails, deletions, crawling) — production only,
   // unless explicitly enabled for local debugging with NETWORQ_JOBS=1.
@@ -419,6 +440,13 @@ function startServer() {
       const admin = createSupabaseClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
       stopCrawler = startEventsCrawler(admin);
     }
+    // Follow-up autopilot: sends due follow-ups every 10 minutes for users who turned it on
+    const { startFollowupEngine } = require("./api/followups");
+    followupTimer = startFollowupEngine({
+      supabase: createSupabaseClient(process.env.EXPO_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }),
+      mailer: require("./api/_lib/mailer").sendTransactional,
+      appUrl: process.env.PUBLIC_APP_URL || "https://www.networq.co.in",
+    });
     const { processPendingWaitlistEmails } = require("./api/waitlist");
     processPendingWaitlistEmails().catch(console.error);
     waitlistTimer = setInterval(() => processPendingWaitlistEmails().catch(console.error), 60 * 1000);
@@ -434,6 +462,7 @@ function startServer() {
     if (purgeTimer) clearInterval(purgeTimer);
     if (stopCrawler) stopCrawler();
     if (waitlistTimer) clearInterval(waitlistTimer);
+    if (followupTimer) clearInterval(followupTimer);
     let open = servers.length;
     if (!open) process.exit(0);
     servers.forEach((srv) =>

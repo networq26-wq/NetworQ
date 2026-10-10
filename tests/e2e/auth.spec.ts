@@ -64,46 +64,74 @@ test.describe("Authentication", () => {
   });
 });
 
-test.describe("Signup", () => {
+test.describe("Signup (one question per screen)", () => {
   async function openSignup(page: import("@playwright/test").Page) {
     await gotoLogin(page);
     await page.getByText("Create Account", { exact: true }).click();
-    await expect(page.getByRole("button", { name: "Continue →" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What's your email?" })).toBeVisible();
   }
+  const cont = (page: import("@playwright/test").Page) => page.getByRole("button", { name: "Continue", exact: true }).click();
 
-  test("step one validates required fields, email and password length", async ({ page }) => {
+  test("each step checks its own answer; Back keeps what you typed; Enter moves on", async ({ page }) => {
     await openSignup(page);
-    await page.getByRole("button", { name: "Continue →" }).click();
-    await expect(page.getByText("Please fill in your name, email and password.")).toBeVisible();
-
-    await page.getByPlaceholder("Priya Sharma").fill("Priya");
-    await page.getByPlaceholder("priya@acme.com").fill("not-an-email");
-    await page.getByPlaceholder("Minimum 8 characters").fill("longenough1");
-    await page.getByRole("button", { name: "Continue →" }).click();
+    await expect(page.getByText("1 of 4")).toBeVisible();
+    await cont(page);
+    await expect(page.getByText("Please enter your email address.")).toBeVisible();
+    await page.getByLabel("Email").fill("not-an-email");
+    await page.getByLabel("Email").press("Enter");
     await expect(page.getByText("Please enter a valid email address.")).toBeVisible();
+    await page.getByLabel("Email").fill("priya@acme.test");
+    await page.getByLabel("Email").press("Enter");
 
-    await page.getByPlaceholder("priya@acme.com").fill("priya@acme.test");
-    await page.getByPlaceholder("Minimum 8 characters").fill("short");
-    await page.getByRole("button", { name: "Continue →" }).click();
+    await expect(page.getByRole("heading", { name: "Create a password" })).toBeVisible();
+    await expect(page.getByText("For priya@acme.test")).toBeVisible();
+    await page.getByLabel("Password", { exact: true }).fill("short");
+    await cont(page);
     await expect(page.getByText("Password must be at least 8 characters.")).toBeVisible();
+    await page.getByLabel("Password", { exact: true }).fill("longenough1");
+    await cont(page);
+
+    await expect(page.getByRole("heading", { name: "What's your name?" })).toBeVisible();
+    await cont(page);
+    await expect(page.getByText("Please enter your name.")).toBeVisible();
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.getByRole("heading", { name: "Create a password" })).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toHaveValue("longenough1");
+    await page.getByRole("button", { name: "Back" }).click();
+    await expect(page.getByLabel("Email")).toHaveValue("priya@acme.test");
   });
 
-  async function fillSignup(page: import("@playwright/test").Page, email: string) {
+  async function fillSignup(page: import("@playwright/test").Page, email: string, { skip = false } = {}) {
     await openSignup(page);
-    await page.getByPlaceholder("Priya Sharma").fill("Priya Sharma");
-    await page.getByPlaceholder("priya@acme.com").fill(email);
-    await page.getByPlaceholder("Minimum 8 characters").fill(PASSWORD);
-    await page.getByRole("button", { name: "Continue →" }).click();
-    await page.getByPlaceholder("Acme Corp").fill("Sharma Ventures");
-    await page.getByPlaceholder("Founder, Lead Architect").fill("Founder");
-    await page.getByRole("button", { name: "Complete Registration" }).click();
+    await page.getByLabel("Email").fill(email);
+    await cont(page);
+    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+    await cont(page);
+    await page.getByLabel("Full name").fill("Priya Sharma");
+    await cont(page);
+    await expect(page.getByRole("heading", { name: "What do you do?" })).toBeVisible();
+    if (skip) return page.getByRole("button", { name: "Skip for now" }).click();
+    await page.getByLabel("Your role").fill("Founder");
+    await page.getByLabel("Company").fill("Sharma Ventures");
+    await page.getByRole("button", { name: "Create account" }).click();
   }
 
-  test("new user signs up and lands in the app with a profile", async ({ page, db }) => {
+  test("new user signs up in 4 short steps and lands in the app with a profile", async ({ page, db }) => {
     await fillSignup(page, "priya@acme.test");
     await expect(signOutButton(page)).toBeVisible();
     const user = db.users.find((u) => u.email === "priya@acme.test")!;
-    expect(db.rowsOwnedBy("profiles", user.id)[0]).toMatchObject({ name: "Priya Sharma", company: "Sharma Ventures" });
+    expect(db.rowsOwnedBy("profiles", user.id)[0]).toMatchObject({ name: "Priya Sharma", company: "Sharma Ventures", role: "Founder" });
+  });
+
+  test("role and company are optional — Skip still creates the account, and no extra form appears later", async ({ page, db }) => {
+    await fillSignup(page, "skip@acme.test", { skip: true });
+    await expect(signOutButton(page)).toBeVisible();
+    const user = db.users.find((u) => u.email === "skip@acme.test")!;
+    expect(db.rowsOwnedBy("profiles", user.id)[0]).toMatchObject({ name: "Priya Sharma", company: null, role: null });
+    await logout(page);
+    await login(page, "skip@acme.test");
+    await expect(signOutButton(page)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /What do you do\?|Welcome/ })).toHaveCount(0);
   });
 
   test("duplicate email is rejected", async ({ page, db }) => {

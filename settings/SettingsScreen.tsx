@@ -1,5 +1,6 @@
 // Settings: profile & photo, security, notifications, data, account deletion.
 import React, { useEffect, useRef, useState } from "react";
+import { FollowupAutopilot } from "./FollowupAutopilot";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PasswordInput } from "../ui/PasswordInput";
 import type { AccountApi } from "./accountApi";
@@ -9,7 +10,7 @@ import { AppLockSetting, BlockedUsers, HelpAbout, PushSwitch, RecentDevices } fr
 import { hapticsEnabled, setHapticsEnabled, haptic } from "../ui/haptics";
 
 const PURPLE = "#7C3AED";
-export type SettingsSection = "profile" | "organization" | "card" | "notifications" | "privacy" | "security" | "appearance" | "data" | "help" | "account";
+export type SettingsSection = "profile" | "organization" | "card" | "followups" | "notifications" | "privacy" | "security" | "appearance" | "data" | "help" | "account";
 type Toast = (message: string, type?: "success" | "error" | "info") => void;
 
 interface Prefs {
@@ -111,7 +112,7 @@ export function SettingsScreen({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const saveProfile = async () => {
-    if (!profile.name.trim() || !profile.company.trim()) return showToast("Name and company are required.", "error");
+    if (!profile.name.trim()) return showToast("Please enter your name.", "error");
     setSavingProfile(true);
     try {
       const { error } = await supabase.from("profiles").update(profile).eq("id", currentUser.id);
@@ -264,6 +265,7 @@ export function SettingsScreen({
     <div style={{ maxWidth: 720, display: "flex", flexDirection: "column", gap: 16, color: t.text }}>
       {!section && <h2 style={{ margin: "4px 0 0", fontSize: 28, letterSpacing: "-0.02em" }}>Settings</h2>}
       {section === "card" && cardSettings}
+      {on("followups") && <FollowupAutopilot supabase={supabase} isDark={isDark} apiBaseUrl={apiBaseUrl} showToast={showToast} />}
 
       {on("profile") && (
         <>
@@ -290,7 +292,7 @@ export function SettingsScreen({
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
           {field("name", "Full name *")}
-          {field("company", "Company *")}
+          {field("company", "Company")}
           {field("role", "Role / title")}
           {field("sector", "Sector")}
           {field("phone", "Phone")}

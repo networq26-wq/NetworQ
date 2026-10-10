@@ -24,6 +24,7 @@ import { BatchScannerModal } from "./scanner/BatchScannerModal";
 import { NetworkMapModal } from "./network/NetworkMapModal";
 import { IntroductionsModal } from "./network/IntroductionsModal";
 import { WhoNext, GroupMessageSheet, pickNext } from "./people/PeopleExtras";
+import { AutopilotCard, ContactAutopilot } from "./people/Autopilot";
 import { CallLayer, placeCall, openCall } from "./calls/CallLayer";
 import { GroupCallLayer, startGroupCall, openGroupCall } from "./calls/GroupCallLayer";
 import { useVoiceRecorder } from "./voice/useVoiceRecorder";
@@ -848,6 +849,10 @@ function dbToContact(row: any) {
     meetLink: row.meet_link,
     meetDate: row.meet_date,
     tags: row.tags || [],
+    // Follow-up autopilot (server sends; undefined until the database is updated)
+    autopilotStatus: row.autopilot_status,
+    autopilotStep: row.autopilot_step,
+    autopilotNextAt: row.autopilot_next_at,
   };
 }
 
@@ -1547,7 +1552,8 @@ VOICE & ASSISTANT DIRECTIVES:
           }
         }
 
-        if (!profileRes.data || !profileRes.data.company) {
+        // Company / role are optional now; only ask when we don't even have a name (e.g. some Google accounts)
+        if (!profileRes.data || !String(profileRes.data.name || "").trim()) {
           setCurrentUser({ id: userId, email: userEmail, ...(profileRes.data || {}) });
           setForm((f) => ({
             ...f,
@@ -1998,19 +2004,19 @@ VOICE & ASSISTANT DIRECTIVES:
     }
   };
 
-  const handleSignup = async () => {
-    if (!form.name || !form.email || !form.password || !form.company) {
-      setAuthMsg({ text: "Please fill in all required fields.", type: "error" });
+  const handleSignup = async (opts: { skipDetails?: boolean } = {}) => {
+    if (!form.name.trim() || !form.email.trim() || form.password.length < 8) {
+      setAuthMsg({ text: "Please fill in your email, password and name.", type: "error" });
       return;
     }
     setAuthSubmitting(true);
     setAuthMsg(null);
     try {
       const profileFields = {
-        name: form.name,
-        company: form.company,
-        role: form.role,
-        sector: form.sector,
+        name: form.name.trim(),
+        company: opts.skipDetails ? null : form.company.trim() || null,
+        role: opts.skipDetails ? null : form.role.trim() || null,
+        sector: form.sector || null,
         phone: form.phone,
         linkedin: form.linkedin,
         bio: form.bio,
@@ -2046,19 +2052,20 @@ VOICE & ASSISTANT DIRECTIVES:
     }
   };
 
-  const handleCompleteGoogleProfile = async () => {
-    if (!form.company || !form.role || !currentUser?.id) {
-      setAuthMsg({ text: "Please enter your company and role.", type: "error" });
+  const handleCompleteGoogleProfile = async (opts: { skipDetails?: boolean } = {}) => {
+    if (!currentUser?.id) return;
+    if (!(form.name || currentUser.name || "").trim()) {
+      setAuthMsg({ text: "Please enter your name.", type: "error" });
       return;
     }
     setAuthSubmitting(true);
     try {
       const { error } = await supabase.from("profiles").upsert({
         id: currentUser.id,
-        name: form.name || currentUser.name || "Networker",
-        company: form.company,
-        role: form.role,
-        sector: form.sector || "Technology",
+        name: (form.name || currentUser.name || "").trim(),
+        company: opts.skipDetails ? null : form.company.trim() || null,
+        role: opts.skipDetails ? null : form.role.trim() || null,
+        sector: form.sector || null,
         phone: form.phone,
         linkedin: form.linkedin,
         bio: form.bio,
@@ -3204,119 +3211,95 @@ Keep it punchy, sharp, and directly actionable.`;
     );
   }
 
-  if (screen === "complete_profile") {
-    return (
-      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
-        <style>{CSS}</style>
-        {renderBackgroundOrbs()}
-        <div style={{ width: "100%", maxWidth: 480, zIndex: 1, animation: "fadeUp 0.4s ease" }}>
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <Icons.Logo size={40} style={{ margin: "0 auto 12px" }} />
-            <div style={{ fontSize: 28 }}>Complete Profile</div>
-            <div style={{ color: themeStyles.textMuted, marginTop: 4, fontSize: 14 }}>
-              Set up your professional card details
-            </div>
-          </div>
-          <div style={S.card}>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={S.label}>Full Name</label>
-                <input
-                  style={S.input}
-                  placeholder="Priya Sharma"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label style={S.label}>Company *</label>
-                <input
-                  style={S.input}
-                  placeholder="Acme Corp"
-                  value={form.company}
-                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={S.label}>Role / Title *</label>
-                <input
-                  style={S.input}
-                  placeholder="Founder, Lead Architect"
-                  value={form.role}
-                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label style={S.label}>Sector</label>
-                <select
-                  style={S.input}
-                  value={form.sector}
-                  onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
-                >
-                  <option value="">Select industry…</option>
-                  {SECTORS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-              <div>
-                <label style={S.label}>Phone</label>
-                <input
-                  style={S.input}
-                  placeholder="+1 (555) 019-2834"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label style={S.label}>LinkedIn</label>
-                <input
-                  style={S.input}
-                  placeholder="linkedin.com/in/username"
-                  value={form.linkedin}
-                  onChange={(e) => setForm((f) => ({ ...f, linkedin: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div style={{ marginBottom: 18 }}>
-              <label style={S.label}>Company Pitch / Bio</label>
-              <textarea
-                style={{ ...S.input, height: 75, resize: "none" }}
-                placeholder="Brief one-line summary of what your company builds…"
-                value={form.bio}
-                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-              />
-            </div>
-            {authMsg && (
-              <div
-                style={{
-                  color: authMsg.type === "error" ? "#ef4444" : "#10b981",
-                  fontSize: 13,
-                  marginBottom: 14,
-                  background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
-                  border: `1px solid ${authMsg.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)"}`,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                }}
-              >
-                {authMsg.text}
-              </div>
-            )}
-            <button
-              style={{ ...S.btn, width: "100%", opacity: authSubmitting ? 0.7 : 1 }}
-              onClick={handleCompleteGoogleProfile}
-              disabled={authSubmitting}
-            >
-              {authSubmitting ? "Saving Profile…" : "Complete Setup & Launch"}
+  // One question per screen: big title, one or two fields, one button (Enter works too)
+  const renderStep = (o: {
+    step: number;
+    total: number;
+    title: string;
+    sub: string;
+    body: React.ReactNode;
+    primary: string;
+    onPrimary: () => void;
+    secondary?: { label: string; onClick: () => void };
+    onBack?: () => void;
+    footer?: React.ReactNode;
+  }) => (
+    // Anchored to the top (not centred) so the header and progress bar don't jump between steps
+    <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", overflowY: "auto", padding: "max(24px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px), 6vh) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
+      <style>{CSS}</style>
+      <div style={{ width: "100%", maxWidth: 420, zIndex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, minHeight: 44 }}>
+          {o.onBack ? (
+            <button type="button" onClick={o.onBack} aria-label="Back" style={{ display: "inline-flex", alignItems: "center", gap: 2, minHeight: 44, padding: "0 8px 0 0", border: "none", background: "none", color: "#7C3AED", fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
+              <I.ChevronLeft size={22} /> Back
             </button>
+          ) : (
+            <span />
+          )}
+          <Icons.Wordmark size={24} isDark={isDark} />
+          <span style={{ minWidth: 60, textAlign: "right", fontSize: 13, color: themeStyles.textMuted }}>{o.step} of {o.total}</span>
+        </div>
+        <div role="progressbar" aria-label="Sign-up progress" aria-valuemin={1} aria-valuemax={o.total} aria-valuenow={o.step} style={{ display: "flex", gap: 6, marginBottom: 28 }}>
+          {Array.from({ length: o.total }, (_, i) => (
+            <span key={i} style={{ flex: 1, height: 4, borderRadius: 4, background: i < o.step ? "#7C3AED" : isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", transition: "background 0.3s" }} />
+          ))}
+        </div>
+        <form
+          key={o.step}
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault();
+            o.onPrimary();
+          }}
+          style={{ animation: "fadeUp 0.25s ease" }}
+        >
+          <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.02em", margin: 0, color: themeStyles.text, lineHeight: 1.2 }}>{o.title}</h1>
+          <p style={{ fontSize: 16, color: themeStyles.textMuted, margin: "8px 0 24px", lineHeight: 1.45 }}>{o.sub}</p>
+          {o.body}
+          {authMsg && (
+            <div role="alert" style={{ color: authMsg.type === "error" ? "#DC2626" : "#059669", fontSize: 15, marginTop: 14, background: authMsg.type === "error" ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)", padding: "12px 14px", borderRadius: 12 }}>
+              {authMsg.text}
+            </div>
+          )}
+          <button type="submit" disabled={authSubmitting} style={{ ...S.btn, width: "100%", minHeight: 54, fontSize: 17, marginTop: 20, opacity: authSubmitting ? 0.7 : 1 }}>
+            {o.primary}
+          </button>
+          {o.secondary && (
+            <button type="button" disabled={authSubmitting} onClick={o.secondary.onClick} style={{ width: "100%", minHeight: 48, marginTop: 8, border: "none", background: "none", color: themeStyles.textMuted, fontSize: 16, fontWeight: 600, cursor: "pointer" }}>
+              {o.secondary.label}
+            </button>
+          )}
+        </form>
+        {o.footer}
+      </div>
+    </div>
+  );
+  const bigInput = { ...S.input, minHeight: 54, fontSize: 17 };
+
+  if (screen === "complete_profile") {
+    return renderStep({
+      step: 1, total: 1, title: `Welcome${form.name ? `, ${form.name.split(" ")[0]}` : ""}!`, sub: "One last thing — what do you do? It's optional and helps AI write better follow-ups.",
+      primary: authSubmitting ? "Saving…" : "Continue", onPrimary: () => handleCompleteGoogleProfile(),
+      secondary: { label: "Skip for now", onClick: () => handleCompleteGoogleProfile({ skipDetails: true }) },
+      body: (
+        <div style={{ display: "grid", gap: 14 }}>
+          {!form.name && (
+            <div>
+              <label style={S.label} htmlFor="cp-name">Full name</label>
+              <input id="cp-name" style={bigInput} autoComplete="name" placeholder="Priya Sharma" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+            </div>
+          )}
+          <div>
+            <label style={S.label} htmlFor="cp-role">Your role</label>
+            <input id="cp-role" style={bigInput} autoComplete="organization-title" autoFocus placeholder="Founder" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} />
+          </div>
+          <div>
+            <label style={S.label} htmlFor="cp-company">Company</label>
+            <input id="cp-company" style={bigInput} autoComplete="organization" placeholder="Acme" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
           </div>
         </div>
-      </div>
-    );
+      ),
+    });
   }
 
   if (screen === "reset_password") {
@@ -3535,241 +3518,107 @@ Keep it punchy, sharp, and directly actionable.`;
     );
   }
 
+
   if (screen === "signup") {
-    return (
-      <div style={{ ...S.page, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "safe center", overflowY: "auto", padding: "max(20px, calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 16px)) 20px max(20px, calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px))" }}>
-        <style>{CSS}</style>
-        <div style={{ width: "100%", maxWidth: 440, zIndex: 1, animation: "fadeUp 0.3s ease" }}>
-          <div style={{ textAlign: "center", marginBottom: 22 }}>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
-              <Icons.Wordmark size={30} isDark={isDark} />
-            </div>
-            <div style={{ color: themeStyles.textMuted, fontSize: 13 }}>Step {signupStep} of 2 · Create Your Account</div>
-            <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10 }}>
-              {[1, 2].map((s) => (
-                <div
-                  key={s}
-                  style={{
-                    width: 32,
-                    height: 3,
-                    borderRadius: 2,
-                    background: s <= signupStep ? "#6D35F5" : isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)",
-                    transition: "background 0.3s",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          <div style={S.card}>
-            {signupStep === 1 && (
-              <>
-                {GOOGLE_SIGNIN_AVAILABLE && (
-                <>
-                <button
-                  style={{
-                    ...S.btnOutline,
-                    width: "100%",
-                    marginBottom: 16,
-                    fontSize: 14,
-                    opacity: googleLoading ? 0.7 : 1,
-                  }}
-                  onClick={handleGoogleSignIn}
-                  disabled={googleLoading}
-                >
-                  <Icons.Google size={18} />
-                  <span>{googleLoading ? "Connecting…" : "Sign up with Google"}</span>
-                </button>
-
-                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                  <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
-                  <span style={{ fontSize: 11, color: themeStyles.textMuted, fontWeight: 700, letterSpacing: "0.05em" }}>OR</span>
-                  <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)" }} />
-                </div>
-                </>
-                )}
-
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                  <div>
-                    <label style={S.label}>Full Name *</label>
-                    <input
-                      style={S.input}
-                      placeholder="Priya Sharma"
-                      value={form.name}
-                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label style={S.label}>Email Address *</label>
-                    <input
-                      style={S.input}
-                      type="email"
-                      placeholder="priya@acme.com"
-                      value={form.email}
-                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginBottom: 12 }}>
-                  <label style={S.label}>Password *</label>
-                  <PasswordInput
-                    style={S.input}
-                    label="Password"
-                    autoComplete="new-password"
-                    placeholder="Minimum 8 characters"
-                    value={form.password}
-                    onChange={(v) => setForm((f) => ({ ...f, password: v }))}
-                  />
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 16 }}>
-                  <div>
-                    <label style={S.label}>Phone</label>
-                    <input
-                      style={S.input}
-                      placeholder="+1 (555) 019-2834"
-                      value={form.phone}
-                      onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label style={S.label}>LinkedIn</label>
-                    <input
-                      style={S.input}
-                      placeholder="linkedin.com/in/username"
-                      value={form.linkedin}
-                      onChange={(e) => setForm((f) => ({ ...f, linkedin: e.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                {authMsg && (
-                  <div
-                    style={{
-                      color: authMsg.type === "error" ? "#ef4444" : "#10b981",
-                      fontSize: 13,
-                      marginBottom: 14,
-                      background: authMsg.type === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(16, 185, 129, 0.1)",
-                      border: `1px solid ${authMsg.type === "error" ? "rgba(239, 68, 68, 0.2)" : "rgba(16, 185, 129, 0.2)"}`,
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                    }}
-                  >
-                    {authMsg.text}
-                  </div>
-                )}
-                <button
-                  style={{ ...S.btn, width: "100%" }}
-                  onClick={() => {
-                    if (!form.name.trim() || !form.email.trim() || !form.password) {
-                      setAuthMsg({ text: "Please fill in your name, email and password.", type: "error" });
-                    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-                      setAuthMsg({ text: "Please enter a valid email address.", type: "error" });
-                    } else if (form.password.length < 8) {
-                      setAuthMsg({ text: "Password must be at least 8 characters.", type: "error" });
-                    } else {
-                      setAuthMsg(null);
-                      setSignupStep(2);
-                    }
-                  }}
-                >
-                  Continue →
-                </button>
-                <div style={{ textAlign: "center", marginTop: 16, fontSize: 13, color: themeStyles.textMuted }}>
-                  Already registered?{" "}
-                  <span
-                    style={{ color: "#6366f1", cursor: "pointer", fontWeight: 600 }}
-                    onClick={() => { setScreen("login"); setAuthMsg(null); }}
-                  >
-                    Sign In
-                  </span>
-                </div>
-              </>
-            )}
-
-            {signupStep === 2 && (
-              <>
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                  <div>
-                    <label style={S.label}>Company *</label>
-                    <input
-                      style={S.input}
-                      placeholder="Acme Corp"
-                      value={form.company}
-                      onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <label style={S.label}>Role / Title *</label>
-                    <input
-                      style={S.input}
-                      placeholder="Founder, Lead Architect"
-                      value={form.role}
-                      onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={S.label}>Sector</label>
-                  <select
-                    style={S.input}
-                    value={form.sector}
-                    onChange={(e) => setForm((f) => ({ ...f, sector: e.target.value }))}
-                  >
-                    <option value="">Select industry…</option>
-                    {SECTORS.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div style={{ marginBottom: 18 }}>
-                  <label style={S.label}>Company Pitch (optional)</label>
-                  <textarea
-                    style={{ ...S.input, height: 75, resize: "none" }}
-                    placeholder="What does your company do?"
-                    value={form.bio}
-                    onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-                  />
-                </div>
-
-                {authMsg && (
-                  <div
-                    style={{
-                      color: "#ef4444",
-                      fontSize: 13,
-                      marginBottom: 14,
-                      background: "rgba(239, 68, 68, 0.1)",
-                      border: "1px solid rgba(239, 68, 68, 0.2)",
-                      padding: "10px 14px",
-                      borderRadius: 10,
-                    }}
-                  >
-                    {authMsg.text}
-                  </div>
-                )}
-
-                <div style={{ display: "flex", gap: 10 }}>
-                  <button style={{ ...S.btnOutline, flex: 1 }} onClick={() => setSignupStep(1)}>
-                    Back
-                  </button>
-                  <button
-                    style={{ ...S.btn, flex: 2, opacity: authSubmitting ? 0.7 : 1 }}
-                    onClick={handleSignup}
-                    disabled={authSubmitting}
-                  >
-                    {authSubmitting ? "Creating…" : "Complete Registration"}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+    const next = () => {
+      setAuthMsg(null);
+      if (signupStep === 1) {
+        const email = form.email.trim();
+        if (!email) return setAuthMsg({ text: "Please enter your email address.", type: "error" });
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setAuthMsg({ text: "Please enter a valid email address.", type: "error" });
+        setForm((f) => ({ ...f, email }));
+        return setSignupStep(2);
+      }
+      if (signupStep === 2) {
+        if (form.password.length < 8) return setAuthMsg({ text: "Password must be at least 8 characters.", type: "error" });
+        return setSignupStep(3);
+      }
+      if (signupStep === 3) {
+        if (!form.name.trim()) return setAuthMsg({ text: "Please enter your name.", type: "error" });
+        return setSignupStep(4);
+      }
+      handleSignup();
+    };
+    const back = () => {
+      setAuthMsg(null);
+      if (signupStep > 1) setSignupStep(signupStep - 1);
+      else setScreen("login");
+    };
+    const toLogin = (
+      <div style={{ textAlign: "center", marginTop: 20, fontSize: 15, color: themeStyles.textMuted }}>
+        Already have an account?{" "}
+        <button type="button" style={{ border: "none", background: "none", color: "#7C3AED", fontWeight: 600, fontSize: 15, cursor: "pointer", minHeight: 44 }} onClick={() => { setScreen("login"); setAuthMsg(null); setSignupStep(1); }}>
+          Sign in
+        </button>
       </div>
     );
+    if (signupStep === 1)
+      return renderStep({
+        step: 1, total: 4, title: "What's your email?", sub: "You'll use it to sign in.", primary: "Continue", onPrimary: next, onBack: back, footer: toLogin,
+        body: (
+          <>
+            {GOOGLE_SIGNIN_AVAILABLE && (
+              <>
+                <button type="button" style={{ ...S.btnOutline, width: "100%", minHeight: 54, fontSize: 16, opacity: googleLoading ? 0.7 : 1 }} onClick={handleGoogleSignIn} disabled={googleLoading}>
+                  <Icons.Google size={20} />
+                  <span>{googleLoading ? "Connecting…" : "Continue with Google"}</span>
+                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+                  <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }} />
+                  <span style={{ fontSize: 13, color: themeStyles.textMuted, fontWeight: 600 }}>or</span>
+                  <div style={{ flex: 1, height: 1, background: isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)" }} />
+                </div>
+              </>
+            )}
+            <label style={S.label} htmlFor="su-email">Email</label>
+            <input id="su-email" style={bigInput} type="email" inputMode="email" autoComplete="email" autoCapitalize="none" autoFocus placeholder="priya@acme.com" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+          </>
+        ),
+      });
+    if (signupStep === 2) {
+      const ok = form.password.length >= 8;
+      return renderStep({
+        step: 2, total: 4, title: "Create a password", sub: `For ${form.email}`, primary: "Continue", onPrimary: next, onBack: back,
+        body: (
+          <>
+            <label style={S.label} htmlFor="su-password">Password</label>
+            <PasswordInput id="su-password" style={bigInput} label="Password" autoComplete="new-password" autoFocus placeholder="At least 8 characters" value={form.password} onChange={(v) => setForm((f) => ({ ...f, password: v }))} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, fontSize: 15, color: ok ? "#059669" : themeStyles.textMuted }}>
+              <span aria-hidden style={{ width: 20, height: 20, borderRadius: 10, display: "inline-flex", alignItems: "center", justifyContent: "center", background: ok ? "#059669" : isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.08)", color: "#fff", fontSize: 12 }}>{ok ? "✓" : ""}</span>
+              At least 8 characters
+            </div>
+          </>
+        ),
+      });
+    }
+    if (signupStep === 3)
+      return renderStep({
+        step: 3, total: 4, title: "What's your name?", sub: "This is how people will see you on your card.", primary: "Continue", onPrimary: next, onBack: back,
+        body: (
+          <>
+            <label style={S.label} htmlFor="su-name">Full name</label>
+            <input id="su-name" style={bigInput} autoComplete="name" autoCapitalize="words" autoFocus placeholder="Priya Sharma" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+          </>
+        ),
+      });
+    return renderStep({
+      step: 4, total: 4, title: "What do you do?", sub: "Optional — it helps AI write better follow-ups. You can add it later.",
+      primary: authSubmitting ? "Creating your account…" : "Create account", onPrimary: next, onBack: back,
+      secondary: { label: "Skip for now", onClick: () => handleSignup({ skipDetails: true }) },
+      body: (
+        <div style={{ display: "grid", gap: 14 }}>
+          <div>
+            <label style={S.label} htmlFor="su-role">Your role</label>
+            <input id="su-role" style={bigInput} autoComplete="organization-title" autoFocus placeholder="Founder" value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} />
+          </div>
+          <div>
+            <label style={S.label} htmlFor="su-company">Company</label>
+            <input id="su-company" style={bigInput} autoComplete="organization" placeholder="Acme" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
+          </div>
+        </div>
+      ),
+    });
   }
-
-
 
   return (
     <div style={S.page}>
@@ -4448,6 +4297,20 @@ Keep it punchy, sharp, and directly actionable.`;
                 </button>
               ))}
             </section>
+
+            {!contactsLoading && currentUser?.id && (
+              <AutopilotCard
+                supabase={supabase}
+                userId={currentUser.id}
+                isDark={isDark}
+                people={effectiveContacts}
+                showToast={showToast}
+                onOpenSettings={() => {
+                  setTab("me");
+                  setMeSection("followups");
+                }}
+              />
+            )}
 
             {!contactsLoading && (
               <WhoNext
@@ -6061,6 +5924,17 @@ Keep it punchy, sharp, and directly actionable.`;
                 <Icons.Close size={15} />
               </button>
             </div>
+
+            <ContactAutopilot
+              supabase={supabase}
+              person={modal}
+              isDark={isDark}
+              showToast={showToast}
+              onChanged={(patch) => {
+                setModal((m: any) => (m ? { ...m, ...patch } : m));
+                setContacts((cs: any[]) => cs.map((c) => (c.id === modal.id ? { ...c, ...patch } : c)));
+              }}
+            />
 
             {modal.image && (
               <img

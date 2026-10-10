@@ -12,6 +12,7 @@ export const SECTION_TITLES: Record<SettingsSection, string> = {
   profile: "Profile",
   card: "Card",
   organization: "Your organization",
+  followups: "Follow-up autopilot",
   notifications: "Notifications",
   privacy: "Privacy & blocking",
   security: "Password & devices",
@@ -79,6 +80,9 @@ export function MeScreen({
         { key: "card", label: "Card", hint: "Finish and what you share", icon: I.Contact, color: "#5856D6" },
         { key: "organization", label: "Your organization", hint: "Used in AI emails", icon: I.Building, color: "#0A84FF" },
       ],
+    },
+    {
+      rows: [{ key: "followups", label: "Follow-up autopilot", hint: "Sends your follow-ups for you", icon: I.Zap, color: "#7C3AED" }],
     },
     {
       rows: [
