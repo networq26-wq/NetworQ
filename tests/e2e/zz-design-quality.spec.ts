@@ -73,6 +73,11 @@ test("design quality: readable text, 44px touch targets, contrast — every main
   const all: Finding[] = [];
   const nav = (n: string) => page.getByRole("button", { name: n, exact: true }).last().click();
   await login(page, "asha@acme.test");
+  all.push(...(await measure(page, "today")));
+  await page.getByRole("button", { name: "Add contact", exact: true }).click();
+  all.push(...(await measure(page, "add-sheet")));
+  await page.getByRole("button", { name: "Close", exact: true }).last().click();
+  await nav("People");
   all.push(...(await measure(page, "people")));
   await page.getByText("Ravi Kumar 0", { exact: true }).first().click();
   all.push(...(await measure(page, "contact")));

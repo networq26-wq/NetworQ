@@ -1,4 +1,4 @@
-import { test, expect, login, PASSWORD } from "./fixtures";
+import { test, expect, login, openFromAddSheet, PASSWORD } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
@@ -161,20 +161,23 @@ for (const width of WIDTHS) {
     }
     await step("sign-in");
     await login(page, "asha@acme.test");
-    await step("people");
+    await step("today");
+    await step("people", () => nav("People"));
     await step("contact", () => page.getByText("Ravi Kumar", { exact: true }).first().click());
     await page.getByRole("button", { name: "Close" }).last().click().catch(() => {});
     await step("messages", () => nav("Messages"));
     await step("radar", () => nav("Radar"));
     await step("events", () => nav("Events"));
-    await step("add-contact", async () => { await nav("People"); await nav("Type it in"); });
-    await step("my-qr", async () => { await nav("People"); await nav("My QR"); });
+    await step("add-sheet", async () => { await nav("Today"); await page.getByRole("button", { name: "Add contact", exact: true }).click(); });
+    await page.getByRole("button", { name: "Close", exact: true }).last().click().catch(() => {});
+    await step("add-contact", () => openFromAddSheet(page, "Type it in"));
+    await step("my-qr", () => openFromAddSheet(page, "My QR"));
     await step("settings", async () => { await nav("People"); await page.getByRole("button", { name: "Profile & Settings" }).click(); });
 
     // Every tab's content must start and end at the same edges (no jumping when switching tabs)
     const edges: Record<string, { left: number; right: number }> = {};
     for (const [screen, go] of [
-      ["people", () => nav("People")], ["messages", () => nav("Messages")], ["radar", () => nav("Radar")], ["events", () => nav("Events")],
+      ["today", () => nav("Today")], ["people", () => nav("People")], ["messages", () => nav("Messages")], ["radar", () => nav("Radar")], ["events", () => nav("Events")],
       ["me", async () => { await nav("People"); await page.getByRole("button", { name: "Profile & Settings" }).click(); }],
     ] as [string, () => Promise<unknown>][]) {
       await go();

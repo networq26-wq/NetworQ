@@ -1145,7 +1145,8 @@ function NetworQApp() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
-  const [tab, setTab] = useState<"contacts" | "messages" | "events" | "scan" | "qr" | "radar" | "add" | "settings" | "me">("contacts");
+  const [tab, setTab] = useState<"today" | "contacts" | "messages" | "events" | "scan" | "qr" | "radar" | "add" | "settings" | "me">("today");
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
@@ -1751,7 +1752,7 @@ VOICE & ASSISTANT DIRECTIVES:
     if (cameraFromShortcut.current && !scanPreview) {
       cameraFromShortcut.current = false;
       navigatingBack.current = true;
-      setTab((tabHistory.current.pop() as typeof tab) || "contacts");
+      setTab((tabHistory.current.pop() as typeof tab) || "today");
     }
   };
   const lastTab = useRef(tab);
@@ -1804,6 +1805,7 @@ VOICE & ASSISTANT DIRECTIVES:
     if (modal) return setModal(null), setPrepBrief(null), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
+    if (addSheetOpen) return setAddSheetOpen(false), true;
     if (tab === "me" && meSection) return setMeSection(null), true;
     if (groupMessageOpen) return setGroupMessageOpen(false), true;
     if (selectMode) return setSelectMode(false), setSelectedIds(new Set()), true;
@@ -1814,9 +1816,9 @@ VOICE & ASSISTANT DIRECTIVES:
       setTab(prev as typeof tab);
       return true;
     }
-    if (screen === "app" && tab !== "contacts") {
+    if (screen === "app" && tab !== "today") {
       navigatingBack.current = true;
-      setTab("contacts");
+      setTab("today");
       return true;
     }
     return false;
@@ -1827,7 +1829,7 @@ VOICE & ASSISTANT DIRECTIVES:
   const ignorePop = useRef(false);
   const isDeep = () =>
     screen === "app" &&
-    (tab !== "contacts" || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
+    (tab !== "today" || addSheetOpen || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
       daySummaryOpen || globalSearchOpen || voiceDebriefOpen || nfcWriterOpen || exportContactsOpen || chatOpen || copilotOpen || !!composer ||
       !!meetModal || bulkEmailModalOpen || !!modal || commandOpen || aiOpen || groupMessageOpen ||
       (typeof document !== "undefined" && !!document.querySelector('[role="dialog"]')));
@@ -2657,7 +2659,7 @@ Keep it punchy, sharp, and directly actionable.`;
       loadedUserRef.current = null;
       setCurrentUser(null);
       setContacts([]);
-      setTab("contacts");
+      setTab("today");
       setScreen("login");
       // Toasts only render inside the app shell — show it on the sign-in screen instead
       setAuthMsg(message ? { text: message, type: "success" } : null);
@@ -2741,14 +2743,18 @@ Keep it punchy, sharp, and directly actionable.`;
         });
         // The email went out; remember it so the next follow-up run doesn't email them again
         let saved = true;
+        let doneDue = false;
         if (draft.contact.id) {
-          const { error: saveErr } = await supabase.from("contacts").update({ email_sent: true }).eq("id", draft.contact.id);
+          // Sending counts as doing a due follow-up (clears "overdue" in Who's next)
+          const followUpDue = !!draft.contact.reminderDate && !draft.contact.reminderDone && String(draft.contact.reminderDate) <= today;
+          doneDue = followUpDue;
+          const { error: saveErr } = await supabase.from("contacts").update(followUpDue ? { email_sent: true, reminder_done: true } : { email_sent: true }).eq("id", draft.contact.id);
           if (saveErr) {
             saved = false;
             console.warn("Couldn't record follow-up as sent for", draft.contact.name, saveErr.message);
           }
         }
-        if (saved) setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true } : c)));
+        if (saved) setContacts((prev) => prev.map((c) => (c.id === draft.contact.id ? { ...c, emailSent: true, ...(doneDue ? { reminderDone: true } : {}) } : c)));
         else unsavedCount++;
         setBulkDrafts((prev) => prev.map((d, idx) => (idx === i ? { ...d, status: "sent" } : d)));
         sentCount++;
@@ -3710,6 +3716,14 @@ Keep it punchy, sharp, and directly actionable.`;
               <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
                 {[
                   {
+                    id: "today",
+                    label: "Today",
+                    icon: I.Home,
+                    count: waitingCount || undefined,
+                    onClick: () => setTab("today"),
+                    isActive: tab === "today",
+                  },
+                  {
                     id: "contacts",
                     label: "All Contacts",
                     icon: Icons.Users,
@@ -3971,7 +3985,7 @@ Keep it punchy, sharp, and directly actionable.`;
             }}
           >
             {isMobile ? (
-              <div style={{ cursor: "pointer" }} onClick={() => setTab("contacts")}>
+              <div style={{ cursor: "pointer" }} onClick={() => setTab("today")}>
                 <Icons.Wordmark size={22} isDark={isDark} />
               </div>
             ) : (
@@ -4243,7 +4257,8 @@ Keep it punchy, sharp, and directly actionable.`;
           </div>
         )}
 
-        {tab === "contacts" && (
+        {/* ── TODAY: the home screen — one job: who to follow up with, and adding someone new ── */}
+        {tab === "today" && (
           <div>
             {/* ── GREETING: plain text, no box; one live line says what needs you today ── */}
             <header style={{ margin: isMobile ? "4px 2px 16px" : "4px 2px 20px" }}>
@@ -4259,6 +4274,62 @@ Keep it punchy, sharp, and directly actionable.`;
                       ? "You're all caught up."
                       : "Scan your first card to get started."}
               </p>
+            </header>
+
+            <button
+              onClick={() => setAddSheetOpen(true)}
+              aria-label="Add contact"
+              aria-haspopup="dialog"
+              className="btn-press"
+              style={{ ...S.btn, width: "100%", minHeight: 56, fontSize: 17, borderRadius: 16, margin: "0 0 24px", gap: 10 }}
+            >
+              <Icons.Plus size={20} />
+              <span>Add contact</span>
+            </button>
+
+            {!contactsLoading && currentUser?.id && (
+              <AutopilotCard
+                supabase={supabase}
+                userId={currentUser.id}
+                isDark={isDark}
+                people={effectiveContacts}
+                showToast={showToast}
+                onOpenSettings={() => {
+                  setTab("me");
+                  setMeSection("followups");
+                }}
+              />
+            )}
+
+            {!contactsLoading && (
+              <WhoNext
+                people={effectiveContacts}
+                today={today}
+                isDark={isDark}
+                onOpen={(c) => setModal(c)}
+                onEmail={(c) => openEmail(c)}
+                onMessage={(c) => { setChatPartner({ id: c.linkedUserId, name: c.name, avatar_url: c.photo || null }); setChatEvent(null); setChatOpen(true); }}
+              />
+            )}
+
+
+            {!contactsLoading && effectiveContacts.length > 0 && (
+              <button
+                onClick={() => setTab("contacts")}
+                style={{ all: "unset", boxSizing: "border-box", width: "100%", minHeight: 52, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", borderRadius: 16, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`, color: themeStyles.text, fontSize: 16, fontWeight: 600, cursor: "pointer" }}
+              >
+                <span>See all {effectiveContacts.length} {effectiveContacts.length === 1 ? "person" : "people"}</span>
+                <I.ChevronLeft size={18} style={{ transform: "rotate(180deg)", color: themeStyles.textMuted }} />
+              </button>
+            )}
+          </div>
+        )}
+
+        {tab === "contacts" && (
+          <div>
+            {/* ── PEOPLE: everyone you've met — numbers, search, filters, the full list ── */}
+            <header style={{ margin: isMobile ? "4px 2px 16px" : "4px 2px 20px" }}>
+              <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.025em", lineHeight: 1.15 }}>People</h1>
             </header>
 
             {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
@@ -4289,69 +4360,6 @@ Keep it punchy, sharp, and directly actionable.`;
                 </div>
               ))}
             </div>
-
-            {/* ── QUICK ACTIONS: round icons with short labels — all five fit in one row (Radar lives in the bottom bar) ── */}
-            <section aria-label="Quick actions" style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0, 1fr))", gap: 4, marginBottom: 28, maxWidth: isMobile ? undefined : 480 }}>
-              {[
-                { label: "Scan", full: "Scan a card", icon: Icons.Camera, primary: true, act: () => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); } },
-                { label: "Type", full: "Type it in", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
-                { label: "Voice", full: "Voice note", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
-                { label: "My QR", full: "My QR", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
-                { label: "Follow up", full: "Follow-ups", icon: I.Mail, act: () => openBulkFollowUpModal() },
-              ].map((q) => (
-                <button
-                  key={q.label}
-                  onClick={q.act}
-                  aria-label={q.full}
-                  className="btn-press"
-                  style={{ border: "none", background: "none", padding: "4px 0", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, color: themeStyles.text, minWidth: 0 }}
-                >
-                  <span
-                    aria-hidden
-                    style={{
-                      width: 52,
-                      height: 52,
-                      borderRadius: 26,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: q.primary ? "#7C3AED" : isDark ? "#1C1C1E" : "#FFFFFF",
-                      color: q.primary ? "#FFFFFF" : isDark ? "#C4B5FD" : "#7C3AED",
-                      border: q.primary ? "none" : `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-                      boxShadow: q.primary ? "0 6px 16px -6px rgba(124,58,237,0.55)" : "none",
-                    }}
-                  >
-                    <q.icon size={22} color="currentColor" />
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 500, lineHeight: 1.2, whiteSpace: "nowrap" }}>{q.label}</span>
-                </button>
-              ))}
-            </section>
-
-            {!contactsLoading && currentUser?.id && (
-              <AutopilotCard
-                supabase={supabase}
-                userId={currentUser.id}
-                isDark={isDark}
-                people={effectiveContacts}
-                showToast={showToast}
-                onOpenSettings={() => {
-                  setTab("me");
-                  setMeSection("followups");
-                }}
-              />
-            )}
-
-            {!contactsLoading && (
-              <WhoNext
-                people={effectiveContacts}
-                today={today}
-                isDark={isDark}
-                onOpen={(c) => setModal(c)}
-                onEmail={(c) => openEmail(c)}
-                onMessage={(c) => { setChatPartner({ id: c.linkedUserId, name: c.name, avatar_url: c.photo || null }); setChatEvent(null); setChatOpen(true); }}
-              />
-            )}
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
@@ -5311,7 +5319,7 @@ Keep it punchy, sharp, and directly actionable.`;
             topSlot={<PushPrompt supabase={supabase} apiBase={apiBase(AI_PROXY)} isDark={isDark} showToast={showToast} />}
             onOpenReminders={() => {
               setNotifOpen(false);
-              setTab("contacts");
+              setTab("today");
               setRemindersOpen(true);
             }}
           />
@@ -6177,8 +6185,8 @@ Keep it punchy, sharp, and directly actionable.`;
           showToast={showToast}
           sendEmail={sendEmailViaServer}
           onClose={() => setComposer(null)}
-          onSent={(id) => {
-            setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, emailSent: true } : c)));
+          onSent={(id, patch) => {
+            setContacts((prev) => prev.map((c) => (c.id === id ? { ...c, emailSent: true, ...patch } : c)));
             setOutreachKey((k) => k + 1);
             successFeedback();
           }}
@@ -6353,6 +6361,7 @@ Keep it punchy, sharp, and directly actionable.`;
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: 64, padding: "4px 8px", boxSizing: "border-box", width: "100%" }}>
           {[
+            { t: "today", icon: I.Home, label: "Today" },
             { t: "contacts", icon: Icons.Users, label: "People" },
             { t: "messages", icon: I.Mail, label: "Messages" },
             { t: "radar", icon: Icons.Radar, label: "Radar" },
@@ -6400,8 +6409,9 @@ Keep it punchy, sharp, and directly actionable.`;
                 {t === "messages" && notif.items.some((n) => n.type === "message" && !n.read_at) && (
                   <span aria-label="Unread messages" className="nq-badge" style={{ position: "absolute", top: 6, right: "calc(50% - 16px)", width: 9, height: 9, borderRadius: 5, background: "#FF3B30", boxShadow: "0 0 0 2px rgba(255,255,255,0.9)" }} />
                 )}
-                {t === "contacts" && dueReminders.length > 0 && (
+                {t === "today" && dueReminders.length > 0 && (
                   <span
+                    aria-hidden="true"
                     style={{
                       position: "absolute",
                       top: 4,
@@ -6426,6 +6436,77 @@ Keep it punchy, sharp, and directly actionable.`;
           })}
           </div>
         </nav>
+      )}
+
+      {/* ── ADD CONTACT SHEET: every way to add someone, in one place (bottom sheet on phones) ── */}
+      {addSheetOpen && screen === "app" && (
+        <div
+          onClick={() => setAddSheetOpen(false)}
+          onKeyDown={(e) => e.key === "Escape" && setAddSheetOpen(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 320, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", animation: "fadeIn 0.15s ease" }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Add contact"
+            onClick={(e) => e.stopPropagation()}
+            className="nq-sheet-up"
+            style={{
+              width: "100%",
+              maxWidth: isMobile ? undefined : 440,
+              background: isDark ? "#1C1C1E" : "#FFFFFF",
+              borderRadius: isMobile ? "24px 24px 0 0" : 24,
+              padding: `12px 16px ${isMobile ? "calc(16px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : "16px"}`,
+              boxShadow: "0 -10px 40px rgba(0,0,0,0.18)",
+              boxSizing: "border-box",
+            }}
+          >
+            {isMobile && <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)", margin: "0 auto 10px" }} />}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 4px 12px" }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: themeStyles.text }}>Add contact</h2>
+              <button onClick={() => setAddSheetOpen(false)} aria-label="Close" style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+                <Icons.Close size={16} />
+              </button>
+            </div>
+            {[
+              { group: "", items: [
+                { label: "Scan a card", hint: "Point your camera at a business card", icon: Icons.Camera, primary: true, act: () => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); } },
+                { label: "Type it in", hint: "Name, company, email…", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+                { label: "Voice note", hint: "Say who you met — AI fills it in", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
+              ] },
+              { group: "More", items: [
+                { label: "My QR", hint: "Let someone scan your card", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
+                { label: "Follow-ups", hint: "Email everyone waiting to hear from you", icon: I.Mail, act: () => openBulkFollowUpModal() },
+              ] },
+            ].map((g) => (
+              <section key={g.group || "add"} aria-label={g.group || "Ways to add"} style={{ marginTop: g.group ? 16 : 0 }}>
+                {g.group && <div style={{ fontSize: 15, fontWeight: 600, color: themeStyles.textMuted, margin: "0 4px 8px" }}>{g.group}</div>}
+                <div style={{ borderRadius: 18, overflow: "hidden", background: isDark ? "#2C2C2E" : "#F6F6F8" }}>
+                  {g.items.map((it, i) => (
+                    <button
+                      key={it.label}
+                      aria-label={it.label}
+                      onClick={() => {
+                        setAddSheetOpen(false);
+                        it.act();
+                      }}
+                      style={{ all: "unset", boxSizing: "border-box", width: "100%", minHeight: 64, display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", cursor: "pointer", borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}
+                    >
+                      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 12, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", background: (it as any).primary ? "#7C3AED" : isDark ? "#3A3A3C" : "#FFFFFF", color: (it as any).primary ? "#FFFFFF" : "#7C3AED" }}>
+                        <it.icon size={20} color="currentColor" />
+                      </span>
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ display: "block", fontSize: 17, fontWeight: 600, color: themeStyles.text }}>{it.label}</span>
+                        <span style={{ display: "block", fontSize: 15, color: themeStyles.textMuted, marginTop: 1 }}>{it.hint}</span>
+                      </span>
+                      <I.ChevronLeft size={18} style={{ transform: "rotate(180deg)", color: themeStyles.textMuted }} />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ── SELECT MODE BAR: act on everyone you ticked ── */}

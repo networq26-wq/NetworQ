@@ -1,8 +1,8 @@
-import { test, expect, login, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
+import { test, expect, login, openFromAddSheet, openPeople, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
 
 const DESKTOP_SCREENS = ["All Contacts", "Roles & Taxonomy", "1-Click Follow-ups", "Card Scanner", "Proximity Radar", "Events Hub", "Me", "Add Contact"];
-// Phone: bottom bar (People · Messages · Radar · Events) plus the home quick actions
-const MOBILE_SCREENS = ["Events", "Radar", "Messages", "People", "Type it in", "People", "My QR"];
+// Phone: bottom bar (Today · People · Messages · Radar · Events); the Add contact sheet is covered in mobile-app.spec
+const MOBILE_SCREENS = ["Events", "Radar", "Messages", "People", "Today"];
 
 async function noHorizontalScroll(page: import("@playwright/test").Page) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -46,7 +46,8 @@ for (const width of [375, 390, 768, 1280, 1440]) {
 
 test("AI outreach: research → 3 drafts → review → send, logged on the timeline", async ({ page, db, sentEmails }) => {
   const u = db.addUser("asha@acme.test", PASSWORD, { profile: PROFILE });
-  db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", email: "ravi@kumar.test", company: "Kumar Freight", website: "kumarfreight.test", added_at: new Date().toISOString() });
+  const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+  db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", email: "ravi@kumar.test", company: "Kumar Freight", website: "kumarfreight.test", added_at: new Date().toISOString(), reminder: "Send the deck", reminder_date: yesterday, reminder_done: false });
   let authHeader = "";
   const draftBodies: any[] = [];
   await page.route("**/api/email", (route) => {
@@ -81,6 +82,8 @@ test("AI outreach: research → 3 drafts → review → send, logged on the time
   });
 
   await login(page, "asha@acme.test");
+  await expect(page.getByText(/Follow-up overdue/)).toBeVisible(); // Today: Ravi's follow-up is late
+  await openPeople(page);
   await page.getByText("Ravi Kumar", { exact: true }).first().click();
   await page.getByRole("button", { name: "Write Email" }).click();
   const dlg = page.getByRole("dialog", { name: "Write email to Ravi Kumar" });
@@ -121,8 +124,13 @@ test("AI outreach: research → 3 drafts → review → send, logged on the time
   const log = db.table("follow_up_emails")[0];
   expect(log).toMatchObject({ contact_id: "c1", subject: "Other B", draft_option: "B", research_id: "r1", provider_id: "re_123", value_props: ["Lead generation"], tone: "Executive", sent: true });
   expect(db.table("contacts")[0].email_sent).toBe(true);
+  expect(db.table("contacts")[0].reminder_done).toBe(true); // sending the email is doing the follow-up
 
   await dlg.getByRole("button", { name: "Done" }).click();
+  if (isMobileProject()) await page.getByRole("button", { name: "Today", exact: true }).last().click();
+  else await page.getByRole("complementary").getByRole("button", { name: /^Today/ }).click();
+  await expect(page.getByText(/Follow-up overdue/)).toHaveCount(0); // no longer "overdue" after sending
+  await openPeople(page);
   await page.getByText("Ravi Kumar", { exact: true }).first().click();
   const timeline = page.getByLabel("Email timeline");
   await expect(timeline.getByText("Other B")).toBeVisible();
@@ -144,8 +152,8 @@ test("Digital Pass QR is generated on-device (no profile data sent to third part
     if (!["localhost", "127.0.0.1"].includes(host) && !host.endsWith(".supabase.co")) external.push(r.url());
   });
   await login(page, "asha@acme.test");
-  const nav = isMobileProject() ? page.locator("body") : page.getByRole("complementary");
-  await nav.getByRole("button", { name: isMobileProject() ? /^My QR$/ : /^Me$/ }).last().click();
+  if (isMobileProject()) await openFromAddSheet(page, "My QR");
+  else await page.getByRole("complementary").getByRole("button", { name: /^Me$/ }).last().click();
   const qr = page.getByRole("img", { name: "QR Code" });
   await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);
   expect(external.filter((u) => u.includes("qrserver"))).toEqual([]);

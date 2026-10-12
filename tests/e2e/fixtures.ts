@@ -116,17 +116,32 @@ export function signOutButton(page: Page) {
 
 export const isMobileProject = () => test.info().project.name.includes("mobile");
 
+/** Today → "Add contact" sheet → one of its options (Scan a card, Type it in, Voice note, My QR, Follow-ups). */
+export async function openFromAddSheet(page: Page, option: string) {
+  if (isMobileProject()) await page.getByRole("button", { name: "Today", exact: true }).last().click();
+  else await page.getByRole("complementary").getByRole("button", { name: /^Today/ }).click();
+  await page.getByRole("button", { name: "Add contact", exact: true }).click();
+  await page.getByRole("dialog", { name: "Add contact" }).getByRole("button", { name: option, exact: true }).click();
+}
+
 export async function openAddContact(page: Page) {
   if (isMobileProject()) {
-    // No "Add" tab any more: the People home quick action "Type it in" opens the form
-    await page.getByRole("button", { name: "Type it in", exact: true }).click();
+    await openFromAddSheet(page, "Type it in");
   } else {
     await page.getByRole("banner").getByRole("button", { name: "Add Contact" }).click();
   }
   await expect(page.getByPlaceholder("Jane Doe")).toBeVisible();
 }
 
+/** The full list lives on the People tab (Today is home and only shows who to follow up with). */
+export async function openPeople(page: Page) {
+  if (isMobileProject()) await page.getByRole("button", { name: "People", exact: true }).last().click();
+  else await page.getByRole("complementary").getByRole("button", { name: /^All Contacts/ }).click();
+  await expect(page.getByRole("heading", { name: "People", exact: true })).toBeVisible();
+}
+
 export async function openContact(page: Page, name: string) {
+  await openPeople(page);
   await page.getByText(name, { exact: true }).first().click();
   await expect(page.getByRole("button", { name: "Edit contact", exact: true })).toBeVisible();
 }

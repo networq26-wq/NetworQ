@@ -1,4 +1,4 @@
-import { test, expect, gotoLogin, login, logout, signOutButton, PASSWORD, PROFILE } from "./fixtures";
+import { test, expect, gotoLogin, login, logout, openPeople, signOutButton, PASSWORD, PROFILE } from "./fixtures";
 
 test.describe("Authentication", () => {
   test("splash hands off to the login screen quickly", async ({ page }) => {
@@ -55,10 +55,12 @@ test.describe("Authentication", () => {
     db.table("contacts").push({ id: "c-b", user_id: b.id, name: "Contact Of B", added_at: new Date().toISOString() });
 
     await login(page, "a@acme.test");
+    await openPeople(page);
     await expect(page.getByText("Contact Of A").first()).toBeVisible();
     await logout(page);
 
     await login(page, "b@acme.test");
+    await openPeople(page);
     await expect(page.getByText("Contact Of B").first()).toBeVisible();
     await expect(page.getByText("Contact Of A")).toHaveCount(0);
   });

@@ -1,4 +1,4 @@
-import { test, expect, login, PASSWORD, PROFILE, isMobileProject } from "./fixtures";
+import { test, expect, openFromAddSheet, openPeople, login, PASSWORD, PROFILE, isMobileProject } from "./fixtures";
 
 const back = (page: import("@playwright/test").Page) => page.evaluate(() => (window as any).__networqHandleBack());
 
@@ -7,7 +7,8 @@ test.describe("Android app behaviour", () => {
     test.skip(!isMobileProject(), "phone layout");
     await page.addInitScript(() => ((window as any).ReactNativeWebView = { postMessage() {} }));
     const u = db.addUser("asha@acme.test", PASSWORD, { profile: PROFILE });
-    db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", added_at: new Date().toISOString() });
+    // Follow-up due today → Ravi shows in Today's "Who's next"
+    db.table("contacts").push({ id: "c1", user_id: u.id, name: "Ravi Kumar", added_at: new Date().toISOString(), reminder: "Follow up", reminder_date: new Date().toISOString().slice(0, 10) });
   });
 
   test("hardware back closes overlays, then walks back through tabs, then lets the app exit", async ({ page }) => {
@@ -21,13 +22,14 @@ test.describe("Android app behaviour", () => {
     await expect(page.getByText("NetworQ Assistant")).toHaveCount(0);
     expect(await back(page)).toBe(true); // Events → Radar
     await expect(page.getByRole("button", { name: "AI Assistant" })).toBeVisible(); // top bar, nothing floating over content
-    expect(await back(page)).toBe(true); // Radar → People
-    await expect(page.getByText("Your people")).toBeVisible();
+    expect(await back(page)).toBe(true); // Radar → Today (home)
+    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
     expect(await back(page)).toBe(false); // home: shell shows "press back again to exit"
   });
 
   test("back closes a contact's detail sheet", async ({ page }) => {
     await login(page, "asha@acme.test");
+    await openPeople(page);
     await page.getByText("Ravi Kumar", { exact: true }).first().click();
     await expect(page.getByRole("button", { name: "Edit contact", exact: true })).toBeVisible();
     expect(await back(page)).toBe(true);
@@ -52,6 +54,7 @@ test.describe("Android app behaviour", () => {
     const owner = db.table("contacts")[0].user_id;
     db.table("contacts").push({ id: "c2", user_id: owner, name: "Lena Park", email: "lena@seed.test", added_at: new Date().toISOString() });
     await login(page, "asha@acme.test");
+    await openPeople(page);
     await page.getByRole("button", { name: "Select", exact: true }).click();
     await page.getByRole("button", { name: /^Select all/ }).click();
     const bar = page.getByRole("toolbar", { name: "Selected people" });
@@ -68,13 +71,13 @@ test.describe("Android app behaviour", () => {
       (window as any).ReactNativeWebView = { postMessage: (m: string) => (window as any).__sent.push(JSON.parse(m)) };
     });
     await login(page, "asha@acme.test");
-    await page.getByRole("button", { name: "Scan a card", exact: true }).click();
+    await openFromAddSheet(page, "Scan a card");
     await expect.poll(() => page.evaluate(() => (window as any).__sent.map((m: any) => m.type))).toContain("perm:camera");
   });
 
   test("back closes every sheet and screen in order, and only exits from home", async ({ page }) => {
     await login(page, "asha@acme.test");
-    const home = page.getByText("Your people");
+    const home = page.getByRole("button", { name: "Add contact", exact: true }); // Today is home
     const step = async (open: () => Promise<void>, visible: import("@playwright/test").Locator, label: string) => {
       await open();
       await expect(visible, `${label} opened`).toBeVisible();
@@ -84,9 +87,9 @@ test.describe("Android app behaviour", () => {
     await step(() => page.getByRole("button", { name: "AI Assistant" }).click(), page.getByText("NetworQ Assistant"), "AI sheet");
     await step(() => page.getByRole("button", { name: /^Notifications/ }).first().click(), page.getByRole("dialog", { name: "Notifications" }), "notifications");
     await step(() => page.getByRole("button", { name: "Open Ravi Kumar" }).first().click(), page.getByRole("button", { name: "Edit contact", exact: true }), "contact sheet");
-    await step(() => page.getByRole("button", { name: "Voice note" }).click(), page.getByText("Voice note", { exact: true }).last(), "voice note");
-    await step(() => page.getByRole("button", { name: "Select", exact: true }).click(), page.getByRole("toolbar", { name: "Selected people" }), "select mode");
-    await step(() => page.getByRole("button", { name: "Scan a card" }).click(), page.getByRole("dialog", { name: "Card camera" }), "camera");
+    await step(() => home.click(), page.getByRole("dialog", { name: "Add contact" }), "add contact sheet");
+    await step(() => openFromAddSheet(page, "Voice note"), page.getByText("Voice note", { exact: true }).last(), "voice note");
+    await step(() => openFromAddSheet(page, "Scan a card"), page.getByRole("dialog", { name: "Card camera" }), "camera");
 
     // Me → sub-page → back to Me → back to People
     await page.getByRole("button", { name: "Profile & Settings" }).click();
@@ -98,7 +101,13 @@ test.describe("Android app behaviour", () => {
     expect(await back(page)).toBe(true);
     await expect(home).toBeVisible();
 
-    // Tabs: People → Messages → Events → back → Messages → back → People → back = exit (handled false)
+    // People list: select mode closes on back, then back returns to Today
+    await page.getByRole("button", { name: "People", exact: true }).last().click();
+    await step(() => page.getByRole("button", { name: "Select", exact: true }).click(), page.getByRole("toolbar", { name: "Selected people" }), "select mode");
+    expect(await back(page)).toBe(true);
+    await expect(home).toBeVisible();
+
+    // Tabs: Today → Messages → Events → back → Messages → back → Today → back = exit (handled false)
     await page.getByRole("button", { name: "Messages", exact: true }).last().click();
     await page.getByRole("button", { name: "Events", exact: true }).last().click();
     expect(await back(page)).toBe(true);
@@ -114,11 +123,11 @@ test.describe("Android app behaviour", () => {
     await expect(page.getByText("NetworQ Assistant")).toBeVisible();
     await page.goBack();
     await expect(page.getByText("NetworQ Assistant")).toHaveCount(0);
-    await expect(page.getByText("Your people")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Events", exact: true }).last().click();
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
     await page.goBack();
-    await expect(page.getByText("Your people")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
   });
 
   test("App lock: shown in the Android app, turning it on goes through the shell, Lock after can be chosen", async ({ page }) => {

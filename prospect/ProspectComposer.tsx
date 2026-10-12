@@ -45,7 +45,7 @@ export function ProspectComposer({
   showToast: (m: string, t?: "success" | "error" | "info") => void;
   sendEmail: (p: { to: string; subject: string; body: string; fromName?: string; replyTo?: string }) => Promise<{ id?: string; provider?: string }>;
   onClose: () => void;
-  onSent: (contactId: string) => void;
+  onSent: (contactId: string, patch: { reminderDone?: boolean }) => void;
 }) {
   const t = palette(isDark);
   const [step, setStep] = useState<Step>("prospect");
@@ -171,8 +171,10 @@ export function ProspectComposer({
         sent: true,
         sent_at: new Date().toISOString(),
       });
-      await supabase.from("contacts").update({ email_sent: true }).eq("id", contact.id);
-      onSent(contact.id);
+      // Emailing someone whose follow-up is due counts as doing the follow-up (clears "overdue" in Who's next)
+      const followUpDue = !!contact.reminderDate && !contact.reminderDone && String(contact.reminderDate) <= new Date().toISOString().slice(0, 10);
+      await supabase.from("contacts").update(followUpDue ? { email_sent: true, reminder_done: true } : { email_sent: true }).eq("id", contact.id);
+      onSent(contact.id, followUpDue ? { reminderDone: true } : {});
       setStep("sent");
     } catch (e: any) {
       setError(e.message || "Couldn't send the email.");

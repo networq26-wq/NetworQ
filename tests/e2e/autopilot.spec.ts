@@ -1,4 +1,4 @@
-import { test, expect, login, PASSWORD, PROFILE } from "./fixtures";
+import { test, expect, login, openPeople, PASSWORD, PROFILE } from "./fixtures";
 
 test.describe("Follow-up autopilot", () => {
   test.beforeEach(async ({ db }) => {
@@ -13,7 +13,7 @@ test.describe("Follow-up autopilot", () => {
     await expect(page.getByRole("heading", { name: "Put your follow-ups on autopilot" })).toBeVisible();
     await page.getByRole("button", { name: "Turn on", exact: true }).click();
     await expect(page.getByText("Autopilot is on", { exact: true })).toBeVisible();
-    await expect(page.getByText(/1 follow-up this week · next: Ravi, tomorrow/)).toBeVisible();
+    await expect(page.getByText(/1 this week · next Ravi tomorrow/)).toBeVisible();
     expect(db.autopilotCalls.at(-1)).toMatchObject({ p_enabled: true });
   });
 
@@ -36,6 +36,7 @@ test.describe("Follow-up autopilot", () => {
 
   test("in a contact: pause, they replied, resume; no email → explains why", async ({ page }) => {
     await login(page, "asha@acme.test");
+    await openPeople(page);
     await page.getByText("Ravi Kumar", { exact: true }).first().click();
     const group = page.getByRole("group", { name: "Follow-up autopilot for this person" });
     await expect(group).toContainText("Next follow-up tomorrow");

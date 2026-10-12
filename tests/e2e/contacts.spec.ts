@@ -1,4 +1,4 @@
-import { test, expect, login, logout, openAddContact, openContact, PASSWORD, PROFILE } from "./fixtures";
+import { test, expect, login, logout, openAddContact, openContact, openPeople, PASSWORD, PROFILE } from "./fixtures";
 
 test.describe("Contacts CRUD", () => {
   test.beforeEach(async ({ db }) => {
@@ -26,6 +26,7 @@ test.describe("Contacts CRUD", () => {
 
     await page.getByRole("button", { name: "Close" }).click();
     await page.reload();
+    await openPeople(page);
     await expect(page.getByText("Ravi Kumar", { exact: true }).first()).toBeVisible();
   });
 
@@ -41,6 +42,7 @@ test.describe("Contacts CRUD", () => {
 
     await page.getByRole("button", { name: "Close" }).click();
     await page.reload();
+    await openPeople(page);
     await expect(page.getByText("Meera Iyer-Shah", { exact: true }).first()).toBeVisible();
   });
 
@@ -57,6 +59,7 @@ test.describe("Contacts CRUD", () => {
     expect(db.table("contacts")).toHaveLength(0);
 
     await page.reload();
+    await openPeople(page);
     await expect(page.getByText("Old Lead", { exact: true })).toHaveCount(0);
   });
 

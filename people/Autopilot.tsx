@@ -90,7 +90,7 @@ export function AutopilotCard({
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: "block", fontSize: 15, fontWeight: 600, color: text }}>Autopilot is on</span>
         <span style={{ display: "block", fontSize: 13, color: muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {next ? `${thisWeek} follow-up${thisWeek === 1 ? "" : "s"} this week · next: ${next.name.split(" ")[0]}, ${when(next.autopilotNextAt)}` : "Add a contact with an email and their follow-ups are planned for you"}
+          {next ? `${thisWeek} this week · next ${next.name.split(" ")[0]} ${when(next.autopilotNextAt)}` : "Add someone with an email — their follow-ups are planned for you"}
         </span>
       </span>
       <span aria-hidden style={{ color: muted, display: "flex" }}>
