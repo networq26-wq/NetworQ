@@ -844,7 +844,7 @@ function dbToContact(row: any) {
     image: row.image,
     addedAt: row.added_at,
     linkedUserId: row.linked_user_id || null, // set when you connected on Radar — enables in-app messaging
-    reminderDone: row.reminder_done,
+    reminderDone: !!row.reminder_done,
     emailSent: row.email_sent,
     meetLink: row.meet_link,
     meetDate: row.meet_date,
@@ -1739,6 +1739,49 @@ VOICE & ASSISTANT DIRECTIVES:
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
+
+  // Coming back to the app (or tab) re-reads contacts, so emails sent by autopilot or on another device show up
+  // in Who's next without a manual refresh. At most once every 20 seconds.
+  const lastContactsRefresh = useRef(0);
+  useEffect(() => {
+    const uid = currentUser?.id;
+    if (!uid) return;
+    const refresh = async () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastContactsRefresh.current < 20_000) return;
+      lastContactsRefresh.current = Date.now();
+      const { data, error } = await supabase.from("contacts").select("*").eq("user_id", uid).order("added_at", { ascending: false });
+      if (!error && data) setContacts(data.map(dbToContact));
+    };
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [currentUser?.id]);
+
+  // The "Ask AI" pill hides while the page is being scrolled down and returns on scroll up, at the top, or shortly after scrolling stops
+  const [aiPillHidden, setAiPillHidden] = useState(false);
+  useEffect(() => {
+    const last = new WeakMap<object, number>();
+    let idle: any;
+    const onScroll = (e: Event) => {
+      const el = (e.target === document ? document.scrollingElement : e.target) as HTMLElement | null;
+      if (!el || typeof el.scrollTop !== "number" || el.scrollHeight - el.clientHeight < 80) return; // ignore tiny / horizontal scrollers
+      const y = el.scrollTop;
+      const prev = last.get(el) ?? 0; // first event: the page started at the top
+      last.set(el, y);
+      if (y < 24 || y < prev - 4) setAiPillHidden(false);
+      else if (y > prev + 4) setAiPillHidden(true);
+      clearTimeout(idle);
+      idle = setTimeout(() => setAiPillHidden(false), 1200);
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => {
+      clearTimeout(idle);
+      document.removeEventListener("scroll", onScroll, { capture: true } as any);
+    };
+  }, []);
 
   // ── Android back button (handled by the app shell via window.__networqHandleBack) ──
   // Closes the top-most overlay first, then walks back through visited tabs.
@@ -2792,7 +2835,7 @@ Keep it punchy, sharp, and directly actionable.`;
   }, [effectiveContacts, selectedContactId]);
 
   const allTags = useMemo(() => [...new Set(effectiveContacts.flatMap((c) => c.tags || []))].sort(), [effectiveContacts]);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })(); // this device's date, not UTC
   const dueReminders = useMemo(
     () => effectiveContacts.filter((c) => c.reminder && c.reminderDate && !c.reminderDone && c.reminderDate <= today),
     [effectiveContacts, today]
@@ -4073,29 +4116,6 @@ Keep it punchy, sharp, and directly actionable.`;
                 </button>
               )}
 
-              {/* AI assistant lives in the top bar (a floating button covered content) */}
-              {isMobile && (
-                <button
-                  onClick={() => setAiOpen(true)}
-                  title="AI Assistant"
-                  aria-label="AI Assistant"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 9,
-                    border: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
-                    background: isDark ? "rgba(255,255,255,0.04)" : "#FFFFFF",
-                    color: "#7C3AED",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                  }}
-                >
-                  <Icons.Sparkles size={18} color={isDark ? "#C4B5FD" : "#7C3AED"} />
-                </button>
-              )}
-
               <button
                 onClick={() => setNotifOpen(true)}
                 title="Notifications & Reminders"
@@ -4219,7 +4239,7 @@ Keep it punchy, sharp, and directly actionable.`;
             style={{
               flex: 1,
               paddingTop: isMobile ? 16 : 28,
-              paddingBottom: isMobile ? "calc(110px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 60,
+              paddingBottom: isMobile ? "calc(180px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 110, // room for the tab bar + floating AI button
               paddingLeft: isMobile ? "max(16px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 16px))" : "36px",
               paddingRight: isMobile ? "max(16px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 16px))" : "36px",
               // One column for every tab: 960px of content (+ 36px padding each side), centred
@@ -4279,7 +4299,7 @@ Keep it punchy, sharp, and directly actionable.`;
               onClick={() => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); }}
               aria-label="Scan a card"
               className="btn-press"
-              style={{ all: "unset", boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 16, padding: "20px 20px 20px 22px", borderRadius: 24, cursor: "pointer", color: "#FFFFFF", background: "radial-gradient(circle at calc(100% - 52px) 50%, rgba(255,255,255,0.12) 0 84px, transparent 85px), linear-gradient(135deg, #7C3AED 0%, #4B3BEA 100%)", boxShadow: "0 14px 30px -14px rgba(76, 59, 234, 0.7)", marginBottom: 12, position: "relative", overflow: "hidden" }}
+              style={{ all: "unset", boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 16, padding: "20px 20px 20px 22px", borderRadius: 24, cursor: "pointer", color: "#FFFFFF", background: "linear-gradient(135deg, #7C3AED 0%, #4B3BEA 100%)", boxShadow: "0 14px 30px -14px rgba(76, 59, 234, 0.7)", marginBottom: 12, position: "relative", overflow: "hidden" }}
             >
               <span style={{ flex: 1, minWidth: 0, position: "relative" }}>
                 <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#EDE9FE" }}>Just met someone?</span>
@@ -6691,42 +6711,42 @@ Keep it punchy, sharp, and directly actionable.`;
       )}
 
       {/* ── NETWORQ AI & VOICE ASSISTANT (NetworQ Intelligence) ── */}
-      {/* Floating Trigger Dock (desktop; on phones the AI lives in the header) */}
-      {!aiOpen && !isMobile && (
-        <div
+      {/* "Ask AI" pill at the bottom. It slides away while you scroll down (so it never sits on what you're reading)
+          and comes back when you scroll up, stop, or reach the top. */}
+      {screen === "app" && !aiOpen && !liveCameraOpen && !globalSearchOpen && !modal && !composer && (
+        <button
+          onClick={() => setAiOpen(true)}
+          onFocus={() => setAiPillHidden(false)}
+          title="AI Assistant"
+          aria-label="AI Assistant"
           style={{
             position: "fixed",
-            bottom: isMobile ? 74 : 26,
+            bottom: isMobile ? "calc(100px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 24,
             right: isMobile ? 16 : 28,
             zIndex: 850,
-            animation: "fadeUp 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            height: 44,
+            padding: "0 16px 0 14px",
+            borderRadius: 22,
+            background: "linear-gradient(135deg, #7C3AED, #4B3BEA)",
+            color: "#FFFFFF",
+            border: "none",
+            boxShadow: "0 8px 22px rgba(76, 59, 234, 0.35)",
+            cursor: "pointer",
+            fontSize: 15,
+            fontWeight: 600,
+            opacity: aiPillHidden ? 0 : 1,
+            transform: aiPillHidden ? "translateY(16px) scale(0.96)" : "none",
+            pointerEvents: aiPillHidden ? "none" : "auto",
+            transition: "opacity 0.22s ease, transform 0.22s ease",
           }}
         >
-          <button
-            onClick={() => setAiOpen(true)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              padding: "10px 18px",
-              borderRadius: 980,
-              background: "linear-gradient(135deg, #7C3AED, #8B5CF6)",
-              color: "#FFFFFF",
-              border: "1px solid rgba(255, 255, 255, 0.25)",
-              boxShadow: "0 10px 28px rgba(124, 58, 237, 0.35)",
-              cursor: "pointer",
-              fontSize: 15,
-              fontWeight: 600,
-              transition: "transform 0.15s ease, box-shadow 0.15s ease",
-              userSelect: "none",
-            }}
-          >
-            <Icons.Logo size={18} color="#FFFFFF" scanning={true} />
-            <span>AI & Voice</span>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#4ADE80", boxShadow: "0 0 6px #4ADE80" }} />
-            <Icons.Mic size={14} color="#FFFFFF" />
-          </button>
-        </div>
+          <Icons.Sparkles size={18} color="#FFFFFF" />
+          <span aria-hidden>Ask AI</span>
+        </button>
       )}
 
       {/* Floating Assistant Window */}

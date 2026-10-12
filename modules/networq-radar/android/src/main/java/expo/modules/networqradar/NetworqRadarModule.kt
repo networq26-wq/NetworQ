@@ -14,6 +14,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.location.LocationManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -201,6 +202,7 @@ class NetworqRadarModule : Module() {
     }
 
     override fun onScanFailed(errorCode: Int) {
+      if (errorCode == SCAN_FAILED_ALREADY_STARTED) return
       scanning = false
       sendEvent("onError", mapOf("code" to "scan_failed", "message" to "Bluetooth scan failed (error $errorCode)."))
     }
@@ -223,19 +225,34 @@ class NetworqRadarModule : Module() {
   private fun startScanning() {
     if (scanning) return
     val scanner = try { adapter?.bluetoothLeScanner } catch (e: SecurityException) { null } ?: return
-    val filter = ScanFilter.Builder().setServiceData(serviceUuid, ByteArray(0)).build()
+    // No hardware filter: a service-data filter with an empty pattern is silently dropped or matches nothing on
+    // many Bluetooth chips, so two phones side by side never saw each other. We scan everything while the app is
+    // open (Radar stops in the background anyway) and keep only NetworQ packets in record().
+    // Android 11 and older return no scan results at all while the phone's Location switch is off.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !locationEnabled()) {
+      sendEvent("onError", mapOf("code" to "location_off", "message" to "Turn on Location in your phone's quick settings. This Android version needs it for Bluetooth scanning; NetworQ doesn't read your location."))
+    }
     val settingsBuilder = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
       settingsBuilder.setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
       settingsBuilder.setMatchMode(ScanSettings.MATCH_MODE_AGGRESSIVE)
     }
     try {
-      scanner.startScan(listOf(filter), settingsBuilder.build(), scanCallback)
+      scanner.startScan(emptyList<ScanFilter>(), settingsBuilder.build(), scanCallback)
       scanning = true
     } catch (e: SecurityException) {
       sendEvent("onStateChange", mapOf("state" to "unauthorized"))
     }
   }
+
+  private fun locationEnabled(): Boolean = try {
+    val lm = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+    when {
+      lm == null -> true
+      Build.VERSION.SDK_INT >= Build.VERSION_CODES.P -> lm.isLocationEnabled
+      else -> lm.isProviderEnabled(LocationManager.GPS_PROVIDER) || lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+    }
+  } catch (_: Exception) { true }
 
   @SuppressLint("MissingPermission")
   private fun stopScanning() {

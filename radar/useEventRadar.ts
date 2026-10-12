@@ -57,8 +57,11 @@ export function useEventRadar(opts: {
   event: RadarEvent | null;
   onContactsChanged: () => void;
   onError?: (message: string) => void;
+  /** The person has agreed to Radar on this device. Until then nothing starts: no Bluetooth, no tokens, no lookups. */
+  consented?: boolean;
 }) {
   const { api, event, onContactsChanged, onError } = opts;
+  const consented = opts.consented !== false;
   const eventId = event?.id ?? null;
 
   const [settings, setSettings] = useState<RadarSettings | null>(event?.settings ?? null);
@@ -71,6 +74,9 @@ export function useEventRadar(opts: {
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [people, setPeople] = useState<RadarPerson[]>([]);
   const [hiddenCount, setHiddenCount] = useState(0);
+  // NetworQ phones whose Bluetooth signal this phone has picked up in the last 30 seconds (whether or not we may show them)
+  const heard = useRef(new Map<string, number>());
+  const [signals, setSignals] = useState(0);
   const [incoming, setIncoming] = useState<IncomingRequest[]>([]);
   const [outgoing, setOutgoing] = useState<Map<string, RequestStatus>>(new Map());
   const [outgoingIds, setOutgoingIds] = useState<Map<string, string>>(new Map());
@@ -125,10 +131,12 @@ export function useEventRadar(opts: {
           if (msg.state !== "unauthorized") setPermission("granted");
           break;
         case "radar:sightings":
+          for (const it of msg.items) heard.current.set(it.token, Date.now());
           tracker.current.ingest(msg.items);
           break;
         case "radar:error":
           if (msg.code.startsWith("advertise") || msg.code === "too_many_advertisers" || msg.code === "data_too_large") setScanOnly(true);
+          else onErrorRef.current?.(msg.message); // e.g. scan failed, Location switched off on older Android
           break;
       }
     };
@@ -137,7 +145,7 @@ export function useEventRadar(opts: {
     return () => window.removeEventListener(NATIVE_EVENT, handler);
   }, []);
 
-  const active = !!eventId && !!saved?.radar_on;
+  const active = consented && !!eventId && !!saved?.radar_on;
   const visible = !!saved?.visible;
 
   // Token lifecycle + BLE start/stop (Android app)
@@ -231,6 +239,8 @@ export function useEventRadar(opts: {
       }
       next.sort((a, b) => (a.meters ?? 1e9) - (b.meters ?? 1e9));
       setPeople(next);
+      for (const [tok, at] of heard.current) if (now - at > 30_000) heard.current.delete(tok);
+      setSignals(heard.current.size);
     }, RENDER_EVERY_MS);
     return () => clearInterval(timer);
   }, [mode, active]);
@@ -396,6 +406,7 @@ export function useEventRadar(opts: {
     mode,
     status,
     people,
+    signals,
     hiddenCount,
     settings,
     updateSettings,

@@ -175,13 +175,56 @@ export function EventRadar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingJoinCode, pendingListedEvent]);
 
+  // ── Consent: Radar never starts on this device until the person has agreed to what it uses and shares ──
+  const [consentKey, setConsentKey] = useState<string | null>(null);
+  const [consented, setConsented] = useState(false);
+  const [consentAsk, setConsentAsk] = useState<{ run: () => void; wasOn: boolean } | null>(null);
+  const [consentDeclined, setConsentDeclined] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    supabase.auth.getSession().then(({ data }) => {
+      const uid = data.session?.user?.id;
+      if (!alive || !uid) return;
+      const key = `${CONSENT_PREFIX}${uid}`;
+      setConsentKey(key);
+      try { setConsented(!!localStorage.getItem(key)); } catch { /* storage blocked → ask each time */ }
+    });
+    return () => { alive = false; };
+  }, [supabase]);
+  const requireConsent = (run: () => void) => (consented ? run() : setConsentAsk({ run, wasOn: false }));
+
   const radar = useEventRadar({
     api,
     supabase,
     event: scope === "nearby" ? nearby || null : activeEvent,
     onContactsChanged,
     onError: (m) => showToast(m, "error"),
+    consented,
   });
+
+  // Radar already on for this event (just joined, or turned on from another phone) but not agreed here → ask first
+  const radarEventId = (scope === "nearby" ? nearby?.id : activeEvent?.id) || null;
+  useEffect(() => {
+    if (!consentKey || consented || consentAsk || shareOpen || !radar.settings?.radar_on || !radarEventId || consentDeclined === radarEventId) return; // one sheet at a time
+    setConsentAsk({ run: () => {}, wasOn: true });
+  }, [consentKey, consented, consentAsk, shareOpen, radar.settings?.radar_on, radarEventId, consentDeclined]);
+
+  const agreeConsent = () => {
+    if (consentKey) try { localStorage.setItem(consentKey, new Date().toISOString()); } catch { /* still agreed for this session */ }
+    setConsented(true);
+    const ask = consentAsk;
+    setConsentAsk(null);
+    ask?.run();
+  };
+  const declineConsent = () => {
+    const ask = consentAsk;
+    setConsentAsk(null);
+    if (!ask?.wasOn) return;
+    setConsentDeclined(radarEventId);
+    if (scope === "nearby") setNearbyOn(false);
+    else radar.updateSettings({ radar_on: false });
+    showToast("Radar is off. Turn it on any time.", "info");
+  };
 
   const selectedPerson = radar.people.find((p) => p.userId === selected) || null;
 
@@ -202,6 +245,14 @@ export function EventRadar({
   const radarBody = (
     <>
           <StatusBanner t={t} status={radar.status} mode={radar.mode} nearby={scope === "nearby"} onBluetooth={radar.openBluetoothSettings} onRetry={radar.retryPermissions} />
+          {/* Plain proof that Bluetooth is working: how many NetworQ phones this phone can hear right now */}
+          {radar.mode === "native" && (radar.status === "scanning" || radar.status === "scan_only") && (
+            <p role="status" aria-label="Bluetooth status" style={{ margin: "0 4px 12px", color: t.muted, fontSize: 15, lineHeight: 1.45 }}>
+              {radar.signals > 0
+                ? `Bluetooth is working: ${radar.signals} NetworQ ${radar.signals === 1 ? "phone" : "phones"} in range.`
+                : "Bluetooth is scanning. No other NetworQ phone in range yet. The other person needs Radar on, the app open, and to be in the same event or on Nearby."}
+            </p>
+          )}
 
           {radar.incoming.length > 0 && (
             <section style={card} aria-label="Connection requests">
@@ -261,7 +312,7 @@ export function EventRadar({
                 <RadarCanvas people={[]} isDark={isDark} onSelect={() => {}} scanning={false} />
                 <div style={{ fontSize: 18, fontWeight: 700, marginTop: 12, marginBottom: 4 }}>Radar is off</div>
                 <div style={{ color: t.muted, fontSize: 15, marginBottom: 14 }}>Turn on Radar to discover people around you.</div>
-                <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => radar.updateSettings({ radar_on: true })}>
+                <button style={{ ...btn(t, "primary"), padding: "10px 20px" }} onClick={() => requireConsent(() => radar.updateSettings({ radar_on: true }))}>
                   Turn on Radar
                 </button>
               </div>
@@ -286,7 +337,7 @@ export function EventRadar({
             />
           )}
 
-          {radar.settings && <PrivacyPanel t={t} card={card} settings={radar.settings} onChange={radar.updateSettings} nearby={scope === "nearby"} />}
+          {radar.settings && <PrivacyPanel t={t} card={card} settings={radar.settings} onChange={(patch) => (patch.radar_on === true ? requireConsent(() => radar.updateSettings(patch)) : radar.updateSettings(patch))} nearby={scope === "nearby"} />}
     </>
   );
 
@@ -327,7 +378,7 @@ export function EventRadar({
                 <button
                   style={{ ...btn(t, "primary"), padding: "12px 28px", fontSize: 15 }}
                   disabled={busy}
-                  onClick={() => setNearbyOn(true, true)}
+                  onClick={() => requireConsent(() => setNearbyOn(true, true))}
                 >
                   {busy ? "Turning on…" : "Turn on Nearby"}
                 </button>
@@ -421,6 +472,8 @@ export function EventRadar({
       )}
 
       {shareOpen && activeEvent && <ShareSheet t={t} event={activeEvent} onClose={() => setShareOpen(false)} showToast={showToast} />}
+
+      {consentAsk && <RadarConsentSheet t={t} native={radar.mode === "native"} onAgree={agreeConsent} onDecline={declineConsent} />}
 
       {selectedPerson && (
         <Sheet t={t} title={selectedPerson.name} onClose={() => setSelected(null)}>
@@ -909,6 +962,52 @@ function PrivacyPanel({ t, card, settings, onChange, nearby }: { t: Theme; card:
         Your phone broadcasts a random ID that changes every 15 minutes. Your location is never collected.
       </p>
     </section>
+  );
+}
+
+const CONSENT_PREFIX = "networq_radar_consent_v1:";
+
+// Shown before Radar can turn on. Every box must be ticked — nothing is assumed.
+function RadarConsentSheet({ t, native, onAgree, onDecline }: { t: Theme; native: boolean; onAgree: () => void; onDecline: () => void }) {
+  const items = [
+    ...(native
+      ? [{ id: "bt", title: "Use Bluetooth to find people near me", body: "Your phone will ask for \u201CNearby devices\u201D next. Radar can't work without it. It shares a random ID that changes every 15 minutes." }]
+      : []),
+    { id: "profile", title: "Show my name, role and company to people nearby", body: "Only while Radar is on and you're visible. You can go hidden or turn Radar off at any time." },
+    { id: "requests", title: "Let people nearby send me a connection request", body: "Nobody is added to your contacts unless you accept." },
+  ];
+  const [ticked, setTicked] = useState<Record<string, boolean>>({});
+  const all = items.every((i) => ticked[i.id]);
+  return (
+    <Sheet t={t} title="Radar permissions" onClose={onDecline}>
+      <h3 style={{ margin: "0 0 4px", fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em" }}>Before Radar turns on</h3>
+      <p style={{ margin: "0 0 14px", color: t.muted, fontSize: 15, lineHeight: 1.45 }}>Please agree to each of these. Radar stays off until you do.</p>
+      {items.map((i) => (
+        <label key={i.id} style={{ display: "flex", gap: 12, alignItems: "flex-start", padding: "12px 0", borderTop: `1px solid ${t.border}`, cursor: "pointer", minHeight: 44 }}>
+          <input
+            type="checkbox"
+            checked={!!ticked[i.id]}
+            onChange={(e) => setTicked((s) => ({ ...s, [i.id]: e.target.checked }))}
+            aria-label={i.title}
+            style={{ width: 24, height: 24, marginTop: 2, accentColor: PURPLE, flexShrink: 0 }}
+          />
+          <span>
+            <span style={{ display: "block", fontSize: 16, fontWeight: 600 }}>{i.title}</span>
+            <span style={{ display: "block", fontSize: 15, color: t.muted, lineHeight: 1.45, marginTop: 2 }}>{i.body}</span>
+          </span>
+        </label>
+      ))}
+      <p style={{ margin: "12px 0 16px", padding: 12, borderRadius: 14, background: t.raised, color: t.muted, fontSize: 15, lineHeight: 1.45 }}>
+        Radar does not use your camera, microphone, contacts or GPS location.
+        {native ? " On Android 11 and older, the phone labels the Bluetooth permission \u201CLocation\u201D; NetworQ still doesn't read where you are." : " Finding people by Bluetooth works in the NetworQ phone app; in a browser you see people at your event instead."}
+      </p>
+      <button style={{ ...btn(t, "primary"), width: "100%", minHeight: 50, fontSize: 16, opacity: all ? 1 : 0.45 }} disabled={!all} onClick={onAgree}>
+        Agree and turn on
+      </button>
+      <button style={{ ...btn(t, "ghost"), width: "100%", minHeight: 44, fontSize: 15, marginTop: 8 }} onClick={onDecline}>
+        Not now
+      </button>
+    </Sheet>
   );
 }
 

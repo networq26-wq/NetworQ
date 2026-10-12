@@ -7,7 +7,9 @@ import type { MockSupabase } from "./mock-supabase";
 // bridge messages the way radar/shellBridge.ts does, and lets tests inject BLE sightings.
 type ShellConfig = { state: "on" | "off" | "unsupported" | "no_advertiser"; permission: "granted" | "denied" | "blocked" };
 
-async function installFakeShell(page: Page, config: ShellConfig = { state: "on", permission: "granted" }) {
+async function installFakeShell(page: Page, config: ShellConfig = { state: "on", permission: "granted" }, consent: "auto" | "manual" = "auto") {
+  // Most tests aren't about consent: agree to the Radar permissions sheet whenever it appears
+  if (consent === "auto") await autoAgreeToRadar(page);
   await page.addInitScript((initial) => {
     const w = window as any;
     w.__shell = { ...initial, sent: [] as any[], token: undefined as string | null | undefined };
@@ -46,13 +48,34 @@ async function openRadar(page: Page) {
   else await page.getByRole("complementary").getByRole("button", { name: /^Proximity Radar/ }).click();
 }
 
-async function newPage(browser: Browser, db: MockSupabase, shell?: ShellConfig | "none") {
+// Agrees to the Radar permissions sheet the moment it appears (a real person would tick each box and tap Agree)
+async function autoAgreeToRadar(page: Page) {
+  await page.addInitScript(() => {
+    const tryAgree = () => {
+      const dlg = document.querySelector('[role="dialog"][aria-label="Radar permissions"]');
+      if (!dlg) return;
+      dlg.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((b) => { if (!b.checked) b.click(); });
+      const agree = Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent?.trim() === "Agree and turn on");
+      if (agree && !agree.disabled) agree.click();
+    };
+    new MutationObserver(tryAgree).observe(document, { childList: true, subtree: true, attributes: true });
+  });
+}
+
+async function agreeToRadar(page: Page) {
+  const dlg = page.getByRole("dialog", { name: "Radar permissions" });
+  for (const box of await dlg.getByRole("checkbox").all()) await box.check();
+  await dlg.getByRole("button", { name: "Agree and turn on" }).click();
+}
+
+async function newPage(browser: Browser, db: MockSupabase, shell?: ShellConfig | "none", consent: "auto" | "manual" = "auto") {
   const ctx = await browser.newContext(isMobileProject() ? { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true } : {});
   await db.attach(ctx);
   const page = await ctx.newPage();
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  if (shell !== "none") await installFakeShell(page, shell);
+  if (shell !== "none") await installFakeShell(page, shell, consent);
+  else if (consent === "auto") await autoAgreeToRadar(page);
   return { page, ctx, errors };
 }
 
@@ -148,7 +171,10 @@ test.describe("Event Radar", () => {
       await expect(p.getByRole("button", { name: "Turn on Nearby" })).toBeVisible();
     }
     expect(db.tokenFor("bob@acme.test")).toBeUndefined(); // nothing broadcast before opting in
-    for (const p of [asha.page, bob.page]) await p.getByRole("button", { name: "Turn on Nearby" }).click();
+    for (const p of [asha.page, bob.page]) {
+      await p.getByRole("button", { name: "Turn on Nearby" }).click();
+      await expect(p.getByRole("switch", { name: "Discoverable" })).toBeVisible(); // permissions agreed, Nearby is on
+    }
     await expect(bob.page.getByRole("switch", { name: "Discoverable" })).toHaveAttribute("aria-checked", "true");
 
     await expect.poll(() => db.tokenFor("bob@acme.test")).toMatch(/^[0-9a-f]{16}$/);
@@ -189,6 +215,7 @@ test.describe("Event Radar", () => {
       await openRadar(p);
       await p.getByRole("tab", { name: "Nearby" }).click();
       await p.getByRole("button", { name: "Turn on Nearby" }).click();
+      await expect(p.getByRole("switch", { name: "Discoverable" })).toBeVisible();
     }
     await expect.poll(() => db.tokenFor("bob@acme.test")).toMatch(/^[0-9a-f]{16}$/);
     await expect.poll(() => db.tokenFor("asha@acme.test")).toMatch(/^[0-9a-f]{16}$/);
@@ -307,6 +334,62 @@ test.describe("Event Radar", () => {
     await page.getByRole("button", { name: "Allow access" }).click();
     await expect(page.getByText("Nearby devices permission needed")).toHaveCount(0);
     await expect(page.getByRole("img", { name: /Radar showing 0 nearby attendees/ })).toBeVisible();
+  });
+
+  test("consent is mandatory: Radar stays off (no Bluetooth, no token) until every box is ticked", async ({ page, db }) => {
+    seed(db);
+    await installFakeShell(page, { state: "on", permission: "granted" }, "manual");
+    await login(page, "asha@acme.test");
+    await openRadar(page);
+    await page.getByRole("tab", { name: "Nearby" }).click();
+    await page.getByRole("button", { name: "Turn on Nearby" }).click();
+
+    const dlg = page.getByRole("dialog", { name: "Radar permissions" });
+    await expect(dlg.getByRole("heading", { name: "Before Radar turns on" })).toBeVisible();
+    await expect(dlg.getByText(/does not use your camera, microphone, contacts or GPS location/)).toBeVisible();
+    const agree = dlg.getByRole("button", { name: "Agree and turn on" });
+    await expect(agree).toBeDisabled();
+    const boxes = await dlg.getByRole("checkbox").all();
+    expect(boxes.length).toBe(3); // Bluetooth, show my profile, receive requests
+    await boxes[0].check();
+    await boxes[1].check();
+    await expect(agree).toBeDisabled(); // every box, not most
+    const sent = () => page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type));
+    expect(await sent()).not.toContain("radar:start");
+    expect(db.tokenFor("asha@acme.test")).toBeUndefined();
+
+    // "Not now" leaves Radar off
+    await dlg.getByRole("button", { name: "Not now" }).click();
+    await expect(dlg).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Turn on Nearby" })).toBeVisible();
+    expect(await sent()).not.toContain("radar:start");
+
+    // Agreeing to everything turns it on and asks the phone for Bluetooth
+    await page.getByRole("button", { name: "Turn on Nearby" }).click();
+    await agreeToRadar(page);
+    await expect(page.getByRole("switch", { name: "Discoverable" })).toHaveAttribute("aria-checked", "true");
+    await expect.poll(sent).toContain("radar:start");
+    await expect(page.getByRole("status", { name: "Bluetooth status" })).toContainText("No other NetworQ phone in range yet");
+
+    // Asked once per person on this phone: off and on again doesn't ask twice
+    await page.reload();
+    await openRadar(page);
+    await expect(page.getByRole("switch", { name: "Discoverable" })).toBeVisible();
+    await expect(dlg).toHaveCount(0);
+  });
+
+  test("joining an event doesn't start Radar until you agree; declining turns it off", async ({ page, db }) => {
+    seed(db);
+    await installFakeShell(page, { state: "on", permission: "granted" }, "manual");
+    await login(page, "asha@acme.test");
+    await openRadar(page);
+    await createEvent(page, "Founders Night");
+    const dlg = page.getByRole("dialog", { name: "Radar permissions" });
+    await expect(dlg).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type))).not.toContain("radar:start");
+    await dlg.getByRole("button", { name: "Not now" }).click();
+    await expect(page.getByText("Radar is off", { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type))).not.toContain("radar:start");
   });
 
   test("wrong event code gives a clear error", async ({ page, db }) => {

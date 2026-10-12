@@ -12,6 +12,9 @@ import {
 } from "./prospectApi";
 import { OrganizationForm, palette } from "./OrganizationForm";
 
+// Today's date on this device (not UTC), as YYYY-MM-DD
+const localDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
 const PURPLE = "#7C3AED";
 type Step = "prospect" | "context" | "drafts" | "review" | "sent";
 const STEPS: { key: Step; label: string }[] = [
@@ -144,6 +147,15 @@ export function ProspectComposer({
     setStep("review");
   };
 
+  // Emailing someone whose follow-up is due counts as doing the follow-up (clears "overdue" in Who's next).
+  // The list updates straight away; the save happens in the background.
+  const markEmailed = async () => {
+    const followUpDue = !!contact.reminderDate && !contact.reminderDone && String(contact.reminderDate).slice(0, 10) <= localDay();
+    onSent(contact.id, followUpDue ? { reminderDone: true } : {});
+    const { error: saveErr } = await supabase.from("contacts").update(followUpDue ? { email_sent: true, reminder_done: true } : { email_sent: true }).eq("id", contact.id);
+    if (saveErr) console.warn("[composer] couldn't mark contact as emailed:", saveErr.message);
+  };
+
   const send = async () => {
     if (!review) return;
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(review.to.trim())) return setError("Add a valid email address for this prospect.");
@@ -171,10 +183,7 @@ export function ProspectComposer({
         sent: true,
         sent_at: new Date().toISOString(),
       });
-      // Emailing someone whose follow-up is due counts as doing the follow-up (clears "overdue" in Who's next)
-      const followUpDue = !!contact.reminderDate && !contact.reminderDone && String(contact.reminderDate) <= new Date().toISOString().slice(0, 10);
-      await supabase.from("contacts").update(followUpDue ? { email_sent: true, reminder_done: true } : { email_sent: true }).eq("id", contact.id);
-      onSent(contact.id, followUpDue ? { reminderDone: true } : {});
+      await markEmailed();
       setStep("sent");
     } catch (e: any) {
       setError(e.message || "Couldn't send the email.");
@@ -395,6 +404,7 @@ export function ProspectComposer({
               </button>
               <a
                 href={`mailto:${encodeURIComponent(review.to)}?subject=${encodeURIComponent(review.subject)}&body=${encodeURIComponent(review.body)}`}
+                onClick={() => { markEmailed(); }}
                 style={{ display: "block", textAlign: "center", marginTop: 12, color: PURPLE, fontSize: 15, textDecoration: "none" }}
               >
                 Open in my mail app instead

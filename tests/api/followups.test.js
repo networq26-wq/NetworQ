@@ -116,6 +116,23 @@ test("sends only due, active contacts with an email, for users who turned autopi
   assert.equal(sb.tables.contacts.find((c) => c.id === "c5").autopilot_step, 0, "autopilot off → nothing sent");
 });
 
+test("an autopilot email completes a follow-up that was due (the app stops calling it overdue)", async () => {
+  const day = (ms) => new Date(ms).toISOString().slice(0, 10);
+  const base = { user_id: "u1", added_at: iso(NOW.getTime() - 2 * DAY), autopilot_step: 0, autopilot_status: "active", autopilot_next_at: iso(NOW.getTime() - DAY) };
+  const sb = world({
+    contacts: [
+      { ...base, id: "d1", name: "Due Person", email: "due@x.test", reminder_date: day(NOW.getTime() - DAY), reminder_done: false },
+      { ...base, id: "d2", name: "Future Person", email: "future@x.test", reminder_date: day(NOW.getTime() + 5 * DAY), reminder_done: false },
+    ],
+  });
+  await runFollowups({ supabase: sb, mailer: async () => {}, appUrl: "https://app.test", now: NOW });
+  const get = (id) => sb.tables.contacts.find((c) => c.id === id);
+  assert.equal(get("d1").email_sent, true);
+  assert.equal(get("d1").reminder_done, true, "due reminder is completed by the email");
+  assert.equal(get("d2").email_sent, true);
+  assert.equal(get("d2").reminder_done, false, "a reminder set for later is left alone");
+});
+
 test("runs the whole Day 1 → 7 → 30 sequence, then stops", async () => {
   const sb = world();
   const sent = [];

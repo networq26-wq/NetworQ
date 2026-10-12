@@ -105,7 +105,7 @@ async function runFollowups(deps) {
 
   const { data: due, error } = await supabase
     .from("contacts")
-    .select("id, user_id, name, title, company, email, event, reference, added_at, autopilot_step, autopilot_next_at, autopilot_status")
+    .select("id, user_id, name, title, company, email, event, reference, added_at, reminder_date, reminder_done, autopilot_step, autopilot_next_at, autopilot_status")
     .eq("autopilot_status", "active")
     .not("email", "is", null)
     .lte("autopilot_next_at", now.toISOString())
@@ -187,7 +187,9 @@ async function runFollowups(deps) {
       const finished = nextIndex >= days.length;
       const added = new Date(c.added_at || now).getTime();
       const nextAt = finished ? null : new Date(Math.max(added + days[nextIndex] * DAY, now.getTime() + DAY)).toISOString();
-      await supabase.from("contacts").update({ autopilot_step: nextIndex, autopilot_last_sent_at: now.toISOString(), autopilot_next_at: nextAt, autopilot_status: finished ? "done" : "active", email_sent: true }).eq("id", c.id);
+      // An autopilot email counts as doing a follow-up that was due (so the app stops showing it as overdue)
+      const reminderDue = !!c.reminder_date && !c.reminder_done && String(c.reminder_date).slice(0, 10) <= now.toISOString().slice(0, 10);
+      await supabase.from("contacts").update({ autopilot_step: nextIndex, autopilot_last_sent_at: now.toISOString(), autopilot_next_at: nextAt, autopilot_status: finished ? "done" : "active", email_sent: true, ...(reminderDue ? { reminder_done: true } : {}) }).eq("id", c.id);
       await log({ user_id: c.user_id, contact_id: c.id, step: nextIndex, to_email: to, subject: draft.subject, body: text, status: "sent" });
       sentToday.set(c.user_id, (sentToday.get(c.user_id) || 0) + 1);
       out.sent++;
