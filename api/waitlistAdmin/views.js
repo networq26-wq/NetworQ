@@ -17,7 +17,7 @@ const STYLE = `
   --r-lg: 18px; --r-md: 12px; --r-sm: 10px; --pad: 20px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13px; color: var(--text); background: var(--page); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 13px; line-height: 1.4; color: var(--text); background: var(--page); min-height: 100vh; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
 a { color: var(--brand); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -37,15 +37,20 @@ h2 { font-size: 14px; font-weight: 700; }
 .tab:hover { background: var(--soft); text-decoration: none; }
 .tab.active { color: var(--brand); background: var(--brand-soft); font-weight: 700; }
 
-.wrap { padding: var(--pad); display: grid; gap: var(--pad); }
+.wrap { padding: var(--pad); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--pad); }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(16,24,40,0.06); overflow: hidden; }
-.panel-body { padding: var(--pad); display: grid; gap: 16px; }
+/* minmax(0, 1fr): a wide table scrolls inside its own box instead of stretching the whole panel */
+.panel-body { padding: var(--pad); display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.panel-body > *, .wrap > * { min-width: 0; }
 .head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .title { display: flex; gap: 12px; align-items: center; }
 .icon-tile { width: 40px; height: 40px; border-radius: var(--r-md); background: var(--brand); display: grid; place-items: center; flex: none; }
 .eyebrow { font-size: 12px; color: var(--text-2); }
 .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > *, .filters > * { min-width: 0; }
+.invite { display: flex; gap: 8px 10px; flex-wrap: wrap; align-items: center; }
+.invite .hint { flex: 1 1 220px; min-width: 0; color: var(--muted); }
 
 .btn { height: 36px; padding: 0 16px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--brand); border-radius: var(--r-sm); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; text-decoration: none !important; }
 .btn:hover { background: var(--soft); }
@@ -57,20 +62,35 @@ h2 { font-size: 14px; font-weight: 700; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .kpi { padding: 14px 16px; background: var(--soft); border: 1px solid var(--border-soft); border-radius: var(--r-md); }
 .kpi-label { font-size: 12px; color: var(--muted); }
-.kpi-val { font-size: 22px; font-weight: 700; margin-top: 2px; }
-.kpi-sub { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 4px; }
+.kpi-val { font-size: 22px; font-weight: 700; margin-top: 2px; line-height: 1.2; display: flex; align-items: baseline; gap: 6px; }
+.kpi-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
 .kpi-note { font-size: 12px; font-weight: 600; margin-top: 2px; }
 .up { color: var(--ok); } .down { color: var(--err); }
 
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: var(--pad); }
 .card-title { padding: 16px var(--pad) 0; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .list { padding: 12px var(--pad) var(--pad); display: grid; gap: 10px; }
-.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: baseline; }
 .bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bar-val { font-weight: 600; color: var(--text-2); }
 .bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--soft); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: 999px; background: var(--brand); }
 .empty { padding: 32px var(--pad); text-align: center; color: var(--muted); }
+.donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--pad); }
+.donut-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: 0 1px 3px rgba(16,24,40,0.06); padding: 16px var(--pad) var(--pad); min-width: 0; }
+.donut-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.donut-body { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 16px; align-items: center; }
+.donut { width: 112px; height: 112px; display: block; }
+.donut-arc { transition: stroke-width 0.15s; }
+.donut-arc:hover { stroke-width: 17; }
+.donut-num { font: 700 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; fill: var(--text); }
+.donut-cap { font: 500 9.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; fill: var(--muted); }
+.legend { list-style: none; display: grid; gap: 8px; min-width: 0; }
+.legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; line-height: 1.2; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.legend .lg-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.legend .lg-val { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.legend .lg-pct { display: inline-block; min-width: 34px; margin-left: 6px; font-weight: 500; color: var(--muted); text-align: right; }
 .chart { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; padding-top: 8px; }
 .chart-y { position: relative; height: 168px; min-width: 22px; font-size: 11px; color: var(--muted); }
 .chart-y span { position: absolute; right: 0; transform: translateY(-50%); line-height: 1; }
@@ -87,26 +107,27 @@ h2 { font-size: 14px; font-weight: 700; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .control { height: 36px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 12px; background: var(--surface); outline: none; max-width: 100%; }
 .control:focus, .field input:focus, textarea:focus { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
-.search { position: relative; }
-.search svg { position: absolute; left: 13px; top: 11px; }
-.search .control { padding-left: 34px; border-radius: 999px; width: 240px; }
+.search { position: relative; display: block; flex: 0 1 260px; }
+.search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); }
+.search .control { padding-left: 34px; border-radius: 999px; width: 100%; }
 
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
 table { width: 100%; border-collapse: collapse; }
 th { background: var(--soft); text-align: left; font-size: 12px; font-weight: 700; color: var(--text-2); padding: 11px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; }
-td { padding: 11px 16px; border-bottom: 1px solid #EFEFF3; white-space: nowrap; }
+td { padding: 11px 16px; border-bottom: 1px solid #EFEFF3; white-space: nowrap; vertical-align: middle; }
+th.r, td.r { text-align: right; }
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: #F7F6FE; }
 td.check, th.check { width: 44px; padding-right: 0; }
 input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); vertical-align: middle; }
 .muted { color: var(--muted); }
-.pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.pill { display: inline-flex; align-items: center; height: 22px; font-size: 12px; font-weight: 600; line-height: 1; padding: 0 10px; border-radius: 999px; vertical-align: middle; }
 .pill-ok { background: var(--ok-bg); color: var(--ok); }
 .pill-warn { background: var(--warn-bg); color: var(--warn); }
 .pill-err { background: var(--err-bg); color: var(--err); }
 .pill-info { background: var(--info-bg); color: var(--info); }
 .pill-brand { background: var(--brand-soft); color: var(--brand); }
-.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--soft); border: 1px solid var(--border-soft); color: var(--text-2); margin-right: 4px; }
+.tag { display: inline-flex; align-items: center; height: 20px; font-size: 11px; font-weight: 600; line-height: 1; padding: 0 8px; vertical-align: middle; border-radius: 999px; background: var(--soft); border: 1px solid var(--border-soft); color: var(--text-2); margin-right: 4px; }
 .bulk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; border-radius: var(--r-md); background: var(--brand-soft); }
 .bulk[hidden] { display: none; }
 
@@ -135,9 +156,16 @@ textarea { min-height: 110px; resize: vertical; }
 @media (max-width: 720px) {
   :root { --pad: 16px; }
   .user .who { display: none; }
-  .search, .search .control { width: 100%; }
-  .filters .control { flex: 1 1 140px; }
+  .appname { display: none; }
+  .appnav { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .filters .search { grid-column: 1 / -1; }
+  .filters .control, .filters .btn { width: 100%; }
+  .invite .hint { flex-basis: 100%; order: 3; }
+  .invite .btn { order: 4; width: 100%; }
   .grid2 { grid-template-columns: 1fr; }
+  .head .row { width: 100%; }
+  .head .row > .btn, .head .row > form, .head .row > form > .btn { flex: 1; }
 }`;
 
 const ICONS = {
@@ -270,6 +298,41 @@ function chart(series) {
   </div>`;
 }
 
+// Donut chart for a part-to-whole KPI (inline SVG, no scripts). Colours are a validated set
+// (colour-blind safe next to each other); every slice is also named with its count and share in
+// the legend, so nothing depends on colour alone. Slices keep their colour whatever the order.
+const SERIES = { violet: "#4B3BEA", orange: "#EB6834", aqua: "#1BAF7A", yellow: "#EDA100", gray: "#8C8A96" };
+function donut({ title, caption, slices, link = "" }) {
+  const total = slices.reduce((t, x) => t + x.value, 0);
+  const shown = slices.filter((x) => x.value > 0);
+  const gap = shown.length > 1 ? 1.1 : 0; // ≈2px surface gap between slices
+  let at = 0;
+  const arcs = shown
+    .map((x) => {
+      const share = (x.value / total) * 100;
+      const len = Math.max(share - gap, 0.4);
+      const arc = `<circle class="donut-arc" cx="60" cy="60" r="44" pathLength="100" stroke="${x.color}" stroke-dasharray="${len.toFixed(2)} ${(100 - len).toFixed(2)}" stroke-dashoffset="${(-(at + gap / 2)).toFixed(2)}"><title>${esc(x.label)}: ${n(x.value)} (${Math.round(share)}%)</title></circle>`;
+      at += share;
+      return arc;
+    })
+    .join("");
+  const legend = slices
+    .map((x) => `<li><span class="sw" style="background:${x.color}"></span><span class="lg-label">${esc(x.label)}</span><span class="lg-val">${n(x.value)}<span class="lg-pct">${total ? Math.round((x.value / total) * 100) : 0}%</span></span></li>`)
+    .join("");
+  return `<section class="donut-card" aria-label="${esc(title)}">
+    <div class="donut-head"><h2>${esc(title)}</h2>${link}</div>
+    <div class="donut-body">
+      <svg class="donut" viewBox="0 0 120 120" role="img" aria-label="${esc(title)}: ${esc(slices.map((x) => `${x.label} ${x.value}`).join(", "))}">
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#ECEBF2" stroke-width="14"/>
+        <g fill="none" stroke-width="14" transform="rotate(-90 60 60)">${arcs}</g>
+        <text x="60" y="58" text-anchor="middle" class="donut-num">${n(total)}</text>
+        <text x="60" y="74" text-anchor="middle" class="donut-cap">${esc(caption)}</text>
+      </svg>
+      ${total ? `<ul class="legend">${legend}</ul>` : `<p class="muted" style="margin:0">Nothing to show yet.</p>`}
+    </div>
+  </section>`;
+}
+
 const statusPill = (s) => ({ waiting: '<span class="pill pill-warn">Waiting</span>', invited: '<span class="pill pill-info">Invited</span>', joined: '<span class="pill pill-ok">Joined app</span>' })[s || "waiting"];
 const emailPill = (r) => (r.notified ? '<span class="pill pill-ok">Sent</span>' : r.email_error ? `<span class="pill pill-err" title="${esc(r.email_error)}">Failed</span>` : '<span class="pill pill-warn">Queued</span>');
 const tagsHtml = (tags) => (tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("");
@@ -305,9 +368,15 @@ function overviewPage({ base, admin, rows, query, loadError, needsMigration = fa
   const k = R.kpis(rows, now);
   const series = R.dailySeries(rows, 30, now);
   const growth = k.growth === null ? "" : `${k.growth >= 0 ? "▲" : "▼"} ${Math.abs(k.growth)}% vs the week before`;
-  const src = R.sources(rows).slice(0, 6);
   const recent = rows.slice(0, 8);
   const eh = R.emailHealth(rows);
+  const dom = R.domains(rows);
+  // Sources donut: top 4 by name, the rest folded into "Other" (never more colours than the validated set)
+  const allSrc = R.sources(rows);
+  const palette = [SERIES.violet, SERIES.orange, SERIES.aqua, SERIES.yellow];
+  const srcSlices = allSrc.slice(0, 4).map((x, i) => ({ label: x.key, value: x.count, color: palette[i] }));
+  const otherSrc = rows.length - srcSlices.reduce((t, x) => t + x.value, 0);
+  if (otherSrc > 0) srcSlices.push({ label: "Other", value: otherSrc, color: SERIES.gray });
   return layout({
     base, admin, query, active: "", title: "Overview", icon: "chart",
     meta: `${n(k.total)} sign-ups · Updated ${esc(fmtDate(now))} IST`,
@@ -324,8 +393,25 @@ function overviewPage({ base, admin, rows, query, loadError, needsMigration = fa
         ${kpi("Joined the app", n(k.joined), k.total ? `${Math.round((k.joined / k.total) * 100)}%` : "")}
       </div>
       <div><h2 style="margin-bottom:8px">Sign-ups per day · last 30 days</h2>${chart(series)}</div>`,
-      rest: `<div class="grid2">
-        ${card("Where sign-ups come from", bars(src, { total: rows.length, empty: "No sign-ups yet." }), `<a href="${esc(base)}/reports">All reports</a>`)}
+      rest: `<div class="donuts">
+        ${donut({ title: "Status", caption: "sign-ups", slices: [
+          { label: "Waiting", value: k.waiting, color: SERIES.violet },
+          { label: "Invited", value: k.invited, color: SERIES.orange },
+          { label: "Joined app", value: k.joined, color: SERIES.aqua },
+        ] })}
+        ${donut({ title: "Sources", caption: "sign-ups", link: `<a href="${esc(base)}/reports">All reports</a>`, slices: srcSlices })}
+        ${donut({ title: "Confirmation emails", caption: "emails", slices: [
+          { label: "Sent", value: eh.sent, color: SERIES.violet },
+          { label: "Queued", value: eh.queued, color: SERIES.gray },
+          { label: "Failed", value: eh.failed, color: SERIES.orange },
+        ] })}
+        ${donut({ title: "Email type", caption: "sign-ups", slices: [
+          { label: "Company", value: dom.companyCount, color: SERIES.violet },
+          { label: "Personal", value: dom.personal, color: SERIES.aqua },
+        ] })}
+      </div>
+      <div class="grid2">
+        ${card("Top companies", bars(dom.companies.slice(0, 6), { total: rows.length, empty: "No company email addresses yet." }), `<a href="${esc(base)}/reports">All reports</a>`)}
         ${card(
           "Latest sign-ups",
           recent.length
@@ -387,7 +473,7 @@ function signupsPage({ base, admin, rows: matched, all, filters, query, loadErro
       <div class="table-wrap" style="margin-top:12px"><table id="t">
         <thead><tr>
           <th class="check"><input type="checkbox" id="all" aria-label="Select all" /></th>
-          <th>Email</th><th>Status</th><th>Queue #</th><th>Referrals</th><th>Joined (IST)</th><th>Source</th><th>Tags</th><th>Confirmation</th>
+          <th>Email</th><th>Status</th><th class="r">Queue #</th><th class="r">Referrals</th><th>Joined (IST)</th><th>Source</th><th>Tags</th><th>Confirmation</th>
         </tr></thead>
         <tbody>${rows
           .map(
@@ -395,8 +481,8 @@ function signupsPage({ base, admin, rows: matched, all, filters, query, loadErro
           <td class="check"><input type="checkbox" name="ids" value="${esc(r.id)}" aria-label="Select ${esc(r.email)}" /></td>
           <td><a href="${esc(base)}/person/${esc(r.id)}">${esc(r.email)}</a></td>
           <td>${statusPill(r.status)}</td>
-          <td>${esc(r.position ?? "—")}</td>
-          <td>${n(refs.get(r.ref_code) || 0)}</td>
+          <td class="r">${esc(r.position ?? "—")}</td>
+          <td class="r">${n(refs.get(r.ref_code) || 0)}</td>
           <td>${esc(fmtDate(r.created_at))}</td>
           <td class="muted">${esc(R.sourceOf(r))}</td>
           <td>${tagsHtml(r.tags)}</td>
@@ -408,10 +494,11 @@ function signupsPage({ base, admin, rows: matched, all, filters, query, loadErro
     </form>`
     : `<div class="empty">No sign-ups match these filters.</div>`;
   const waiting = all.filter((r) => (r.status || "waiting") === "waiting").length;
-  const inviteNext = `<form class="row" method="post" action="${esc(base)}/invite-next">
-      <label for="n" class="muted">Invite the next</label>
-      <input class="control" id="n" name="n" type="number" min="1" max="50" value="10" style="width:80px" />
-      <span class="muted">people (most referrals first, then earliest) · ${n(waiting)} waiting</span>
+  const inviteNext = `<form class="invite" method="post" action="${esc(base)}/invite-next">
+      <label for="n">Invite the next</label>
+      <input class="control" id="n" name="n" type="number" min="1" max="50" value="10" style="width:76px" />
+      <span>people</span>
+      <span class="hint">Most referrals first, then earliest · ${n(waiting)} waiting</span>
       <button class="btn btn-brand" type="submit">Send invites</button>
     </form>`;
   const script = `<script>

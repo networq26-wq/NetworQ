@@ -110,9 +110,8 @@ export function RadarCanvas({
       ctx.arc(c, c, R, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Rings
-      ctx.font = "700 11px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
-      ctx.textAlign = "left";
+      // Rings, then their distance labels — each centred exactly on top of its ring, on a small pill
+      // that hides the dashed line behind it, so all labels sit in one straight column above "you"
       for (const ring of RINGS) {
         ctx.strokeStyle = isDark ? "rgba(167, 139, 250, 0.40)" : "rgba(124, 58, 237, 0.36)";
         ctx.lineWidth = 1.5;
@@ -121,9 +120,33 @@ export function RadarCanvas({
         ctx.arc(c, c, R * ring.r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = isDark ? "#C4B5FD" : "#6D28D9";
-        ctx.fillText(ring.label, c + 6, c - R * ring.r + 13);
       }
+      ctx.font = "700 11px -apple-system, BlinkMacSystemFont, 'SF Pro Text', Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      for (const ring of RINGS) {
+        const y = c - R * ring.r;
+        const w = ctx.measureText(ring.label).width + 12;
+        const h = 17;
+        const x0 = c - w / 2;
+        const y0 = y - h / 2;
+        const rr = h / 2;
+        ctx.beginPath();
+        ctx.moveTo(x0 + rr, y0);
+        ctx.lineTo(x0 + w - rr, y0);
+        ctx.arc(x0 + w - rr, y0 + rr, rr, -Math.PI / 2, Math.PI / 2);
+        ctx.lineTo(x0 + rr, y0 + h);
+        ctx.arc(x0 + rr, y0 + rr, rr, Math.PI / 2, (3 * Math.PI) / 2);
+        ctx.closePath();
+        ctx.fillStyle = isDark ? "#1C1830" : "#F5F1FF";
+        ctx.fill();
+        ctx.strokeStyle = isDark ? "rgba(167, 139, 250, 0.45)" : "rgba(124, 58, 237, 0.30)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = isDark ? "#C4B5FD" : "#6D28D9";
+        ctx.fillText(ring.label, c, y + 0.5);
+      }
+      ctx.textBaseline = "alphabetic";
 
       // Sweep
       const sweep = reduceMotion || !scanning ? -Math.PI / 2 : (t * 1.1) % (Math.PI * 2);
