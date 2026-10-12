@@ -4326,24 +4326,21 @@ Keep it punchy, sharp, and directly actionable.`;
         )}
 
         {tab === "contacts" && (
-          <div>
-            {/* ── PEOPLE: everyone you've met — numbers, search, filters, the full list ── */}
-            <header style={{ margin: isMobile ? "4px 2px 16px" : "4px 2px 20px" }}>
-              <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 700, margin: 0, color: themeStyles.text, letterSpacing: "-0.025em", lineHeight: 1.15 }}>People</h1>
-            </header>
-
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {/* ── PEOPLE: title, then search at the very top, filters and the full list; the numbers sit below the list ── */}
             {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
             <div
               role="group"
               aria-label="At a glance"
               style={{
+                order: 2, // after the list
                 display: "grid",
                 gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
                 background: isDark ? "#1C1C1E" : "#FFFFFF",
                 border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
                 borderRadius: 18,
                 padding: "14px 0",
-                marginBottom: 20,
+                marginTop: 24,
               }}
             >
               {[
@@ -4362,7 +4359,7 @@ Keep it punchy, sharp, and directly actionable.`;
             </div>
 
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
-            <div style={{ display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
+            <div style={{ order: 1, display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
               <div style={{ flex: isMobile ? "1" : "1 1 58%", minWidth: 0 }}>
                 <div
                   style={{
@@ -4374,10 +4371,10 @@ Keep it punchy, sharp, and directly actionable.`;
                     gap: 14,
                   }}
                 >
-                  <div>
-                    <h2 style={{ fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>
-                      Your people
-                    </h2>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h1 style={{ fontSize: isMobile ? 28 : 32, fontWeight: 700, margin: "4px 0 0", color: themeStyles.text, letterSpacing: "-0.025em", lineHeight: 1.15 }}>
+                      People
+                    </h1>
                     <div style={{ color: themeStyles.textMuted, fontSize: 15, marginTop: 2 }}>
                       {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
                     </div>
@@ -4386,7 +4383,7 @@ Keep it punchy, sharp, and directly actionable.`;
                     <button
                       onClick={() => { setSelectMode((m) => !m); setSelectedIds(new Set()); }}
                       aria-pressed={selectMode}
-                      style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 16, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "0 4px", alignSelf: "center" }}
+                      style={{ border: "none", background: "none", color: isDark ? "#C4B5FD" : "#7C3AED", fontSize: 16, fontWeight: 600, cursor: "pointer", minHeight: 44, padding: "0 4px", alignSelf: "flex-start", flexShrink: 0 }}
                     >
                       {selectMode ? "Cancel" : "Select"}
                     </button>
@@ -4395,7 +4392,7 @@ Keep it punchy, sharp, and directly actionable.`;
               {/* One aligned toolbar row: search grows, actions keep a common 40 px height */}
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", width: "100%" }}>
                 {/* Product search pill — same look as Events */}
-                <div style={{ flex: isMobile ? "1 1 0" : "1 1 220px", minWidth: 0, display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "0 6px 0 16px", boxSizing: "border-box", borderRadius: 16, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` }}>
+                <div style={{ flex: isMobile ? "1 1 0" : "1 1 140px", minWidth: 0, display: "flex", alignItems: "center", gap: 10, minHeight: 52, padding: "0 6px 0 16px", boxSizing: "border-box", borderRadius: 16, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` }}>
                   <span aria-hidden style={{ color: themeStyles.textMuted, display: "flex" }}>
                     <I.Search size={18} />
                   </span>
