@@ -984,11 +984,23 @@ function RadarCheck({ t, card, health, signals, radarOn, onBluetooth, onRetry }:
   const via = link === "wifi" ? " (Wi-Fi)" : link === "cellular" ? " (mobile data)" : "";
   const engineOk = h.shell && h.shellAnswered && h.nativeState !== "unsupported";
   type Row = { id: string; label: string; state: "ok" | "bad" | "wait"; text: string; fix?: { label: string; run: () => void } };
+  // Where is this page really running? The installed app, a home-screen shortcut of the website, or a browser tab.
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const inWebView = /; wv\)/.test(ua);
+  const shortcut = typeof window !== "undefined" && !!window.matchMedia?.("(display-mode: standalone)").matches;
+  const where = h.shell ? "app" : inWebView ? "app-no-bridge" : shortcut ? "shortcut" : "browser";
+  const getApp = { label: "Get the app", run: () => { window.location.href = "/download/NetworQ.apk"; } };
   const rows: Row[] = [
-    h.shell
+    where === "app"
       ? { id: "app", label: "NetworQ app", state: "ok", text: "You're in the Android app." }
-      : { id: "app", label: "NetworQ app", state: "bad", text: "You're in a browser. Finding people by Bluetooth only works in the NetworQ Android app." },
+      : where === "app-no-bridge"
+        ? { id: "app", label: "NetworQ app", state: "bad", text: "You're in the app, but it isn't talking to this page. Close the app fully and open it again. If this stays, install the latest app.", fix: getApp }
+        : where === "shortcut"
+          ? { id: "app", label: "NetworQ app", state: "bad", text: "This is a home-screen shortcut to the website, not the Android app. It looks the same but can't use Bluetooth. Install the app to use Radar.", fix: getApp }
+          : { id: "app", label: "NetworQ app", state: "bad", text: "You're in a browser. Finding people by Bluetooth only works in the NetworQ Android app.", fix: getApp },
   ];
+  // One line a person can read out or screenshot so support knows exactly what this phone reports
+  const report = `${where} · bridge ${h.shell ? "yes" : "no"} · radar ${h.shellAnswered ? h.nativeState : "no answer"} · permission ${h.permission ?? "not asked"} · ${h.online ? "online" : "offline"}`;
   if (h.shell) {
     rows.push(
       !h.shellAnswered
@@ -1050,6 +1062,7 @@ function RadarCheck({ t, card, health, signals, radarOn, onBluetooth, onRetry }:
           </li>
         ))}
       </ul>
+      <p aria-label="Radar report" style={{ margin: "10px 0 0", color: t.muted, fontSize: 13, lineHeight: 1.4, wordBreak: "break-word" }}>Report: {report}</p>
     </section>
   );
 }
