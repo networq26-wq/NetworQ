@@ -1,4 +1,4 @@
-import { test, expect, login, openFromAddSheet, PASSWORD } from "./fixtures";
+import { test, expect, login, openQuickAction, PASSWORD } from "./fixtures";
 import type { Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
@@ -168,10 +168,9 @@ for (const width of WIDTHS) {
     await step("messages", () => nav("Messages"));
     await step("radar", () => nav("Radar"));
     await step("events", () => nav("Events"));
-    await step("add-sheet", async () => { await nav("Today"); await page.getByRole("button", { name: "Add contact", exact: true }).click(); });
-    await page.getByRole("button", { name: "Close", exact: true }).last().click().catch(() => {});
-    await step("add-contact", () => openFromAddSheet(page, "Type it in"));
-    await step("my-qr", () => openFromAddSheet(page, "My QR"));
+    await step("today", () => nav("Today"));
+    await step("add-contact", () => openQuickAction(page, "Type it in"));
+    await step("my-qr", () => openQuickAction(page, "My QR"));
     await step("settings", async () => { await nav("People"); await page.getByRole("button", { name: "Profile & Settings" }).click(); });
 
     // Every tab's content must start and end at the same edges (no jumping when switching tabs)

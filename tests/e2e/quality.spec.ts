@@ -1,7 +1,7 @@
-import { test, expect, login, openFromAddSheet, openPeople, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
+import { test, expect, login, openQuickAction, openPeople, isMobileProject, PASSWORD, PROFILE } from "./fixtures";
 
 const DESKTOP_SCREENS = ["All Contacts", "Roles & Taxonomy", "1-Click Follow-ups", "Card Scanner", "Proximity Radar", "Events Hub", "Me", "Add Contact"];
-// Phone: bottom bar (Today · People · Messages · Radar · Events); the Add contact sheet is covered in mobile-app.spec
+// Phone: bottom bar (Today · People · Messages · Radar · Events); the quick actions on Today are covered in mobile-app.spec
 const MOBILE_SCREENS = ["Events", "Radar", "Messages", "People", "Today"];
 
 async function noHorizontalScroll(page: import("@playwright/test").Page) {
@@ -152,7 +152,7 @@ test("Digital Pass QR is generated on-device (no profile data sent to third part
     if (!["localhost", "127.0.0.1"].includes(host) && !host.endsWith(".supabase.co")) external.push(r.url());
   });
   await login(page, "asha@acme.test");
-  if (isMobileProject()) await openFromAddSheet(page, "My QR");
+  if (isMobileProject()) await openQuickAction(page, "My QR");
   else await page.getByRole("complementary").getByRole("button", { name: /^Me$/ }).last().click();
   const qr = page.getByRole("img", { name: "QR Code" });
   await expect(qr).toHaveAttribute("src", /^data:image\/png;base64,/);

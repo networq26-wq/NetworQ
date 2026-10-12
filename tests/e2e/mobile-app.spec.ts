@@ -1,4 +1,4 @@
-import { test, expect, openFromAddSheet, openPeople, login, PASSWORD, PROFILE, isMobileProject } from "./fixtures";
+import { test, expect, openQuickAction, openPeople, login, PASSWORD, PROFILE, isMobileProject } from "./fixtures";
 
 const back = (page: import("@playwright/test").Page) => page.evaluate(() => (window as any).__networqHandleBack());
 
@@ -23,7 +23,7 @@ test.describe("Android app behaviour", () => {
     expect(await back(page)).toBe(true); // Events → Radar
     await expect(page.getByRole("button", { name: "AI Assistant" })).toBeVisible(); // top bar, nothing floating over content
     expect(await back(page)).toBe(true); // Radar → Today (home)
-    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quick actions" })).toBeVisible();
     expect(await back(page)).toBe(false); // home: shell shows "press back again to exit"
   });
 
@@ -71,13 +71,13 @@ test.describe("Android app behaviour", () => {
       (window as any).ReactNativeWebView = { postMessage: (m: string) => (window as any).__sent.push(JSON.parse(m)) };
     });
     await login(page, "asha@acme.test");
-    await openFromAddSheet(page, "Scan a card");
+    await openQuickAction(page, "Scan a card");
     await expect.poll(() => page.evaluate(() => (window as any).__sent.map((m: any) => m.type))).toContain("perm:camera");
   });
 
   test("back closes every sheet and screen in order, and only exits from home", async ({ page }) => {
     await login(page, "asha@acme.test");
-    const home = page.getByRole("button", { name: "Add contact", exact: true }); // Today is home
+    const home = page.getByRole("region", { name: "Quick actions" }); // Today is home
     const step = async (open: () => Promise<void>, visible: import("@playwright/test").Locator, label: string) => {
       await open();
       await expect(visible, `${label} opened`).toBeVisible();
@@ -87,9 +87,8 @@ test.describe("Android app behaviour", () => {
     await step(() => page.getByRole("button", { name: "AI Assistant" }).click(), page.getByText("NetworQ Assistant"), "AI sheet");
     await step(() => page.getByRole("button", { name: /^Notifications/ }).first().click(), page.getByRole("dialog", { name: "Notifications" }), "notifications");
     await step(() => page.getByRole("button", { name: "Open Ravi Kumar" }).first().click(), page.getByRole("button", { name: "Edit contact", exact: true }), "contact sheet");
-    await step(() => home.click(), page.getByRole("dialog", { name: "Add contact" }), "add contact sheet");
-    await step(() => openFromAddSheet(page, "Voice note"), page.getByText("Voice note", { exact: true }).last(), "voice note");
-    await step(() => openFromAddSheet(page, "Scan a card"), page.getByRole("dialog", { name: "Card camera" }), "camera");
+    await step(() => openQuickAction(page, "Voice note"), page.getByText("Voice note", { exact: true }).last(), "voice note");
+    await step(() => openQuickAction(page, "Scan a card"), page.getByRole("dialog", { name: "Card camera" }), "camera");
 
     // Me → sub-page → back to Me → back to People
     await page.getByRole("button", { name: "Profile & Settings" }).click();
@@ -123,11 +122,11 @@ test.describe("Android app behaviour", () => {
     await expect(page.getByText("NetworQ Assistant")).toBeVisible();
     await page.goBack();
     await expect(page.getByText("NetworQ Assistant")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quick actions" })).toBeVisible();
     await page.getByRole("button", { name: "Events", exact: true }).last().click();
     await expect(page.getByRole("heading", { name: "Events", exact: true })).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("button", { name: "Add contact", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Quick actions" })).toBeVisible();
   });
 
   test("App lock: shown in the Android app, turning it on goes through the shell, Lock after can be chosen", async ({ page }) => {

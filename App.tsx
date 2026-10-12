@@ -1146,7 +1146,6 @@ function NetworQApp() {
   const [activeDetailTab, setActiveDetailTab] = useState<"overview" | "relationship" | "notes" | "opportunities">("overview");
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   const [tab, setTab] = useState<"today" | "contacts" | "messages" | "events" | "scan" | "qr" | "radar" | "add" | "settings" | "me">("today");
-  const [addSheetOpen, setAddSheetOpen] = useState(false);
   const [radarJoinCode, setRadarJoinCode] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [radarListedEvent, setRadarListedEvent] = useState<ListedEventInput | null>(null);
@@ -1805,7 +1804,6 @@ VOICE & ASSISTANT DIRECTIVES:
     if (modal) return setModal(null), setPrepBrief(null), true;
     if (commandOpen) return setCommandOpen(false), true;
     if (aiOpen) return setAiOpen(false), true;
-    if (addSheetOpen) return setAddSheetOpen(false), true;
     if (tab === "me" && meSection) return setMeSection(null), true;
     if (groupMessageOpen) return setGroupMessageOpen(false), true;
     if (selectMode) return setSelectMode(false), setSelectedIds(new Set()), true;
@@ -1829,7 +1827,7 @@ VOICE & ASSISTANT DIRECTIVES:
   const ignorePop = useRef(false);
   const isDeep = () =>
     screen === "app" &&
-    (tab !== "today" || addSheetOpen || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
+    (tab !== "today" || !!meSection || selectMode || notifOpen || liveCameraOpen || batchScannerOpen || networkMapOpen || introductionsOpen ||
       daySummaryOpen || globalSearchOpen || voiceDebriefOpen || nfcWriterOpen || exportContactsOpen || chatOpen || copilotOpen || !!composer ||
       !!meetModal || bulkEmailModalOpen || !!modal || commandOpen || aiOpen || groupMessageOpen ||
       (typeof document !== "undefined" && !!document.querySelector('[role="dialog"]')));
@@ -4035,8 +4033,8 @@ Keep it punchy, sharp, and directly actionable.`;
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <button
                 onClick={() => setGlobalSearchOpen(true)}
-                title="Global Professional Search"
-                aria-label="Global Professional Search"
+                title="Search"
+                aria-label="Search"
                 style={{
                   width: 44,
                   height: 44,
@@ -4276,16 +4274,75 @@ Keep it punchy, sharp, and directly actionable.`;
               </p>
             </header>
 
+{/* ── SCAN: the main action, big and obvious ── */}
             <button
-              onClick={() => setAddSheetOpen(true)}
-              aria-label="Add contact"
-              aria-haspopup="dialog"
+              onClick={() => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); }}
+              aria-label="Scan a card"
               className="btn-press"
-              style={{ ...S.btn, width: "100%", minHeight: 56, fontSize: 17, borderRadius: 16, margin: "0 0 24px", gap: 10 }}
+              style={{ all: "unset", boxSizing: "border-box", width: "100%", display: "flex", alignItems: "center", gap: 16, padding: "20px 20px 20px 22px", borderRadius: 24, cursor: "pointer", color: "#FFFFFF", background: "radial-gradient(circle at calc(100% - 52px) 50%, rgba(255,255,255,0.12) 0 84px, transparent 85px), linear-gradient(135deg, #7C3AED 0%, #4B3BEA 100%)", boxShadow: "0 14px 30px -14px rgba(76, 59, 234, 0.7)", marginBottom: 12, position: "relative", overflow: "hidden" }}
             >
-              <Icons.Plus size={20} />
-              <span>Add contact</span>
+              <span style={{ flex: 1, minWidth: 0, position: "relative" }}>
+                <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "#EDE9FE" }}>Just met someone?</span>
+                <span style={{ display: "block", fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", lineHeight: 1.2, marginTop: 2 }}>Scan their card</span>
+                <span style={{ display: "block", fontSize: 15, color: "#EDE9FE", marginTop: 4 }}>AI saves the contact in seconds</span>
+              </span>
+              <span aria-hidden style={{ width: 64, height: 64, borderRadius: 32, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flex: "none", position: "relative" }}>
+                <Icons.Camera size={30} color="#FFFFFF" />
+              </span>
             </button>
+
+            {/* ── EVERY OTHER WAY, always visible (nothing hidden behind a menu) ── */}
+            <section aria-label="Quick actions" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 10, marginBottom: 20 }}>
+              {[
+                { label: "Type", full: "Type it in", icon: Icons.Edit, tint: "#7C3AED", act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
+                { label: "Voice", full: "Voice note", icon: I.Mic, tint: "#0A84FF", act: () => setVoiceDebriefOpen(true) },
+                { label: "My QR", full: "My QR", icon: Icons.QrCode, tint: "#1F8A3B", act: () => { setMeSection(null); setTab("me"); } },
+                { label: "Follow up", full: "Follow-ups", icon: I.Mail, tint: "#C2410C", act: () => openBulkFollowUpModal() },
+              ].map((q) => (
+                <button
+                  key={q.label}
+                  onClick={q.act}
+                  aria-label={q.full}
+                  className="btn-press"
+                  style={{ all: "unset", boxSizing: "border-box", minHeight: 96, padding: "12px 4px", borderRadius: 20, cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, background: isDark ? "#1C1C1E" : "#FFFFFF", border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` }}
+                >
+                  <span aria-hidden style={{ width: 44, height: 44, borderRadius: 22, display: "flex", alignItems: "center", justifyContent: "center", background: `${q.tint}${isDark ? "33" : "1F"}`, color: isDark ? "#FFFFFF" : q.tint }}>
+                    <q.icon size={22} color="currentColor" />
+                  </span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: themeStyles.text, whiteSpace: "nowrap" }}>{q.label}</span>
+                </button>
+              ))}
+            </section>
+
+            {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
+            <div
+              role="group"
+              aria-label="At a glance"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                background: isDark ? "#1C1C1E" : "#FFFFFF",
+                border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
+                borderRadius: 18,
+                padding: "14px 0",
+                marginBottom: 24,
+              }}
+            >
+              {[
+                { count: effectiveContacts.length, label: "People" },
+                { count: waitingCount, label: "To follow up", accent: waitingCount > 0 },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Leads" },
+                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
+              ].map((m, i) => (
+                <div key={m.label} style={{ textAlign: "center", minWidth: 0, padding: "0 4px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
+                    {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
+                  </div>
+                  <div style={{ fontSize: "clamp(12px, 3.4vw, 13px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+
 
             {!contactsLoading && currentUser?.id && (
               <AutopilotCard
@@ -4328,36 +4385,6 @@ Keep it punchy, sharp, and directly actionable.`;
         {tab === "contacts" && (
           <div style={{ display: "flex", flexDirection: "column" }}>
             {/* ── PEOPLE: title, then search at the very top, filters and the full list; the numbers sit below the list ── */}
-            {/* ── AT A GLANCE: one quiet strip instead of four boxes ── */}
-            <div
-              role="group"
-              aria-label="At a glance"
-              style={{
-                order: 2, // after the list
-                display: "grid",
-                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                background: isDark ? "#1C1C1E" : "#FFFFFF",
-                border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}`,
-                borderRadius: 18,
-                padding: "14px 0",
-                marginTop: 24,
-              }}
-            >
-              {[
-                { count: effectiveContacts.length, label: "People" },
-                { count: waitingCount, label: "To follow up", accent: waitingCount > 0 },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /opportunity|client|deal|investor/i.test(t))).length, label: "Leads" },
-                { count: effectiveContacts.filter((c) => (c.tags || []).some((t: string) => /intro|referral|partner/i.test(t))).length, label: "Intros" },
-              ].map((m, i) => (
-                <div key={m.label} style={{ textAlign: "center", minWidth: 0, padding: "0 4px", borderLeft: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}>
-                  <div style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.1, minHeight: 24, display: "flex", alignItems: "center", justifyContent: "center", color: m.accent ? "#7C3AED" : themeStyles.text, fontVariantNumeric: "tabular-nums" }}>
-                    {contactsLoading ? <Skeleton w={22} h={20} r={6} /> : m.count}
-                  </div>
-                  <div style={{ fontSize: "clamp(12px, 3.4vw, 13px)", color: themeStyles.textMuted, marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.label}</div>
-                </div>
-              ))}
-            </div>
-
             {/* Split Layout Container (Left: Recent People, Right: Contact Detail Inspector) */}
             <div style={{ order: 1, display: isMobile ? "block" : "flex", gap: 24, alignItems: "flex-start" }}>
               <div style={{ flex: isMobile ? "1" : "1 1 58%", minWidth: 0 }}>
@@ -6433,77 +6460,6 @@ Keep it punchy, sharp, and directly actionable.`;
           })}
           </div>
         </nav>
-      )}
-
-      {/* ── ADD CONTACT SHEET: every way to add someone, in one place (bottom sheet on phones) ── */}
-      {addSheetOpen && screen === "app" && (
-        <div
-          onClick={() => setAddSheetOpen(false)}
-          onKeyDown={(e) => e.key === "Escape" && setAddSheetOpen(false)}
-          style={{ position: "fixed", inset: 0, zIndex: 320, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", animation: "fadeIn 0.15s ease" }}
-        >
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Add contact"
-            onClick={(e) => e.stopPropagation()}
-            className="nq-sheet-up"
-            style={{
-              width: "100%",
-              maxWidth: isMobile ? undefined : 440,
-              background: isDark ? "#1C1C1E" : "#FFFFFF",
-              borderRadius: isMobile ? "24px 24px 0 0" : 24,
-              padding: `12px 16px ${isMobile ? "calc(16px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : "16px"}`,
-              boxShadow: "0 -10px 40px rgba(0,0,0,0.18)",
-              boxSizing: "border-box",
-            }}
-          >
-            {isMobile && <div aria-hidden style={{ width: 40, height: 5, borderRadius: 3, background: isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.15)", margin: "0 auto 10px" }} />}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "0 4px 12px" }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: themeStyles.text }}>Add contact</h2>
-              <button onClick={() => setAddSheetOpen(false)} aria-label="Close" style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: isDark ? "#2C2C2E" : "#F2F2F7", color: themeStyles.textMuted, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <Icons.Close size={16} />
-              </button>
-            </div>
-            {[
-              { group: "", items: [
-                { label: "Scan a card", hint: "Point your camera at a business card", icon: Icons.Camera, primary: true, act: () => { cameraFromShortcut.current = true; setTab("scan"); setLiveCameraOpen(true); } },
-                { label: "Type it in", hint: "Name, company, email…", icon: Icons.Edit, act: () => { setTab("add"); setAddStep("form"); setScanPreview(null); setEditingContact(null); } },
-                { label: "Voice note", hint: "Say who you met — AI fills it in", icon: I.Mic, act: () => setVoiceDebriefOpen(true) },
-              ] },
-              { group: "More", items: [
-                { label: "My QR", hint: "Let someone scan your card", icon: Icons.QrCode, act: () => { setMeSection(null); setTab("me"); } },
-                { label: "Follow-ups", hint: "Email everyone waiting to hear from you", icon: I.Mail, act: () => openBulkFollowUpModal() },
-              ] },
-            ].map((g) => (
-              <section key={g.group || "add"} aria-label={g.group || "Ways to add"} style={{ marginTop: g.group ? 16 : 0 }}>
-                {g.group && <div style={{ fontSize: 15, fontWeight: 600, color: themeStyles.textMuted, margin: "0 4px 8px" }}>{g.group}</div>}
-                <div style={{ borderRadius: 18, overflow: "hidden", background: isDark ? "#2C2C2E" : "#F6F6F8" }}>
-                  {g.items.map((it, i) => (
-                    <button
-                      key={it.label}
-                      aria-label={it.label}
-                      onClick={() => {
-                        setAddSheetOpen(false);
-                        it.act();
-                      }}
-                      style={{ all: "unset", boxSizing: "border-box", width: "100%", minHeight: 64, display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", cursor: "pointer", borderTop: i ? `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)"}` : "none" }}
-                    >
-                      <span aria-hidden style={{ width: 40, height: 40, borderRadius: 12, flex: "none", display: "flex", alignItems: "center", justifyContent: "center", background: (it as any).primary ? "#7C3AED" : isDark ? "#3A3A3C" : "#FFFFFF", color: (it as any).primary ? "#FFFFFF" : "#7C3AED" }}>
-                        <it.icon size={20} color="currentColor" />
-                      </span>
-                      <span style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ display: "block", fontSize: 17, fontWeight: 600, color: themeStyles.text }}>{it.label}</span>
-                        <span style={{ display: "block", fontSize: 15, color: themeStyles.textMuted, marginTop: 1 }}>{it.hint}</span>
-                      </span>
-                      <I.ChevronLeft size={18} style={{ transform: "rotate(180deg)", color: themeStyles.textMuted }} />
-                    </button>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* ── SELECT MODE BAR: act on everyone you ticked ── */}

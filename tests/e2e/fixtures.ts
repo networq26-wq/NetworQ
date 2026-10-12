@@ -116,17 +116,17 @@ export function signOutButton(page: Page) {
 
 export const isMobileProject = () => test.info().project.name.includes("mobile");
 
-/** Today → "Add contact" sheet → one of its options (Scan a card, Type it in, Voice note, My QR, Follow-ups). */
-export async function openFromAddSheet(page: Page, option: string) {
+/** Today → one of the always-visible actions (Scan a card, Type it in, Voice note, My QR, Follow-ups). */
+export async function openQuickAction(page: Page, option: string) {
   if (isMobileProject()) await page.getByRole("button", { name: "Today", exact: true }).last().click();
   else await page.getByRole("complementary").getByRole("button", { name: /^Today/ }).click();
-  await page.getByRole("button", { name: "Add contact", exact: true }).click();
-  await page.getByRole("dialog", { name: "Add contact" }).getByRole("button", { name: option, exact: true }).click();
+  if (option === "Scan a card") await page.getByRole("button", { name: option, exact: true }).first().click();
+  else await page.getByRole("region", { name: "Quick actions" }).getByRole("button", { name: option, exact: true }).click();
 }
 
 export async function openAddContact(page: Page) {
   if (isMobileProject()) {
-    await openFromAddSheet(page, "Type it in");
+    await openQuickAction(page, "Type it in");
   } else {
     await page.getByRole("banner").getByRole("button", { name: "Add Contact" }).click();
   }

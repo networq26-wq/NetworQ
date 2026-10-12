@@ -1,4 +1,4 @@
-import { test, expect, login, openFromAddSheet, PASSWORD } from "./fixtures";
+import { test, expect, login, openQuickAction, PASSWORD } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 for (const vp of [{ name: "pixel7", width: 412, height: 915 }, { name: "small", width: 360, height: 740 }]) {
@@ -41,10 +41,10 @@ for (const vp of [{ name: "pixel7", width: 412, height: 915 }, { name: "small", 
     await nav("Events"); await shot("04-events");
     await nav("Radar"); await shot("05-radar");
     // Bottom bar is People · Messages · Radar · Events; Scan / QR / Add are People-home quick actions
-    await openFromAddSheet(page, "Scan a card"); await shot("06-scan-camera");
+    await openQuickAction(page, "Scan a card"); await shot("06-scan-camera");
     await page.getByRole("button", { name: "Close camera" }).click(); await shot("06b-scan-tab");
-    await openFromAddSheet(page, "My QR"); await shot("07-pass");
-    await openFromAddSheet(page, "Type it in"); await shot("08-add");
+    await openQuickAction(page, "My QR"); await shot("07-pass");
+    await openQuickAction(page, "Type it in"); await shot("08-add");
     await page.getByRole("button", { name: "Profile & Settings" }).click().catch(() => console.log(`NO SETTINGS ENTRY ${vp.name}`));
     await shot("09-settings");
     await nav("People");
