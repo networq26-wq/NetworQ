@@ -12,6 +12,8 @@ export interface NetworqRadarNative {
   setToken(tokenHex: string | null): void;
   stop(): void;
   openBluetoothSettings(): void;
+  /** Shows Android's "turn on Bluetooth?" dialog. Missing in app builds made before it existed. */
+  requestEnable?(): boolean;
   addListener(event: "onSightings", cb: (e: { items: Sighting[] }) => void): Subscription;
   addListener(event: "onStateChange", cb: (e: { state: NativeState }) => void): Subscription;
   addListener(event: "onError", cb: (e: { code: string; message: string }) => void): Subscription;

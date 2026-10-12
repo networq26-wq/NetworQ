@@ -26,6 +26,20 @@ async function requestPermission(): Promise<PermissionState> {
   return values.some((v) => v === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) ? "blocked" : "denied";
 }
 
+// One tap instead of a trip to Settings: Android's own "Allow NetworQ to turn on Bluetooth?" dialog.
+async function askToEnableBluetooth(): Promise<boolean> {
+  if (Platform.OS !== "android" || !NetworqRadar?.requestEnable || NetworqRadar.getState() !== "off") return false;
+  try {
+    if (Number(Platform.Version) >= 31) {
+      const res = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT);
+      if (res !== PermissionsAndroid.RESULTS.GRANTED) return false;
+    }
+    return !!NetworqRadar.requestEnable();
+  } catch {
+    return false;
+  }
+}
+
 export function useRadarBridge(webViewRef: React.RefObject<React.ElementRef<typeof WebView> | null>, allowedOrigin: string) {
   const wanted = useRef(false);
   const token = useRef<string | null>(null);
@@ -109,7 +123,7 @@ export function useRadarBridge(webViewRef: React.RefObject<React.ElementRef<type
           break;
         case "radar:openSettings":
           if (permission.current === "blocked") Linking.openSettings();
-          else NetworqRadar?.openBluetoothSettings();
+          else if (!(await askToEnableBluetooth())) NetworqRadar?.openBluetoothSettings();
           break;
       }
     },

@@ -71,6 +71,7 @@ export function useEventRadar(opts: {
   const [nativeState, setNativeState] = useState<NativeState | null>(null);
   const [permission, setPermission] = useState<PermissionState | null>(null);
   const [scanOnly, setScanOnly] = useState(false);
+  const [shellAnswered, setShellAnswered] = useState(false); // the Android app replied to "what can you do?"
   const [online, setOnline] = useState(typeof navigator === "undefined" ? true : navigator.onLine);
   const [people, setPeople] = useState<RadarPerson[]>([]);
   const [hiddenCount, setHiddenCount] = useState(0);
@@ -122,6 +123,7 @@ export function useEventRadar(opts: {
       if (!isNativeToWeb(msg)) return;
       switch (msg.type) {
         case "radar:capabilities":
+          setShellAnswered(true);
           setNativeState(msg.state);
           setPermission(startRequested || msg.permission === "granted" ? msg.permission : null);
           if (msg.state === "unsupported") setMode("web");
@@ -142,7 +144,12 @@ export function useEventRadar(opts: {
     };
     window.addEventListener(NATIVE_EVENT, handler);
     postNative({ type: "radar:capabilities" });
-    return () => window.removeEventListener(NATIVE_EVENT, handler);
+    // Keep asking: Bluetooth or the permission may be switched on or off outside the app at any moment
+    const poll = setInterval(() => document.visibilityState === "visible" && postNative({ type: "radar:capabilities" }), 4000);
+    return () => {
+      clearInterval(poll);
+      window.removeEventListener(NATIVE_EVENT, handler);
+    };
   }, []);
 
   const active = consented && !!eventId && !!saved?.radar_on;
@@ -407,6 +414,8 @@ export function useEventRadar(opts: {
     status,
     people,
     signals,
+    // Raw facts for the "Radar check" panel
+    health: { shell: hasNativeShell(), shellAnswered, nativeState, permission, online, scanOnly, active, visible },
     hiddenCount,
     settings,
     updateSettings,

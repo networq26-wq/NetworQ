@@ -449,6 +449,16 @@ export function EventRadar({
         </>
       )}
 
+      <RadarCheck
+        t={t}
+        card={card}
+        health={radar.health}
+        signals={radar.signals}
+        radarOn={!!radar.settings?.radar_on}
+        onBluetooth={radar.openBluetoothSettings}
+        onRetry={radar.retryPermissions}
+      />
+
       {scope === "events" && activeId === "__new__" && activeEvent && (
         <Sheet t={t} title="Join another event" onClose={() => setActiveId(activeEvent.id)}>
           <NoEvent
@@ -895,7 +905,7 @@ function NearbyList({
               ? "Looking for NetworQ people around you… They need Nearby on and Discoverable."
               : "Looking for attendees… Ask people near you to open Radar in NetworQ."
             : nearbyScope
-              ? "Finding people around you uses Bluetooth, so it works in the NetworQ phone app. Open NetworQ on your phone to see who's nearby."
+              ? "Finding people around you uses Bluetooth. See Radar check below for what needs fixing."
               : "No one else is active yet. Share the event code to invite people."}
         </div>
       ) : (
@@ -961,6 +971,85 @@ function PrivacyPanel({ t, card, settings, onChange, nearby }: { t: Theme; card:
       <p style={{ color: t.muted, fontSize: 13, margin: "8px 0 0" }}>
         Your phone broadcasts a random ID that changes every 15 minutes. Your location is never collected.
       </p>
+    </section>
+  );
+}
+
+// "Radar check": the app says plainly what is working and what isn't — app, Bluetooth, permission, internet,
+// visibility and how many NetworQ phones it can hear — with the fix next to anything that's wrong.
+type RadarHealth = ReturnType<typeof useEventRadar>["health"];
+function RadarCheck({ t, card, health, signals, radarOn, onBluetooth, onRetry }: { t: Theme; card: React.CSSProperties; health: RadarHealth; signals: number; radarOn: boolean; onBluetooth: () => void; onRetry: () => void }) {
+  const h = health;
+  const link = typeof navigator !== "undefined" ? (navigator as any).connection?.type : undefined;
+  const via = link === "wifi" ? " (Wi-Fi)" : link === "cellular" ? " (mobile data)" : "";
+  const engineOk = h.shell && h.shellAnswered && h.nativeState !== "unsupported";
+  type Row = { id: string; label: string; state: "ok" | "bad" | "wait"; text: string; fix?: { label: string; run: () => void } };
+  const rows: Row[] = [
+    h.shell
+      ? { id: "app", label: "NetworQ app", state: "ok", text: "You're in the Android app." }
+      : { id: "app", label: "NetworQ app", state: "bad", text: "You're in a browser. Finding people by Bluetooth only works in the NetworQ Android app." },
+  ];
+  if (h.shell) {
+    rows.push(
+      !h.shellAnswered
+        ? { id: "engine", label: "Radar in this app", state: "wait", text: "Checking\u2026" }
+        : h.nativeState === "unsupported"
+          ? { id: "engine", label: "Radar in this app", state: "bad", text: "This phone, or this version of the app, can't use Bluetooth Radar. Install the latest NetworQ app." }
+          : { id: "engine", label: "Radar in this app", state: "ok", text: "Ready." }
+    );
+    if (engineOk) {
+      rows.push(
+        h.nativeState === "off"
+          ? { id: "bt", label: "Bluetooth", state: "bad", text: "Bluetooth is off. Radar can't find anyone without it.", fix: { label: "Turn on", run: onBluetooth } }
+          : { id: "bt", label: "Bluetooth", state: "ok", text: "On." }
+      );
+      rows.push(
+        h.permission === "blocked"
+          ? { id: "perm", label: "Nearby devices permission", state: "bad", text: "Blocked in the phone's settings.", fix: { label: "Open Settings", run: onBluetooth } }
+          : h.permission === "denied" || h.nativeState === "unauthorized"
+            ? { id: "perm", label: "Nearby devices permission", state: "bad", text: "Not allowed yet.", fix: { label: "Allow", run: onRetry } }
+            : h.permission === "granted"
+              ? { id: "perm", label: "Nearby devices permission", state: "ok", text: "Allowed." }
+              : { id: "perm", label: "Nearby devices permission", state: "wait", text: "Your phone asks when Radar turns on." }
+      );
+    }
+  }
+  rows.push(h.online ? { id: "net", label: "Internet", state: "ok", text: `Connected${via}.` } : { id: "net", label: "Internet", state: "bad", text: "Offline. Radar needs internet to show who people are." });
+  rows.push(radarOn ? { id: "radar", label: "Radar", state: h.active ? "ok" : "wait", text: h.active ? "On." : "Waiting for you to agree to the permissions." } : { id: "radar", label: "Radar", state: "wait", text: "Off." });
+  if (engineOk && h.active) {
+    rows.push(
+      !h.visible
+        ? { id: "vis", label: "Others can find you", state: "wait", text: "No, you're hidden." }
+        : h.scanOnly || h.nativeState === "no_advertiser"
+          ? { id: "vis", label: "Others can find you", state: "bad", text: "This phone can't broadcast over Bluetooth, so others won't see it." }
+          : { id: "vis", label: "Others can find you", state: "ok", text: "Yes, while the app is open." }
+    );
+    if (h.nativeState !== "off") rows.push({ id: "heard", label: "NetworQ phones in range", state: signals > 0 ? "ok" : "wait", text: signals > 0 ? `${signals} right now.` : "None yet." });
+  }
+  const dot = { ok: "#1F8A3B", bad: "#D70015", wait: t.muted } as const;
+  const problems = rows.filter((r) => r.state === "bad").length;
+  return (
+    <section style={card} aria-label="Radar check">
+      <h3 style={{ margin: "0 0 2px", fontSize: 16 }}>Radar check</h3>
+      <div style={{ color: t.muted, fontSize: 15, marginBottom: 8 }}>{problems ? `${problems} thing${problems === 1 ? "" : "s"} to fix` : "Nothing to fix"}</div>
+      <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+        {rows.map((r, i) => (
+          <li key={r.id} data-state={r.state} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: i ? `1px solid ${t.border}` : "none", minHeight: 44 }}>
+            <span aria-hidden style={{ width: 24, height: 24, borderRadius: 12, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#FFFFFF", fontSize: 15, fontWeight: 700, background: dot[r.state] }}>
+              {r.state === "ok" ? <I.Check size={14} strokeWidth={3} /> : r.state === "bad" ? "!" : ""}
+            </span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 15, fontWeight: 600 }}>{r.label}</span>
+              <span style={{ display: "block", fontSize: 15, color: r.state === "bad" ? (t.text) : t.muted, lineHeight: 1.4 }}>{r.text}</span>
+            </span>
+            {r.fix && (
+              <button style={{ ...btn(t, "primary"), minHeight: 44, flexShrink: 0 }} onClick={r.fix.run}>
+                {r.fix.label}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

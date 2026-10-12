@@ -78,6 +78,18 @@ class NetworqRadarModule : Module() {
 
     Function("stop") { stopInternal() }
 
+    // Android's own one-tap "Allow NetworQ to turn on Bluetooth?" dialog — the closest an app may get to
+    // switching Bluetooth on (apps can't do it silently). False = couldn't show it; the caller opens Settings.
+    Function("requestEnable") {
+      val activity = appContext.currentActivity ?: return@Function false
+      try {
+        activity.startActivity(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
+        true
+      } catch (e: Exception) {
+        false
+      }
+    }
+
     Function("openBluetoothSettings") {
       val intent = Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
       context.startActivity(intent)

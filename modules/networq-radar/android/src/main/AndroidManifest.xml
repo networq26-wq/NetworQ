@@ -2,6 +2,8 @@
   <!-- Android 12+: nearby-device permissions; never used to derive location -->
   <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" />
   <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+  <!-- Only to show the system "turn on Bluetooth?" dialog; NetworQ never connects to other devices -->
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
   <!-- Android 11 and below -->
   <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
   <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />

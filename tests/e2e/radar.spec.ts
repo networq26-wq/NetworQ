@@ -392,6 +392,51 @@ test.describe("Event Radar", () => {
     expect(await page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type))).not.toContain("radar:start");
   });
 
+  test("Radar check says what works and what doesn't: Bluetooth off → one tap to fix; then on", async ({ page, db }) => {
+    seed(db);
+    await installFakeShell(page, { state: "off", permission: "granted" });
+    await login(page, "asha@acme.test");
+    await openRadar(page);
+    await page.getByRole("tab", { name: "Nearby" }).click();
+    const check = page.getByRole("region", { name: "Radar check" });
+    const row = (label: string) => check.getByRole("listitem").filter({ hasText: label });
+    await expect(row("NetworQ app")).toContainText("You're in the Android app.");
+    await expect(row("Radar in this app")).toContainText("Ready.");
+    await expect(row("Bluetooth")).toContainText("Bluetooth is off"); // known before Radar is even turned on
+    await expect(row("Bluetooth")).toHaveAttribute("data-state", "bad");
+    await expect(row("Internet")).toContainText("Connected");
+    await expect(check.getByText("1 thing to fix")).toBeVisible();
+    await row("Bluetooth").getByRole("button", { name: "Turn on" }).click();
+    expect(await page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type))).toContain("radar:openSettings");
+
+    // the person switches Bluetooth on outside the app → the check notices by itself
+    await page.evaluate(() => ((window as any).__shell.state = "on"));
+    await expect(row("Bluetooth")).toContainText("On.", { timeout: 8000 });
+    await expect(check.getByText("Nothing to fix")).toBeVisible();
+
+    await page.getByRole("button", { name: "Turn on Nearby" }).click();
+    await expect(row("Nearby devices permission")).toContainText("Allowed.");
+    await expect(row("Others can find you")).toContainText("Yes, while the app is open.");
+    await expect(row("NetworQ phones in range")).toContainText("None yet.");
+  });
+
+  test("Radar check: in a browser, or in an app without Radar, it says so instead of showing an empty list", async ({ browser, db }) => {
+    seed(db);
+    const web = await newPage(browser, db, "none");
+    await login(web.page, "asha@acme.test");
+    await openRadar(web.page);
+    await expect(web.page.getByRole("region", { name: "Radar check" }).getByText(/You're in a browser/)).toBeVisible();
+
+    const old = await newPage(browser, db, { state: "unsupported", permission: "denied" });
+    await login(old.page, "bob@acme.test");
+    await openRadar(old.page);
+    const check = old.page.getByRole("region", { name: "Radar check" });
+    await expect(check.getByText("You're in the Android app.")).toBeVisible();
+    await expect(check.getByText(/can't use Bluetooth Radar. Install the latest NetworQ app/)).toBeVisible();
+    await web.ctx.close();
+    await old.ctx.close();
+  });
+
   test("wrong event code gives a clear error", async ({ page, db }) => {
     seed(db);
     await installFakeShell(page);
