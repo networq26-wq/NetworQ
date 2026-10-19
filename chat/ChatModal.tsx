@@ -3,6 +3,7 @@ import { I } from "../ui/icons";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createChatApi, type ChatMessage } from "./chatApi";
 import { placeCall } from "../calls/CallLayer";
+import { ReportSheet } from "../ui/ReportSheet";
 
 export function ChatModal({
   open,
@@ -37,6 +38,16 @@ export function ChatModal({
   const [chatId, setChatId] = useState<string | null>(null);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  // Safety: report a message or person, block a person (Google Play UGC policy)
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reporting, setReporting] = useState<null | { kind: "message" | "user"; userId: string; name: string; messageId?: string; content?: string }>(null);
+  const blockPerson = async (userId: string, name: string) => {
+    if (!window.confirm(`Block ${name}? They won't be able to message or call you, or see you on Radar.`)) return;
+    const { error } = await supabase.rpc("block_user", { p_user: userId });
+    if (error) return showToast("Couldn't block. Try again.", "error");
+    showToast(`${name} is blocked.`, "success");
+    onClose();
+  };
 
   const chatApi = useRef(createChatApi(supabase)).current;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -292,6 +303,29 @@ export function ChatModal({
             </div>
           )}
 
+          {partner && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="More options"
+                aria-expanded={menuOpen}
+                style={{ width: 44, height: 44, borderRadius: 22, border: "none", background: "transparent", color: isDark ? "#D1D5DB" : "#4B5563", cursor: "pointer", fontSize: 22, lineHeight: 1 }}
+              >
+                ⋯
+              </button>
+              {menuOpen && (
+                <div role="menu" style={{ position: "absolute", right: 0, top: 48, zIndex: 20, minWidth: 220, borderRadius: 16, padding: 6, background: isDark ? "#2C2C2E" : "#FFFFFF", boxShadow: "0 12px 32px rgba(0,0,0,0.25)" }}>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); setReporting({ kind: "user", userId: partner.id, name: partner.name || "this person" }); }} style={{ display: "block", width: "100%", minHeight: 44, textAlign: "left", padding: "0 12px", border: "none", borderRadius: 10, background: "transparent", color: isDark ? "#FFFFFF" : "#1C1C1E", fontSize: 16, cursor: "pointer" }}>
+                    Report {partner.name || "this person"}
+                  </button>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); blockPerson(partner.id, partner.name || "this person"); }} style={{ display: "block", width: "100%", minHeight: 44, textAlign: "left", padding: "0 12px", border: "none", borderRadius: 10, background: "transparent", color: isDark ? "#FF6961" : "#D70015", fontSize: 16, cursor: "pointer" }}>
+                    Block {partner.name || "this person"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <button
             onClick={onClose}
             aria-label="Close chat"
@@ -382,6 +416,15 @@ export function ChatModal({
                       <span>
                         {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
+                      {!isMine && (
+                        <button
+                          onClick={() => setReporting({ kind: "message", userId: m.sender_id, name: partner?.name || "this person", messageId: m.id, content: m.content || m.attachment_name || "" })}
+                          aria-label="Report this message"
+                          style={{ border: "none", background: "transparent", color: "inherit", fontSize: 12, textDecoration: "underline", cursor: "pointer", padding: "0 0 0 6px", minHeight: 24 }}
+                        >
+                          Report
+                        </button>
+                      )}
                       {isMine && (
                         <span aria-label={m.status === "read" ? "Read" : "Sent"} style={{ display: "inline-flex" }}><I.Check size={12} strokeWidth={2.4} />{m.status === "read" && <I.Check size={12} strokeWidth={2.4} style={{ marginLeft: -7 }} />}</span>
                       )}
@@ -390,6 +433,25 @@ export function ChatModal({
                 </div>
               );
             })
+          )}
+
+          {reporting && (
+            <ReportSheet
+              supabase={supabase}
+              isDark={isDark}
+              kind={reporting.kind}
+              subject={reporting.kind === "message" ? "this message" : reporting.name}
+              targetUser={reporting.userId}
+              targetName={reporting.name}
+              messageId={reporting.messageId}
+              content={reporting.content}
+              onClose={() => setReporting(null)}
+              onDone={({ blocked }) => {
+                setReporting(null);
+                showToast(blocked ? `Report sent and ${reporting.name} is blocked.` : "Report sent. Thank you — we'll review it.", "success");
+                if (blocked) onClose();
+              }}
+            />
           )}
 
           {partnerTyping && (

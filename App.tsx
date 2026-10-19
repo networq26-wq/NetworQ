@@ -30,6 +30,7 @@ import { GroupCallLayer, startGroupCall, openGroupCall } from "./calls/GroupCall
 import { useVoiceRecorder } from "./voice/useVoiceRecorder";
 import { NetworkingDaySummaryModal } from "./crm/NetworkingDaySummaryModal";
 import { GlobalSearchModal } from "./search/GlobalSearchModal";
+import { ReportSheet } from "./ui/ReportSheet";
 import { LazyVoiceDebriefModal } from "./scanner/LazyVoiceDebriefModal";
 import { NfcWriterModal } from "./pass/NfcWriterModal";
 import { ExportContactsModal } from "./crm/ExportContactsModal";
@@ -85,7 +86,8 @@ function successFeedback() {
 
 // "Today", "Yesterday", "In 3 days", "12 Sep" — for real dates on a contact
 function relativeDay(value: string): string {
-  const d = new Date(value);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || "");
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(value);
   if (isNaN(d.getTime())) return "—";
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((day(d) - day(new Date())) / 86400000);
@@ -1289,6 +1291,7 @@ function NetworQApp() {
   const [introTargetContact, setIntroTargetContact] = useState<any | null>(null);
   const [daySummaryOpen, setDaySummaryOpen] = useState(false);
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  const [aiReport, setAiReport] = useState<string | null>(null); // AI answer being reported (Play AI-content policy)
   const [voiceDebriefOpen, setVoiceDebriefOpen] = useState(false);
   const [nfcWriterOpen, setNfcWriterOpen] = useState(false);
   const [exportContactsOpen, setExportContactsOpen] = useState(false);
@@ -1313,7 +1316,7 @@ function NetworQApp() {
   const [aiMessages, setAiMessages] = useState<Array<{ role: "user" | "assistant"; content: string; time?: string }>>([
     {
       role: "assistant",
-      content: "Hello! I am your NetworQ Voice & AI Assistant. Ask me anything about your contacts, reminders, and follow-up emails, or tap the microphone to speak.",
+      content: "Hi! Ask me about your contacts, reminders and follow-ups, or tap the mic to speak.",
       time: "Just now",
     },
   ]);
@@ -1764,6 +1767,13 @@ VOICE & ASSISTANT DIRECTIVES:
   const [aiPillHidden, setAiPillHidden] = useState(false);
   // …and steps aside entirely while any sheet, picker or pop-up is open, so it never covers what you're tapping
   const [overlayOpen, setOverlayOpen] = useState(false);
+  // Shows "Ask AI" for a few seconds on each screen, then shrinks to a small round button so it covers less
+  const [aiPillCompact, setAiPillCompact] = useState(false);
+  useEffect(() => {
+    setAiPillCompact(false);
+    const t = setTimeout(() => setAiPillCompact(true), 3500);
+    return () => clearTimeout(t);
+  }, [tab]);
   useEffect(() => {
     let raf = 0;
     const check = () => {
@@ -3571,10 +3581,9 @@ Keep it punchy, sharp, and directly actionable.`;
                 Create Account
               </span>
             </div>
-            <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, color: themeStyles.textMuted }}>
-              <a href="/privacy" style={{ color: themeStyles.textMuted }}>Privacy</a>
-              {" · "}
-              <a href="/terms" style={{ color: themeStyles.textMuted }}>Terms</a>
+            <div style={{ textAlign: "center", marginTop: 14, fontSize: 13, lineHeight: 1.5, color: themeStyles.textMuted }}>
+              By continuing, you agree to NetworQ's <a href="/terms" style={{ color: themeStyles.textMuted, fontWeight: 600 }}>Terms</a> and{" "}
+              <a href="/privacy" style={{ color: themeStyles.textMuted, fontWeight: 600 }}>Privacy Policy</a>.
             </div>
           </div>
         </div>
@@ -3616,9 +3625,16 @@ Keep it punchy, sharp, and directly actionable.`;
         </button>
       </div>
     );
+    // Play's user-generated content policy: people accept the terms before they can create content
+    const agree = (
+      <p style={{ margin: "14px 0 0", fontSize: 13, lineHeight: 1.5, color: themeStyles.textMuted, textAlign: "center" }}>
+        By continuing, you agree to NetworQ's <a href="/terms" style={{ color: "inherit", fontWeight: 600 }}>Terms</a> and{" "}
+        <a href="/privacy" style={{ color: "inherit", fontWeight: 600 }}>Privacy Policy</a>, including no spam, harassment or offensive content.
+      </p>
+    );
     if (signupStep === 1)
       return renderStep({
-        step: 1, total: 4, title: "What's your email?", sub: "You'll use it to sign in.", primary: "Continue", onPrimary: next, onBack: back, footer: toLogin,
+        step: 1, total: 4, title: "What's your email?", sub: "You'll use it to sign in.", primary: "Continue", onPrimary: next, onBack: back, footer: <>{agree}{toLogin}</>,
         body: (
           <>
             {GOOGLE_SIGNIN_AVAILABLE && (
@@ -4252,7 +4268,7 @@ Keep it punchy, sharp, and directly actionable.`;
             style={{
               flex: 1,
               paddingTop: isMobile ? 16 : 28,
-              paddingBottom: isMobile ? "calc(180px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 110, // room for the tab bar + floating AI button
+              paddingBottom: isMobile ? "calc(110px + var(--safe-bottom, env(safe-area-inset-bottom, 0px)))" : 110, // room for the tab bar (phones) / the Ask AI pill (desktop)
               paddingLeft: isMobile ? "max(16px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 16px))" : "36px",
               paddingRight: isMobile ? "max(16px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 16px))" : "36px",
               // One column for every tab: 960px of content (+ 36px padding each side), centred
@@ -4436,7 +4452,7 @@ Keep it punchy, sharp, and directly actionable.`;
                       People
                     </h1>
                     <div style={{ color: themeStyles.textMuted, fontSize: 15, marginTop: 2 }}>
-                      {effectiveContacts.length} connection{effectiveContacts.length === 1 ? "" : "s"} · Connection Health: <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong>
+                      {effectiveContacts.length} {effectiveContacts.length === 1 ? "person" : "people"} <span style={{ whiteSpace: "nowrap" }}>· Network health <strong style={{ color: isDark ? "#A78BFA" : "#7C3AED" }}>{momentumScore}/100</strong></span>
                     </div>
                   </div>
                   {!contactsLoading && filtered.length > 0 && (
@@ -4621,7 +4637,7 @@ Keep it punchy, sharp, and directly actionable.`;
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <Icons.Bell size={16} color="#F59E0B" />
                     <span style={{ fontWeight: 700, fontSize: 15, color: isDark ? "#fbbf24" : "#b45309" }}>
-                      {dueReminders.length} reminder{dueReminders.length > 1 ? "s" : ""} scheduled for today
+                      {dueReminders.length} follow-up{dueReminders.length > 1 ? "s" : ""} due
                     </span>
                     <span style={{ fontSize: 13, color: isDark ? "#fcd34d" : "#d97706" }}>
                       {dueReminders.filter((c) => c.reminderDate < today).length > 0 &&
@@ -4653,24 +4669,12 @@ Keep it punchy, sharp, and directly actionable.`;
                           onClick={() => setModal(c)}
                         >
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: 15, color: themeStyles.text }}>{c.name}</div>
-                            <div style={{ fontSize: 13, color: themeStyles.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {c.reminder}
+                            <div style={{ fontWeight: 700, fontSize: 15, color: themeStyles.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                            <div style={{ fontSize: 13, color: overdue ? (isDark ? "#FF6961" : "#D70015") : (isDark ? "#FFB340" : "#B25000"), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {c.reminder || "Follow up"} · {overdue ? `overdue, ${relativeDay(c.reminderDate).toLowerCase()}` : "due today"}
                             </div>
                           </div>
-                          <span
-                            style={{
-                              display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                              background: overdue ? "rgba(239, 68, 68, 0.15)" : "rgba(245, 158, 11, 0.15)",
-                              color: overdue ? "#ef4444" : "#f59e0b",
-                              borderRadius: 6,
-                              padding: "3px 8px",
-                              fontSize: 13,
-                              fontWeight: 700,
-                            }}
-                          >
-                            {overdue ? `Overdue · ${c.reminderDate}` : "Due today"}
-                          </span>
+
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -6068,18 +6072,11 @@ Keep it punchy, sharp, and directly actionable.`;
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 4 }}>
-                  <img
-                    src="/illustrations/Split-Pages/Split-Pages-1.svg"
-                    alt="Briefing illustration"
-                    style={{
-                      width: 58,
-                      height: 28,
-                      objectFit: "contain",
-                      filter: isDark ? "invert(0.85) hue-rotate(180deg) brightness(0.9)" : "none",
-                    }}
-                  />
-                  <div style={{ fontSize: 13, color: themeStyles.textMuted }}>
-                    Generate structured talking points, past interaction history, and relationship notes.
+                  <span aria-hidden style={{ width: 36, height: 36, borderRadius: 18, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: isDark ? "rgba(167,139,250,0.16)" : "rgba(124,58,237,0.1)", color: isDark ? "#C4B5FD" : "#7C3AED" }}>
+                    <Icons.Sparkles size={18} color="currentColor" />
+                  </span>
+                  <div style={{ fontSize: 15, color: themeStyles.textMuted, lineHeight: 1.4 }}>
+                    Talking points and what you know about them, ready before you meet.
                   </div>
                 </div>
               )}
@@ -6141,7 +6138,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 <div>
                   <span style={{ fontSize: 12, fontWeight: 700, color: "#f59e0b" }}>Reminder</span>
                   <div style={{ marginTop: 2, fontSize: 15 }}>
-                    {modal.reminder} {modal.reminderDate && <span style={{ color: themeStyles.textMuted }}>· {modal.reminderDate}</span>}
+                    {modal.reminder} {modal.reminderDate && <span style={{ color: themeStyles.textMuted }}>· {relativeDay(modal.reminderDate)}</span>}
                   </div>
                 </div>
                 <div
@@ -6397,17 +6394,27 @@ Keep it punchy, sharp, and directly actionable.`;
 
       {/* ── IPHONE FLOATING CURVED GLASS DOCK ── */}
       {isMobile && (
-        <nav
-          aria-label="Main navigation"
+        // The tab bar and the AI button share one row, so the AI button never sits on top of the page
+        <div
           style={{
             position: "fixed",
             bottom: "calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 12px)",
             left: "max(14px, calc(var(--safe-left, env(safe-area-inset-left, 0px)) + 14px))",
             right: "max(14px, calc(var(--safe-right, env(safe-area-inset-right, 0px)) + 14px))",
-            maxWidth: 440,
+            maxWidth: 512,
             margin: "0 auto",
-            height: 64,
             zIndex: 200,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+        <nav
+          aria-label="Main navigation"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            height: 64,
             borderRadius: 36,
             background: isDark ? "rgba(22, 22, 28, 0.96)" : "rgba(255, 255, 255, 0.97)",
             backdropFilter: "blur(24px) saturate(180%)",
@@ -6493,6 +6500,18 @@ Keep it punchy, sharp, and directly actionable.`;
           })}
           </div>
         </nav>
+        {screen === "app" && !aiOpen && (
+          <button
+            onClick={() => setAiOpen(true)}
+            title="AI Assistant"
+            aria-label="AI Assistant"
+            className="btn-press"
+            style={{ width: 56, height: 56, flexShrink: 0, borderRadius: 28, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #7C3AED, #4B3BEA)", boxShadow: "0 10px 24px rgba(76, 59, 234, 0.4)" }}
+          >
+            <Icons.Sparkles size={24} color="#FFFFFF" />
+          </button>
+        )}
+        </div>
       )}
 
       {/* ── SELECT MODE BAR: act on everyone you ticked ── */}
@@ -6726,7 +6745,7 @@ Keep it punchy, sharp, and directly actionable.`;
       {/* ── NETWORQ AI & VOICE ASSISTANT (NetworQ Intelligence) ── */}
       {/* "Ask AI" pill at the bottom. It slides away while you scroll down (so it never sits on what you're reading)
           and comes back when you scroll up, stop, or reach the top. */}
-      {screen === "app" && !aiOpen && !liveCameraOpen && !globalSearchOpen && !modal && !composer && !overlayOpen && (
+      {!isMobile && screen === "app" && !aiOpen && !liveCameraOpen && !globalSearchOpen && !modal && !composer && !overlayOpen && (
         <button
           onClick={() => setAiOpen(true)}
           onFocus={() => setAiPillHidden(false)}
@@ -6742,7 +6761,8 @@ Keep it punchy, sharp, and directly actionable.`;
             justifyContent: "center",
             gap: 8,
             height: 44,
-            padding: "0 16px 0 14px",
+            minWidth: 44,
+            padding: aiPillCompact ? 0 : "0 16px 0 14px",
             borderRadius: 22,
             background: "linear-gradient(135deg, #7C3AED, #4B3BEA)",
             color: "#FFFFFF",
@@ -6758,8 +6778,20 @@ Keep it punchy, sharp, and directly actionable.`;
           }}
         >
           <Icons.Sparkles size={18} color="#FFFFFF" />
-          <span aria-hidden>Ask AI</span>
+          {!aiPillCompact && <span aria-hidden>Ask AI</span>}
         </button>
+      )}
+
+      {aiReport !== null && (
+        <ReportSheet
+          supabase={supabase}
+          isDark={isDark}
+          kind="ai"
+          subject="this AI answer"
+          content={aiReport}
+          onClose={() => setAiReport(null)}
+          onDone={() => { setAiReport(null); showToast("Report sent. Thank you — it helps us make the AI safer.", "success"); }}
+        />
       )}
 
       {/* Floating Assistant Window */}
@@ -6826,21 +6858,9 @@ Keep it punchy, sharp, and directly actionable.`;
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{ fontSize: 15, fontWeight: 700, color: themeStyles.text }}>NetworQ Assistant</span>
-                  <span
-                    style={{
-                      display: "inline-flex", alignItems: "center", justifyContent: "center", lineHeight: 1.2, whiteSpace: "nowrap", flexShrink: 0,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: isDark ? "#A78BFA" : "#7C3AED",
-                      background: isDark ? "rgba(167, 139, 250, 0.12)" : "rgba(124, 58, 237, 0.08)",
-                      padding: "1px 6px",
-                      borderRadius: 980,
-                    }}
-                  >
-                    AI Active
-                  </span>
+                  
                 </div>
-                <div style={{ fontSize: 13, color: themeStyles.textMuted }}>Voice & Intelligence Engine</div>
+                <div style={{ fontSize: 13, color: themeStyles.textMuted }}>Ask about your contacts</div>
               </div>
             </div>
 
@@ -6951,7 +6971,7 @@ Keep it punchy, sharp, and directly actionable.`;
             {/* Quick Action Suggestion Chips */}
             <div style={{ marginBottom: 4 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: themeStyles.textMuted, marginBottom: 8 }}>
-                Suggested Prompts:
+                Try asking
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {[
@@ -7064,6 +7084,15 @@ Keep it punchy, sharp, and directly actionable.`;
                         {isSpeakingReply ? "■ Stop" : "▶ Listen"}
                       </button>
                     )}
+                    {idx > 0 && (
+                      <button
+                        onClick={() => setAiReport(m.content)}
+                        aria-label="Report this AI answer"
+                        style={{ background: "none", border: "none", color: themeStyles.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}
+                      >
+                        Report
+                      </button>
+                    )}
                     {m.time && <span style={{ fontSize: 12, color: themeStyles.textMuted }}>{m.time}</span>}
                   </div>
                 )}
@@ -7166,7 +7195,7 @@ Keep it punchy, sharp, and directly actionable.`;
                 borderRadius: 10,
                 border: isDark ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(0, 0, 0, 0.12)",
               }}
-              placeholder="Ask anything about contacts or tap mic…"
+              placeholder="Ask about your contacts…"
               value={aiInput}
               onChange={(e) => setAiInput(e.target.value)}
               onKeyDown={(e) => {

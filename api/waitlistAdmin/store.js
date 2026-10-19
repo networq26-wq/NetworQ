@@ -60,11 +60,23 @@ function createSupabaseStore(sb) {
     async listAudit(limit = 200) {
       return must(await sb.from("admin_audit").select("*").order("created_at", { ascending: false }).limit(limit));
     },
+    // Safety: reports of messages, people and AI answers (content_reports), with names for both sides
+    async listReports(limit = 300) {
+      const rows = must(await sb.from("content_reports").select("*").order("created_at", { ascending: false }).limit(limit));
+      const ids = [...new Set(rows.flatMap((r) => [r.reporter, r.target_user]).filter(Boolean))];
+      const names = new Map();
+      if (ids.length) for (const p of must(await sb.from("profiles").select("id, name").in("id", ids))) names.set(p.id, p.name);
+      return rows.map((r) => ({ ...r, reporter_name: names.get(r.reporter) || null, target_name: names.get(r.target_user) || null }));
+    },
+    async updateReport(id, patch) {
+      const allowed = Object.fromEntries(Object.entries(patch).filter(([k]) => ["status", "admin_note", "handled_by", "handled_at"].includes(k)));
+      return must(await sb.from("content_reports").update(allowed).eq("id", id).select("id").maybeSingle());
+    },
   };
 }
 
-function createMemoryStore({ signups = [], admins = [], stats = {}, users = [] } = {}) {
-  const s = { signups: signups.map((r) => ({ tags: [], status: "waiting", ...r })), admins: [...admins], auditLog: [], stats, users };
+function createMemoryStore({ signups = [], admins = [], stats = {}, users = [], reports = [] } = {}) {
+  const s = { signups: signups.map((r) => ({ tags: [], status: "waiting", ...r })), admins: [...admins], auditLog: [], stats, users, reports: reports.map((r) => ({ status: "open", ...r })) };
   return {
     _state: s,
     async listSignups() {
@@ -122,6 +134,15 @@ function createMemoryStore({ signups = [], admins = [], stats = {}, users = [] }
     },
     async listAudit(limit = 200) {
       return s.auditLog.slice(0, limit);
+    },
+    async listReports(limit = 300) {
+      return [...s.reports].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, limit);
+    },
+    async updateReport(id, patch) {
+      const r = s.reports.find((x) => x.id === id);
+      if (!r) return null;
+      for (const k of ["status", "admin_note", "handled_by", "handled_at"]) if (k in patch) r[k] = patch[k];
+      return { id };
     },
   };
 }

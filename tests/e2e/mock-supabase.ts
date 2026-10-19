@@ -151,7 +151,30 @@ export class MockSupabase {
   private rpc(fn: string, a: any, uid: string): unknown {
     switch (fn) {
       case "my_direct_chats":
-        return []; // 1:1 chats aren't modelled here — an empty inbox, like a new account
+        return []; // the inbox list isn't modelled here — an empty inbox, like a new account
+      // Minimal 1:1 chat: enough to open a conversation, see messages, report and block
+      case "get_or_create_direct_chat": {
+        const pair = [uid, a.p_other_user_id].sort().join(":");
+        let chat = this.table("chats").find((c) => c.pair === pair);
+        if (!chat) this.table("chats").push((chat = { id: randomUUID(), pair }));
+        return chat.id;
+      }
+      case "send_chat_message": {
+        const pair = [uid, a.p_recipient_id].sort().join(":");
+        const chat = this.table("chats").find((c) => c.pair === pair);
+        if (this.blocks.some((x) => (x.blocker === uid && x.blocked === a.p_recipient_id) || (x.blocker === a.p_recipient_id && x.blocked === uid))) throw new RpcError("blocked");
+        const m = { id: randomUUID(), chat_id: chat?.id || null, sender_id: uid, recipient_id: a.p_recipient_id, content: a.p_content, status: "sent", created_at: new Date().toISOString() };
+        this.table("chat_messages").push(m);
+        return m;
+      }
+      case "mark_chat_read":
+        return null;
+      case "report_content": {
+        if (a.p_target_user === uid) throw new RpcError("cannot_report_self");
+        const r = { id: randomUUID(), reporter: uid, kind: a.p_kind, reason: a.p_reason, target_user: a.p_target_user ?? null, message_id: a.p_message_id ?? null, details: a.p_details ?? null, content: a.p_content ?? null, status: "open", created_at: new Date().toISOString() };
+        this.table("content_reports").push(r);
+        return r.id;
+      }
       case "set_autopilot": {
         const prof = this.table("profiles").find((r) => r.id === uid)!;
         prof.autopilot_enabled = !!a.p_enabled;
@@ -468,7 +491,12 @@ export class MockSupabase {
 
     // RLS: callers only ever see their own rows
     const SHARED_READ = ["public_events"];
-    const visible = () => (SHARED_READ.includes(table) ? this.table(table) : this.table(table).filter((r) => r[ownerCol] === user.id));
+    const visible = () =>
+      SHARED_READ.includes(table)
+        ? this.table(table)
+        : table === "chat_messages" // the two people in a chat both see its messages
+          ? this.table(table).filter((r) => r.sender_id === user.id || r.recipient_id === user.id)
+          : this.table(table).filter((r) => r[ownerCol] === user.id);
     const matches = (row: Row) => {
       for (const [key, raw] of url.searchParams) {
         if (["select", "order", "limit", "offset", "on_conflict", "columns"].includes(key)) continue;

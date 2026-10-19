@@ -25,7 +25,7 @@ test.describe("Assistant voice", () => {
     await page.getByRole("button", { name: "AI Assistant" }).or(page.getByRole("button", { name: /AI & Voice/ })).first().click();
     await page.getByText("Listen").first().click();
     await expect.poll(() => page.evaluate(() => (window as any).__played.length)).toBe(2);
-    expect(ttsBody.text).toMatch(/NetworQ/);
+    expect(ttsBody.text).toMatch(/Ask me about your contacts/);
   });
 
   test("without the server voice, the device's female voice is used (not a male/robotic default)", async ({ page }) => {

@@ -288,11 +288,11 @@ export function EventsHub({
 
           {/* When: one calm segmented control + a calendar for any exact day */}
           <div style={{ display: "flex", gap: 8 }}>
-            <div role="group" aria-label="Filter by date" style={{ flex: 1, display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", background: t.raised, borderRadius: 14, padding: 3, gap: 2 }}>
+            <div role="group" aria-label="Filter by date" style={{ flex: 1, minWidth: 0, display: "flex", background: t.raised, borderRadius: 14, padding: 3, gap: 2 }}>
               {(["Any time", "Today", "This weekend", "This week"] as const).map((d) => {
                 const on = dateFilter === d;
                 return (
-                  <button key={d} onClick={() => setDateFilter(d)} aria-pressed={on} style={{ minHeight: 44, borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", background: on ? t.surface : "transparent", color: on ? t.text : t.muted, boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "background 0.15s ease, color 0.15s ease" }}>
+                  <button key={d} onClick={() => setDateFilter(d)} aria-pressed={on} style={{ flex: "1 1 auto", padding: "0 8px", minWidth: 48, minHeight: 44, borderRadius: 12, border: "none", fontSize: 15, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", background: on ? t.surface : "transparent", color: on ? t.text : t.muted, boxShadow: on ? "0 1px 3px rgba(0,0,0,0.12)" : "none", transition: "background 0.15s ease, color 0.15s ease" }}>
                     {d === "Any time" ? "All" : d === "This weekend" ? "Weekend" : d}
                   </button>
                 );

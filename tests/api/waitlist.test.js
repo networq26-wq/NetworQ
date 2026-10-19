@@ -313,6 +313,34 @@ test("reports, app, health and activity pages render real numbers", async () => 
   });
 });
 
+test("Safety: open reports are listed (escaped), resolved with a note, logged, and hidden from the open list", async () => {
+  await withAdmin(async ({ base, store, form, loginAs, get }) => {
+    store._state.reports.push(
+      { id: uuid(91), kind: "message", reason: "harassment", status: "open", content: "<img src=x onerror=alert(1)> you are useless", reporter_name: "Asha Rao", target_name: "Bob Iyer", created_at: new Date().toISOString() },
+      { id: uuid(92), kind: "ai", reason: "harmful", status: "open", content: "bad AI answer", reporter_name: "Asha Rao", created_at: new Date(Date.now() - 60e3).toISOString() }
+    );
+    assert.equal((await get("/admin/safety")).status, 401, "needs login");
+    const cookie = await loginAs("founder", "owner-password-1");
+    let page = await (await get("/admin/safety", cookie)).text();
+    assert.match(page, /2 open · 2 total/);
+    assert.match(page, /Harassment/);
+    assert.match(page, /AI answer/);
+    assert.match(page, /&lt;img src=x onerror=alert\(1\)&gt;/);
+    assert.doesNotMatch(page, /<img src=x/);
+    const r = await fetch(`${base}/admin/safety/${uuid(91)}`, form({ action: "resolve", note: "Warned the user" }, cookie));
+    assert.equal(r.status, 303);
+    const rep = store._state.reports.find((x) => x.id === uuid(91));
+    assert.equal(rep.status, "resolved");
+    assert.equal(rep.admin_note, "Warned the user");
+    assert.ok(rep.handled_at);
+    page = await (await get("/admin/safety", cookie)).text();
+    assert.match(page, /1 open · 2 total/);
+    assert.doesNotMatch(page, /you are useless/, "resolved reports leave the open list");
+    assert.match(await (await get("/admin/safety?show=all", cookie)).text(), /Warned the user/);
+    assert.ok(store._state.auditLog.some((e) => e.action === "report_resolved" && e.target === uuid(91)));
+  });
+});
+
 test("owner adds an admin; admins can't manage admins; disabling signs them out", async () => {
   await withAdmin(async ({ base, store, form, loginAs, get }) => {
     const owner = await loginAs("founder", "owner-password-1");

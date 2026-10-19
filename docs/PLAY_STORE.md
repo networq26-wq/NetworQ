@@ -31,8 +31,16 @@ Signing: EAS keeps the upload key. Keep Play App Signing turned on when Play ask
 - Bluetooth scan is declared `neverForLocation`. Location is requested only on Android 11 and older, where Android requires it for Bluetooth.
 - Permissions Play questions are removed: overlay (`SYSTEM_ALERT_WINDOW`), old storage (`READ/WRITE_EXTERNAL_STORAGE`), `DUMP`.
 - Radar shows a consent screen before any Bluetooth use. Play calls this a "prominent disclosure".
+- Chat (user-generated content policy): Report a message, Report or Block a person from the chat menu; blocked
+  people can't message, call or see you on Radar. Sign-up states that you agree to the Terms, and the Terms
+  define banned content and enforcement.
+- AI answers (AI-generated content policy): every answer has "Report".
+- Reports land in the admin panel → **Safety** (`/waitlist/admin/safety`). Check it daily; Play expects ongoing moderation.
+- Target API: React Native 0.83 builds against Android 16 (API 36), which Play requires for new apps and updates from 31 Aug 2026.
 
 ## Only you can do this
+
+0. **Run `supabase/migrations/20261026_content_reports.sql`** in the Supabase SQL editor (reports table). Until then, Report shows an error and the Safety page says what to run.
 
 1. **Play developer account** at play.google.com/console ($25 once). A personal account must run a closed test with
    at least 12 testers for 14 days before going public. An organisation account (needs a D-U-N-S number) skips that.
@@ -55,6 +63,28 @@ Signing: EAS keeps the upload key. Keep Play App Signing turned on when Play ask
   • Events: discover real events near you and meet attendees
   Your contacts are private to your account. No ads, and we don't sell your data.
 - **Category:** Business. **Contact email:** support@networq.co.in. **Privacy policy:** https://www.networq.co.in/privacy
+
+## Store assets (ready in `store/android/`)
+
+| File | Play Console field |
+|---|---|
+| `icon-512.png` | App icon (512 × 512) |
+| `feature-graphic-1024x500.png` | Feature graphic |
+| `screenshots/1-today.png` … `6-ai.png` (1080 × 1920) | Phone screenshots, in this order |
+
+Regenerate screenshots after a redesign: `npm run build && STORE_SHOTS=<dir> npx playwright test tests/e2e/zz-store-shots.spec.ts --project=mobile-chrome`.
+
+## App access (reviewer login)
+
+NetworQ needs sign-in, so Play asks for a working login. Create one before submitting:
+
+1. Sign up in the app with an address you control, e.g. `playreview@networq.co.in`, and a strong password.
+2. Add 4–5 sample contacts (scan or type), so screens aren't empty.
+3. In Play Console → App content → App access → "All or some functionality is restricted", add the email and
+   password with this note:
+   "Sign in with the email and password above. Bluetooth Radar needs two phones with the app, so it can't be
+   tested alone; everything else works with this account. Camera, microphone and Nearby devices permissions are
+   asked for when you first use card scanning, voice notes and Radar."
 
 ## App content answers
 

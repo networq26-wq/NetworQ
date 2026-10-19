@@ -150,6 +150,16 @@ function createAdminHandler(deps) {
         const { rows } = await loadAll();
         return html(res, 200, V.healthPage({ base, admin, health: healthSnapshot(), provider: emailProvider(), rows, query: q }));
       }
+      if (sub === "/safety") {
+        let reports = [];
+        let error = "";
+        try {
+          reports = await store.listReports(300);
+        } catch (e) {
+          error = /content_reports/.test(e.message) ? "Reports aren't set up yet: run supabase/migrations/20261026_content_reports.sql in Supabase." : e.message;
+        }
+        return html(res, 200, V.safetyPage({ base, admin, reports, error, query: q }));
+      }
       if (sub === "/activity") {
         const entries = await store.listAudit(200).catch(() => []);
         return html(res, 200, V.activityPage({ base, admin, entries, query: q }));
@@ -220,6 +230,16 @@ function createAdminHandler(deps) {
           return res.redirect(303, `${back}msg=deleted&n=${nDel}`);
         }
         return res.redirect(303, back);
+      }
+
+      const reportMatch = /^\/safety\/([0-9a-f-]{36})$/i.exec(sub);
+      if (reportMatch) {
+        const status = b.action === "resolve" ? "resolved" : b.action === "dismiss" ? "dismissed" : b.action === "reopen" ? "open" : null;
+        if (!status) return res.redirect(303, `${base}/safety`);
+        const note = String(b.note || "").trim().slice(0, 1000) || null;
+        await store.updateReport(reportMatch[1], { status, admin_note: note, handled_by: status === "open" ? null : admin.username, handled_at: status === "open" ? null : new Date().toISOString() });
+        await audit(admin, `report_${status}`, reportMatch[1], note ? { note } : null);
+        return res.redirect(303, `${base}/safety?msg=report&s=${status}`);
       }
 
       if (sub === "/invite-next") {

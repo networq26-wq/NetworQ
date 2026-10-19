@@ -204,6 +204,7 @@ const TABS = [
   ["/reports", "Reports"],
   ["/app", "App"],
   ["/health", "Health"],
+  ["/safety", "Safety"],
   ["/activity", "Activity"],
   ["/admins", "Admins", true],
 ];
@@ -213,6 +214,7 @@ const FLASH = {
   resent: (q) => [`Confirmation email sent to ${q.n || 0}.${Number(q.f) ? ` ${q.f} failed.` : ""}`, Number(q.f) ? "warn" : "ok"],
   tagged: (q) => [`Updated tags on ${q.n || 0}.`, "ok"],
   status: (q) => [`Updated ${q.n || 0}.`, "ok"],
+  report: (q) => [q.s === "open" ? "Report reopened." : `Report ${q.s === "resolved" ? "resolved" : "dismissed"}.`, "ok"],
   deleted: (q) => [`Deleted ${q.n || 0} permanently.`, "ok"],
   saved: () => ["Saved.", "ok"],
   none: () => ["Select at least one person first.", "warn"],
@@ -713,8 +715,44 @@ function healthPage({ base, admin, health, provider, rows, query }) {
 const ACTION_LABELS = {
   login: "Logged in", login_failed: "Failed login", logout: "Logged out", invite: "Sent invite", resend: "Resent confirmation",
   tag_add: "Added tag", tag_remove: "Removed tag", status_waiting: "Marked as waiting", delete: "Deleted sign-up", notes: "Edited notes & tags",
+  report_resolved: "Resolved a report", report_dismissed: "Dismissed a report", report_open: "Reopened a report",
   export: "Exported CSV", admin_add: "Added admin", admin_disable: "Disabled admin", admin_enable: "Enabled admin", retry_failed: "Retried failed emails", invite_next: "Invited next in queue",
 };
+
+const REPORT_REASON = { spam: "Spam or scam", harassment: "Harassment", inappropriate: "Sexual or offensive", harmful: "Dangerous or harmful", impersonation: "Impersonation", other: "Other" };
+const REPORT_KIND = { message: "Message", user: "Person", ai: "AI answer" };
+
+function safetyPage({ base, admin, reports, error, query }) {
+  const open = reports.filter((r) => r.status === "open");
+  const shown = query.show === "all" ? reports : open;
+  const row = (r) => `<tr>
+    <td>${esc(fmtDate(r.created_at))}</td>
+    <td>${esc(REPORT_KIND[r.kind] || r.kind)}</td>
+    <td><b>${esc(REPORT_REASON[r.reason] || r.reason)}</b>${r.details ? `<div class="muted">${esc(r.details)}</div>` : ""}</td>
+    <td>${r.kind === "ai" ? '<span class="muted">AI assistant</span>' : esc(r.target_name || r.target_user || "—")}</td>
+    <td style="max-width:320px;white-space:pre-wrap;word-break:break-word">${esc(String(r.content || "").slice(0, 500)) || '<span class="muted">—</span>'}</td>
+    <td>${esc(r.reporter_name || "")}</td>
+    <td>${r.status === "open" ? '<span class="pill pill-warn">Open</span>' : `<span class="pill pill-ok">${r.status === "resolved" ? "Resolved" : "Dismissed"}</span><div class="muted">${esc(r.handled_by || "")}${r.admin_note ? ` · ${esc(r.admin_note)}` : ""}</div>`}</td>
+    <td><form method="post" action="${esc(base)}/safety/${esc(r.id)}" class="list" style="gap:6px;min-width:180px">
+      ${r.status === "open"
+        ? `<input name="note" placeholder="Note (optional)" aria-label="Note" maxlength="1000" />
+           <div style="display:flex;gap:6px"><button class="btn btn-brand" name="action" value="resolve" type="submit">Resolve</button><button class="btn" name="action" value="dismiss" type="submit">Dismiss</button></div>`
+        : `<button class="btn" name="action" value="reopen" type="submit">Reopen</button>`}
+    </form></td></tr>`;
+  return layout({
+    base, admin, query, active: "/safety", title: "Safety", eyebrow: "Reports from the app", icon: "shield",
+    meta: `${n(open.length)} open · ${n(reports.length)} total`,
+    actions: `<a class="btn" href="${esc(base)}/safety${query.show === "all" ? "" : "?show=all"}">${query.show === "all" ? "Open only" : "Show all"}</a>`,
+    body: {
+      top: error
+        ? `<div class="empty">${esc(error)}</div>`
+        : shown.length
+          ? `<div class="table-wrap"><table><thead><tr><th>When (IST)</th><th>Type</th><th>Reason</th><th>Reported</th><th>Content</th><th>Reported by</th><th>Status</th><th></th></tr></thead><tbody>${shown.map(row).join("")}</tbody></table></div>`
+          : `<div class="empty">${query.show === "all" ? "No reports yet." : "No open reports. People can report a message, a person or an AI answer from inside the app."}</div>`,
+      rest: card("What to do with a report", `<p class="fine">Read the content and decide. Resolve once you've acted (for example, removed content or suspended the account in Supabase → Authentication). Dismiss if nothing breaks the rules. Google Play expects reports to be reviewed regularly, so check this page at least once a day.</p>`),
+    },
+  });
+}
 
 function activityPage({ base, admin, entries, query }) {
   return layout({
@@ -764,4 +802,4 @@ function adminsPage({ base, admin, owner, admins, query }) {
   });
 }
 
-module.exports = { esc, loginPage, offPage, overviewPage, signupsPage, personPage, reportsPage, appPage, healthPage, activityPage, adminsPage };
+module.exports = { esc, loginPage, offPage, overviewPage, signupsPage, personPage, reportsPage, appPage, healthPage, safetyPage, activityPage, adminsPage };
