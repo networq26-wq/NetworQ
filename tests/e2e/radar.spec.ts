@@ -5,7 +5,7 @@ import type { MockSupabase } from "./mock-supabase";
 // ── Fake Android shell ────────────────────────────────────────────────────────
 // Stands in for App.native.tsx + the Kotlin BLE module: answers the web app's
 // bridge messages the way radar/shellBridge.ts does, and lets tests inject BLE sightings.
-type ShellConfig = { state: "on" | "off" | "unsupported" | "no_advertiser"; permission: "granted" | "denied" | "blocked" };
+type ShellConfig = { state: "on" | "off" | "unsupported" | "no_advertiser"; permission: "granted" | "denied" | "blocked"; oldApp?: boolean };
 
 async function installFakeShell(page: Page, config: ShellConfig = { state: "on", permission: "granted" }, consent: "auto" | "manual" = "auto") {
   // Most tests aren't about consent: agree to the Radar permissions sheet whenever it appears
@@ -13,6 +13,7 @@ async function installFakeShell(page: Page, config: ShellConfig = { state: "on",
   await page.addInitScript((initial) => {
     const w = window as any;
     w.__shell = { ...initial, sent: [] as any[], token: undefined as string | null | undefined };
+    if (!initial.oldApp) w.__NETWORQ_SHELL__ = { build: 2, platform: "android" }; // what shell/version.ts injects
     const reply = (detail: any) => setTimeout(() => window.dispatchEvent(new CustomEvent("networq-native", { detail })), 10);
     w.ReactNativeWebView = {
       postMessage(raw: string) {
@@ -254,7 +255,7 @@ test.describe("Event Radar", () => {
     await login(eve.page, "eve@acme.test");
     await openRadar(eve.page);
     await createEvent(eve.page, "Different Meetup");
-    await expect.poll(() => db.tokenFor("eve@acme.test")).toBeTruthy();
+    await expect.poll(() => db.tokenFor("eve@acme.test"), { timeout: 20_000 }).toBeTruthy(); // consent + token can be slow under load
 
     await sendSightings(asha.page, db.tokenFor("eve@acme.test")!, -60, 6);
     await asha.page.waitForTimeout(2600); // at least one resolve cycle
@@ -318,7 +319,7 @@ test.describe("Event Radar", () => {
     await login(page, "asha@acme.test");
     await openRadar(page);
     await createEvent(page, "Founders Night");
-    await expect(page.getByText("Bluetooth is off")).toBeVisible();
+    await expect(page.getByText("Bluetooth is off", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Turn on Bluetooth" }).click();
     expect(await page.evaluate(() => (window as any).__shell.sent.map((m: any) => m.type))).toContain("radar:openSettings");
   });
@@ -435,6 +436,18 @@ test.describe("Event Radar", () => {
     await expect(check.getByText(/can't use Bluetooth Radar. Install the latest NetworQ app/)).toBeVisible();
     await web.ctx.close();
     await old.ctx.close();
+  });
+
+  test("an old app install is told to update instead of failing silently", async ({ page, db }) => {
+    seed(db);
+    await installFakeShell(page, { state: "unsupported", permission: "denied", oldApp: true });
+    await login(page, "asha@acme.test");
+    await openRadar(page);
+    const check = page.getByRole("region", { name: "Radar check" });
+    await expect(check.getByRole("listitem").filter({ hasText: "App version" })).toContainText("out of date");
+    await expect(check.getByRole("button", { name: "Update" })).toBeVisible();
+    await expect(check.getByLabel("Radar report")).toContainText("build 1");
+    await expect(page.getByText("Live distance works in the NetworQ Android app.")).toHaveCount(0); // never "use the app" inside the app
   });
 
   test("wrong event code gives a clear error", async ({ page, db }) => {

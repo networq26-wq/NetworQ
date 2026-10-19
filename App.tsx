@@ -1762,6 +1762,19 @@ VOICE & ASSISTANT DIRECTIVES:
 
   // The "Ask AI" pill hides while the page is being scrolled down and returns on scroll up, at the top, or shortly after scrolling stops
   const [aiPillHidden, setAiPillHidden] = useState(false);
+  // …and steps aside entirely while any sheet, picker or pop-up is open, so it never covers what you're tapping
+  const [overlayOpen, setOverlayOpen] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const check = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setOverlayOpen(!!document.querySelector('[role="dialog"], [aria-modal="true"]')));
+    };
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, { childList: true, subtree: true });
+    check();
+    return () => { mo.disconnect(); cancelAnimationFrame(raf); };
+  }, []);
   useEffect(() => {
     const last = new WeakMap<object, number>();
     let idle: any;
@@ -6713,7 +6726,7 @@ Keep it punchy, sharp, and directly actionable.`;
       {/* ── NETWORQ AI & VOICE ASSISTANT (NetworQ Intelligence) ── */}
       {/* "Ask AI" pill at the bottom. It slides away while you scroll down (so it never sits on what you're reading)
           and comes back when you scroll up, stop, or reach the top. */}
-      {screen === "app" && !aiOpen && !liveCameraOpen && !globalSearchOpen && !modal && !composer && (
+      {screen === "app" && !aiOpen && !liveCameraOpen && !globalSearchOpen && !modal && !composer && !overlayOpen && (
         <button
           onClick={() => setAiOpen(true)}
           onFocus={() => setAiPillHidden(false)}

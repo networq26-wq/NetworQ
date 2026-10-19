@@ -21,6 +21,7 @@ import { useRadarBridge } from "./radar/shellBridge";
 import { SHELL_CAPABILITIES_JS, useGoogleAuthBridge } from "./shell/googleAuth";
 import { PUSH_CAPABILITY_JS, usePushBridge } from "./shell/pushBridge";
 import { APPLOCK_CAPABILITY_JS, useAppLock } from "./shell/appLock";
+import { SHELL_VERSION_JS } from "./shell/version";
 import type { WebViewNavigation, WebViewHttpErrorEvent, ShouldStartLoadRequest } from "react-native-webview/lib/WebViewTypes";
 
 const TARGET_URL = "https://www.networq.co.in";
@@ -182,7 +183,7 @@ function Shell() {
               Linking.openURL(url).catch(() => {});
             }
           }}
-          injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${PUSH_CAPABILITY_JS}\n${APPLOCK_CAPABILITY_JS}`}
+          injectedJavaScriptBeforeContentLoaded={`${safeAreaScript}\n${SHELL_CAPABILITIES_JS}\n${SHELL_VERSION_JS}\n${PUSH_CAPABILITY_JS}\n${APPLOCK_CAPABILITY_JS}`}
           onLoadEnd={push.onLoadEnd}
           onMessage={(e) => {
             // any page on our own domain (www or not, any path) can answer the back button

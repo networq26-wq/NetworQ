@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy · NetworQ</title><link rel="stylesheet" href="/legal/_style.css"></head><body><main>
 <a class="brand" href="/">Networ<span>Q</span></a><div class="card">
-<h1>Privacy Policy</h1><p class="muted">Last updated: 1 October 2026</p>
+<h1>Privacy Policy</h1><p class="muted">Last updated: 19 October 2026</p>
 <p>NetworQ helps professionals save contacts, follow up and meet people at events. This policy explains what we collect, why, and the choices you have.</p>
 
 <h2>What we collect</h2>
@@ -12,15 +12,19 @@
 <tr><td>Business-card photos you scan</td><td>To extract contact details with AI; stored in your private folder</td></tr>
 <tr><td>Event Radar: events you join, Radar settings, connection requests</td><td>To let attendees of the same event discover each other</td></tr>
 <tr><td>Sign-in devices (browser/app name and a one-way fingerprint)</td><td>To alert you about sign-ins from new devices</td></tr>
+<tr><td>Voice recordings (voice notes and spoken questions to the assistant)</td><td>Turned into text, then the recording is discarded; only the text is kept</td></tr>
+<tr><td>Push notification token for your device</td><td>To send reminders and connection requests you've turned on</td></tr>
+<tr><td>Follow-up emails sent for you (recipient, subject, text, delivery status)</td><td>To send the follow-ups you ask for or that autopilot sends after you turn it on, and to stop when someone unsubscribes</td></tr>
 </table>
 
 <h2>Event Radar and Bluetooth</h2>
-<p>When Radar is on, your phone broadcasts a random identifier that changes every 15 minutes. It contains no personal data. Only attendees of the same event, with Radar on, can see your public profile (name, title, company, photo) and an approximate distance range. Your contact details are shared only when you accept a connection request. <strong>We never collect your location.</strong> On Android 11 and below, the system calls the Bluetooth permission "Location"; NetworQ does not use it to determine where you are.</p>
+<p>When Radar is on, your phone broadcasts a random identifier that changes every 15 minutes. It contains no personal data. Radar only starts after you agree to it on your phone. Only people in the same event, or on Nearby, with Radar on, can see your public profile (name, title, company, photo) and an approximate distance range. Your contact details are shared only when you accept a connection request. <strong>We never collect your location.</strong> On Android 11 and below, the system calls the Bluetooth permission "Location"; NetworQ does not use it to determine where you are.</p>
 
 <h2>Service providers</h2>
 <table>
 <tr><td>Supabase</td><td>Database, authentication and file storage</td></tr>
-<tr><td>Groq</td><td>AI processing of card images and assistant messages (not used to train models under their API terms)</td></tr>
+<tr><td>Groq</td><td>AI processing of card images, assistant messages and voice-to-text (not used to train models under their API terms)</td></tr>
+<tr><td>ElevenLabs</td><td>Reading the assistant's replies aloud when you use voice (only the reply text is sent)</td></tr>
 <tr><td>Resend</td><td>Sending emails you request (follow-ups, invites) and account emails</td></tr>
 <tr><td>Google (optional)</td><td>Sign in with Google and Calendar invites, only if you choose them</td></tr>
 </table>

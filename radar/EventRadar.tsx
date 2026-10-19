@@ -848,7 +848,11 @@ function StatusBanner({ t, status, mode, nearby, onBluetooth, onRetry }: { t: Th
     if (nearby) return null; // the Nearby list says it once
     return (
       <div role="status" style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.25)", borderRadius: 16, padding: "12px 16px", fontSize: 15 }}>
-        <strong>Live distance works in the NetworQ Android app.</strong> <span style={{ color: t.muted }}>Here you can see who's at the event and connect.</span>
+        {typeof window !== "undefined" && (window as any).ReactNativeWebView ? (
+          <><strong>Live distance needs the newest NetworQ app.</strong> <span style={{ color: t.muted }}>See Radar check below. Meanwhile you can see who's at the event and connect.</span></>
+        ) : (
+          <><strong>Live distance works in the NetworQ Android app.</strong> <span style={{ color: t.muted }}>Here you can see who's at the event and connect.</span></>
+        )}
       </div>
     );
   }
@@ -978,18 +982,23 @@ function PrivacyPanel({ t, card, settings, onChange, nearby }: { t: Theme; card:
 // "Radar check": the app says plainly what is working and what isn't — app, Bluetooth, permission, internet,
 // visibility and how many NetworQ phones it can hear — with the fix next to anything that's wrong.
 type RadarHealth = ReturnType<typeof useEventRadar>["health"];
+// Oldest Android app build with working Bluetooth Radar (see shell/version.ts). Raise it with native fixes.
+const MIN_SHELL_BUILD = 2;
+// Where "Update" / "Get the app" sends people. Switch to the Play Store listing once it's published:
+// https://play.google.com/store/apps/details?id=com.networq.app
+const APP_UPDATE_URL = "/download/NetworQ.apk";
 function RadarCheck({ t, card, health, signals, radarOn, onBluetooth, onRetry }: { t: Theme; card: React.CSSProperties; health: RadarHealth; signals: number; radarOn: boolean; onBluetooth: () => void; onRetry: () => void }) {
   const h = health;
   const link = typeof navigator !== "undefined" ? (navigator as any).connection?.type : undefined;
   const via = link === "wifi" ? " (Wi-Fi)" : link === "cellular" ? " (mobile data)" : "";
-  const engineOk = h.shell && h.shellAnswered && h.nativeState !== "unsupported";
+  const engineOk = h.shell && h.shellAnswered && h.nativeState !== "unsupported" && (h.shellBuild ?? 1) >= MIN_SHELL_BUILD;
   type Row = { id: string; label: string; state: "ok" | "bad" | "wait"; text: string; fix?: { label: string; run: () => void } };
   // Where is this page really running? The installed app, a home-screen shortcut of the website, or a browser tab.
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const inWebView = /; wv\)/.test(ua);
   const shortcut = typeof window !== "undefined" && !!window.matchMedia?.("(display-mode: standalone)").matches;
   const where = h.shell ? "app" : inWebView ? "app-no-bridge" : shortcut ? "shortcut" : "browser";
-  const getApp = { label: "Get the app", run: () => { window.location.href = "/download/NetworQ.apk"; } };
+  const getApp = { label: "Get the app", run: () => { window.location.href = APP_UPDATE_URL; } };
   const rows: Row[] = [
     where === "app"
       ? { id: "app", label: "NetworQ app", state: "ok", text: "You're in the Android app." }
@@ -1000,8 +1009,10 @@ function RadarCheck({ t, card, health, signals, radarOn, onBluetooth, onRetry }:
           : { id: "app", label: "NetworQ app", state: "bad", text: "You're in a browser. Finding people by Bluetooth only works in the NetworQ Android app.", fix: getApp },
   ];
   // One line a person can read out or screenshot so support knows exactly what this phone reports
-  const report = `${where} · bridge ${h.shell ? "yes" : "no"} · radar ${h.shellAnswered ? h.nativeState : "no answer"} · permission ${h.permission ?? "not asked"} · ${h.online ? "online" : "offline"}`;
-  if (h.shell) {
+  const report = `${where} · build ${h.shellBuild ?? "-"} · bridge ${h.shell ? "yes" : "no"} · radar ${h.shellAnswered ? h.nativeState : "no answer"} · permission ${h.permission ?? "not asked"} · ${h.online ? "online" : "offline"}`;
+  const outdated = h.shell && (h.shellBuild ?? 1) < MIN_SHELL_BUILD;
+  if (outdated) rows.push({ id: "version", label: "App version", state: "bad", text: "Your NetworQ app is out of date. Radar needs the newest version.", fix: { label: "Update", run: getApp.run } });
+  if (h.shell && !outdated) {
     rows.push(
       !h.shellAnswered
         ? { id: "engine", label: "Radar in this app", state: "wait", text: "Checking\u2026" }

@@ -415,7 +415,7 @@ export function useEventRadar(opts: {
     people,
     signals,
     // Raw facts for the "Radar check" panel
-    health: { shell: hasNativeShell(), shellAnswered, nativeState, permission, online, scanOnly, active, visible },
+    health: { shell: hasNativeShell(), shellBuild: hasNativeShell() ? Number((window as any).__NETWORQ_SHELL__?.build) || 1 : null, shellAnswered, nativeState, permission, online, scanOnly, active, visible },
     hiddenCount,
     settings,
     updateSettings,
